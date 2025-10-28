@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import {
     Box, CssBaseline, AppBar, Stack, Typography, Paper, MenuItem, Table, TableBody, TableCell,
     TableContainer, TableHead, TableRow, useTheme, InputAdornment, TextField, CircularProgress,
-    Snackbar, Alert, Button
+    Snackbar, Alert, Button, useMediaQuery
 } from "@mui/material";
 import { School, CalendarMonth, Group, Refresh } from "@mui/icons-material";
 import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
@@ -74,6 +74,7 @@ interface ClassTeacherReportData {
 
 const ClassTeacherReport: React.FC = () => {
     const theme = useTheme();
+    const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
     const [sidebarOpen, setSidebarOpen] = useState(false);
 
     // Initializing state with Dayjs objects for consistency
@@ -187,10 +188,10 @@ const ClassTeacherReport: React.FC = () => {
     };
 
     return (
-        <Box sx={{ display: "flex", width: "99vw", minHeight: "100vh" }}>
+        <Box sx={{ display: "flex", width: "100vw", minHeight: "100vh", overflow: "hidden" }}>
             <CssBaseline />
             <Sidebar open={sidebarOpen} setOpen={setSidebarOpen} />
-            <Box sx={{ flexGrow: 1 }}>
+            <Box sx={{ flexGrow: 1, width: "100%", overflow: "hidden" }}>
                 <AppBar
                     position="static"
                     sx={{
@@ -208,9 +209,14 @@ const ClassTeacherReport: React.FC = () => {
                 </AppBar>
 
                 <LocalizationProvider dateAdapter={AdapterDayjs}>
-                    <Stack spacing={3} sx={{ px: 4, py: 3 }}>
-                        <Paper elevation={1} sx={{ p: 2 }}>
-                            <Stack direction="row" spacing={3} flexWrap="wrap" justifyContent="space-between" alignItems="center">
+                    <Stack spacing={3} sx={{ px: { xs: 2, sm: 3, md: 4 }, py: { xs: 2, sm: 3 } }}>
+                        <Paper elevation={1} sx={{ p: { xs: 2, sm: 2 } }}>
+                            <Stack 
+                                direction={{ xs: "column", sm: "row" }} 
+                                spacing={2} 
+                                flexWrap="wrap" 
+                                alignItems={{ xs: "stretch", sm: "center" }}
+                            >
                                 {/* Start Date */}
                                 <TextField
                                     type="date"
@@ -218,7 +224,13 @@ const ClassTeacherReport: React.FC = () => {
                                     value={startDate ? startDate.format('YYYY-MM-DD') : ''}
                                     onChange={(e) => setStartDate(e.target.value ? dayjs(e.target.value) : null)}
                                     InputLabelProps={{ shrink: true }}
-                                    sx={{ minWidth: { xs: '100%', sm: 150 } }}
+                                    sx={{ 
+                                        width: { xs: '100%', sm: 'auto' },
+                                        minWidth: { sm: 150 },
+                                        flex: { sm: 1 },
+                                        maxWidth: { sm: 200 }
+                                    }}
+                                    size={isMobile ? "small" : "medium"}
                                 />
                                 {/* End Date */}
                                 <TextField
@@ -227,7 +239,13 @@ const ClassTeacherReport: React.FC = () => {
                                     value={endDate ? endDate.format('YYYY-MM-DD') : ''}
                                     onChange={(e) => setEndDate(e.target.value ? dayjs(e.target.value) : null)}
                                     InputLabelProps={{ shrink: true }}
-                                    sx={{ minWidth: { xs: '100%', sm: 150 } }}
+                                    sx={{ 
+                                        width: { xs: '100%', sm: 'auto' },
+                                        minWidth: { sm: 150 },
+                                        flex: { sm: 1 },
+                                        maxWidth: { sm: 200 }
+                                    }}
+                                    size={isMobile ? "small" : "medium"}
                                 />
 
                                 {/* Grade */}
@@ -240,11 +258,17 @@ const ClassTeacherReport: React.FC = () => {
                                     InputProps={{
                                         startAdornment: (
                                             <InputAdornment position="start">
-                                                <School />
+                                                <School fontSize={isMobile ? "small" : "medium"} />
                                             </InputAdornment>
                                         ),
                                     }}
-                                    sx={{ minWidth: { xs: '100%', sm: 150 }, flex: 1, maxWidth: 250, "& .MuiOutlinedInput-root": { borderRadius: "10px", height: "45px", }, }}
+                                    sx={{ 
+                                        width: { xs: '100%', sm: 'auto' },
+                                        minWidth: { sm: 150 },
+                                        flex: { sm: 1 },
+                                        maxWidth: { sm: 200 }
+                                    }}
+                                    size={isMobile ? "small" : "medium"}
                                 >
                                     {isGradesLoading ? (
                                         <MenuItem disabled>
@@ -269,11 +293,17 @@ const ClassTeacherReport: React.FC = () => {
                                     InputProps={{
                                         startAdornment: (
                                             <InputAdornment position="start">
-                                                <Group />
+                                                <Group fontSize={isMobile ? "small" : "medium"} />
                                             </InputAdornment>
                                         ),
                                     }}
-                                    sx={{ minWidth: { xs: '100%', sm: 150 }, flex: 1, maxWidth: 250, "& .MuiOutlinedInput-root": { borderRadius: "10px", height: "45px", }, }}
+                                    sx={{ 
+                                        width: { xs: '100%', sm: 'auto' },
+                                        minWidth: { sm: 150 },
+                                        flex: { sm: 1 },
+                                        maxWidth: { sm: 200 }
+                                    }}
+                                    size={isMobile ? "small" : "medium"}
                                 >
                                     {classes.map((c) => (
                                         <MenuItem key={c} value={c}>
@@ -291,11 +321,17 @@ const ClassTeacherReport: React.FC = () => {
                                     InputProps={{
                                         startAdornment: (
                                             <InputAdornment position="start">
-                                                <CalendarMonth />
+                                                <CalendarMonth fontSize={isMobile ? "small" : "medium"} />
                                             </InputAdornment>
                                         ),
                                     }}
-                                    sx={{ minWidth: { xs: '100%', sm: 150 }, flex: 1, maxWidth: 250, "& .MuiOutlinedInput-root": { borderRadius: "10px", height: "45px", }, }}
+                                    sx={{ 
+                                        width: { xs: '100%', sm: 'auto' },
+                                        minWidth: { sm: 150 },
+                                        flex: { sm: 1 },
+                                        maxWidth: { sm: 200 }
+                                    }}
+                                    size={isMobile ? "small" : "medium"}
                                 >
                                     {exams.map((examOption) => (
                                         <MenuItem key={examOption.value} value={examOption.value}>
@@ -315,19 +351,17 @@ const ClassTeacherReport: React.FC = () => {
                                         InputProps={{
                                             startAdornment: (
                                                 <InputAdornment position="start">
-                                                    <CalendarMonth />
+                                                    <CalendarMonth fontSize={isMobile ? "small" : "medium"} />
                                                 </InputAdornment>
                                             ),
                                         }}
-                                        sx={{
-                                            minWidth: 150,
-                                            flex: 1,
-                                            maxWidth: 250,
-                                            "& .MuiOutlinedInput-root": {
-                                                borderRadius: "10px",
-                                                height: "45px",
-                                            },
+                                        sx={{ 
+                                            width: { xs: '100%', sm: 'auto' },
+                                            minWidth: { sm: 150 },
+                                            flex: { sm: 1 },
+                                            maxWidth: { sm: 200 }
                                         }}
+                                        size={isMobile ? "small" : "medium"}
                                     >
                                         {months.map((m) => (
                                             <MenuItem key={m.value} value={m.value}>
@@ -342,27 +376,29 @@ const ClassTeacherReport: React.FC = () => {
                                     variant="outlined"
                                     onClick={handleRefresh}
                                     disabled={isLoading}
-                                    startIcon={<Refresh />}
+                                    startIcon={<Refresh fontSize={isMobile ? "small" : "medium"} />}
                                     sx={{
                                         borderRadius: "10px",
-                                        height: "45px",
-                                        minWidth: 120,
+                                        height: { xs: "40px", sm: "45px" },
+                                        width: { xs: '100%', sm: 'auto' },
+                                        minWidth: { sm: 120 },
                                     }}
+                                    size={isMobile ? "small" : "medium"}
                                 >
                                     Refresh
                                 </Button>
                             </Stack>
                         </Paper>
 
-                        <Stack direction={{ xs: "column", md: "row" }} spacing={3} flexWrap="wrap">
-                            <Paper sx={{ p: 3, flex: 1 }}>
-                                <Typography fontWeight={600} mb={2}>
+                        <Stack direction={{ xs: "column", md: "row" }} spacing={3}>
+                            <Paper sx={{ p: { xs: 2, sm: 3 }, flex: 1, width: "100%" }}>
+                                <Typography fontWeight={600} mb={2} variant={isMobile ? "body1" : "h6"}>
                                     Subject Wise Marks
                                 </Typography>
-                                <ResponsiveContainer width="90%" height={350}>
+                                <ResponsiveContainer width="100%" height={isMobile ? 300 : 350}>
                                     {isLoading ? (
                                         <Box
-                                            sx={{ display: "flex", justifyContent: "center", alignItems: "center", height: 250 }}
+                                            sx={{ display: "flex", justifyContent: "center", alignItems: "center", height: "100%" }}
                                         >
                                             <CircularProgress />
                                         </Box>
@@ -374,8 +410,8 @@ const ClassTeacherReport: React.FC = () => {
                                                     value: sm.average_marks,
                                                 }))}
                                                 dataKey="value"
-                                                outerRadius={80}
-                                                label={({ name, percent }) =>
+                                                outerRadius={isMobile ? 60 : 80}
+                                                label={isMobile ? false : ({ name, percent }) =>
                                                     `${name}: ${percent ? (percent * 100).toFixed(0) : 0}%`
                                                 }
                                             >
@@ -387,42 +423,61 @@ const ClassTeacherReport: React.FC = () => {
                                                 formatter={(value: number) => [`${value}`, "Average Marks"]}
                                                 labelFormatter={(label) => label}
                                             />
-                                            <Legend />
+                                            <Legend 
+                                                wrapperStyle={{ fontSize: isMobile ? '12px' : '14px' }}
+                                                layout={isMobile ? "horizontal" : "vertical"}
+                                                verticalAlign={isMobile ? "bottom" : "middle"}
+                                                align={isMobile ? "center" : "right"}
+                                            />
                                         </PieChart>
                                     )}
                                 </ResponsiveContainer>
                             </Paper>
 
-                            <Paper sx={{ p: 3, flex: 2 }}>
-                                <Typography fontWeight={600} mb={2}>
+                            <Paper sx={{ p: { xs: 2, sm: 3 }, flex: { xs: 1, md: 2 }, width: "100%" }}>
+                                <Typography fontWeight={600} mb={2} variant={isMobile ? "body1" : "h6"}>
                                     Yearly Subject Averages
                                 </Typography>
-                                <ResponsiveContainer width="100%" height={350}>
+                                <ResponsiveContainer width="100%" height={isMobile ? 300 : 350}>
                                     {isLoading ? (
                                         <Box
-                                            sx={{ display: "flex", justifyContent: "center", alignItems: "center", height: 350 }}
+                                            sx={{ display: "flex", justifyContent: "center", alignItems: "center", height: "100%" }}
                                         >
                                             <CircularProgress />
                                         </Box>
                                     ) : (
                                         <BarChart
                                             data={getYearlySubjectAveragesData()}
-                                            margin={{ top: 20, right: 30, left: 60, bottom: 60 }}
+                                            margin={{ 
+                                                top: 20, 
+                                                right: isMobile ? 10 : 30, 
+                                                left: isMobile ? 0 : 60, 
+                                                bottom: isMobile ? 80 : 60 
+                                            }}
                                         >
                                             <CartesianGrid strokeDasharray="3 3" />
                                             <XAxis
                                                 dataKey="year"
-                                                label={{ value: 'Year', position: 'insideBottomRight', offset: -10 }}
+                                                label={!isMobile ? { value: 'Year', position: 'insideBottomRight', offset: -10 } : undefined}
+                                                tick={{ fontSize: isMobile ? 10 : 12 }}
                                             />
                                             <YAxis
-                                                label={{ value: 'Total Marks', angle: -90, position: 'insideLeft' }}
+                                                label={!isMobile ? { value: 'Total Marks', angle: -90, position: 'insideLeft' } : undefined}
                                                 domain={[0, 100]}
+                                                tick={{ fontSize: isMobile ? 10 : 12 }}
                                             />
                                             <ReTooltip
                                                 formatter={(value: number) => [`${value}%`, "Percentage"]}
                                                 labelFormatter={(label) => `Year: ${label}`}
                                             />
-                                            <Legend layout="horizontal" verticalAlign="bottom" wrapperStyle={{ paddingTop: 20 }} />
+                                            <Legend 
+                                                layout="horizontal" 
+                                                verticalAlign="bottom" 
+                                                wrapperStyle={{ 
+                                                    paddingTop: 20,
+                                                    fontSize: isMobile ? '10px' : '12px'
+                                                }} 
+                                            />
                                             {Array.from(new Set(data?.yearly_subject_averages.flatMap(y => y.subjects.map(s => s.subject)) || [])).map((subject, index) => (
                                                 <Bar
                                                     key={subject}
@@ -438,27 +493,73 @@ const ClassTeacherReport: React.FC = () => {
                             </Paper>
                         </Stack>
 
-                        <Paper elevation={2} sx={{ p: 2, overflow: "auto" }}>
-                            <Typography variant="h6" fontWeight={600} mb={2}>
+                        <Paper elevation={2} sx={{ p: { xs: 1, sm: 2 }, overflow: "auto" }}>
+                            <Typography 
+                                variant={isMobile ? "body1" : "h6"} 
+                                fontWeight={600} 
+                                mb={2}
+                                px={isMobile ? 1 : 0}
+                            >
                                 Detailed Marks Breakdown
                             </Typography>
-                            <TableContainer>
-                                <Table size="small" stickyHeader>
+                            <TableContainer sx={{ maxHeight: { xs: 400, sm: 600 } }}>
+                                <Table size={isMobile ? "small" : "medium"} stickyHeader>
                                     <TableHead>
                                         <TableRow>
-                                            <TableCell sx={{ fontWeight: "bold" }}>Student Name</TableCell>
+                                            <TableCell 
+                                                sx={{ 
+                                                    fontWeight: "bold",
+                                                    fontSize: isMobile ? '0.75rem' : '0.875rem',
+                                                    minWidth: isMobile ? 80 : 120,
+                                                    position: 'sticky',
+                                                    left: 0,
+                                                    bgcolor: 'background.paper',
+                                                    zIndex: 2
+                                                }}
+                                            >
+                                                Student
+                                            </TableCell>
                                             {(data?.subject_marks || []).map((subject) => (
-                                                <TableCell key={subject.subject} align="right" sx={{ fontWeight: "bold" }}>
+                                                <TableCell 
+                                                    key={subject.subject} 
+                                                    align="right" 
+                                                    sx={{ 
+                                                        fontWeight: "bold",
+                                                        fontSize: isMobile ? '0.75rem' : '0.875rem',
+                                                        minWidth: isMobile ? 60 : 80
+                                                    }}
+                                                >
                                                     {subject.subject}
                                                 </TableCell>
                                             ))}
-                                            <TableCell align="right" sx={{ fontWeight: "bold" }}>
+                                            <TableCell 
+                                                align="right" 
+                                                sx={{ 
+                                                    fontWeight: "bold",
+                                                    fontSize: isMobile ? '0.75rem' : '0.875rem',
+                                                    minWidth: isMobile ? 50 : 70
+                                                }}
+                                            >
                                                 Total
                                             </TableCell>
-                                            <TableCell align="right" sx={{ fontWeight: "bold" }}>
-                                                Average
+                                            <TableCell 
+                                                align="right" 
+                                                sx={{ 
+                                                    fontWeight: "bold",
+                                                    fontSize: isMobile ? '0.75rem' : '0.875rem',
+                                                    minWidth: isMobile ? 50 : 70
+                                                }}
+                                            >
+                                                Avg
                                             </TableCell>
-                                            <TableCell align="right" sx={{ fontWeight: "bold" }}>
+                                            <TableCell 
+                                                align="right" 
+                                                sx={{ 
+                                                    fontWeight: "bold",
+                                                    fontSize: isMobile ? '0.75rem' : '0.875rem',
+                                                    minWidth: isMobile ? 50 : 70
+                                                }}
+                                            >
                                                 Rank
                                             </TableCell>
                                         </TableRow>
@@ -481,18 +582,48 @@ const ClassTeacherReport: React.FC = () => {
                                         ) : (
                                             (data?.student_marks || []).map((student) => (
                                                 <TableRow key={student.studentName} hover>
-                                                    <TableCell sx={{ fontWeight: "bold" }}>{student.studentName}</TableCell>
+                                                    <TableCell 
+                                                        sx={{ 
+                                                            fontWeight: "bold",
+                                                            fontSize: isMobile ? '0.75rem' : '0.875rem',
+                                                            position: 'sticky',
+                                                            left: 0,
+                                                            bgcolor: 'background.paper',
+                                                            zIndex: 1
+                                                        }}
+                                                    >
+                                                        {student.studentName}
+                                                    </TableCell>
                                                     {(data?.subject_marks || []).map((subject) => {
                                                         const subjectMark = student.subjects.find((s) => s.subject === subject.subject);
                                                         return (
-                                                            <TableCell key={`${student.studentName}-${subject.subject}`} align="right">
+                                                            <TableCell 
+                                                                key={`${student.studentName}-${subject.subject}`} 
+                                                                align="right"
+                                                                sx={{ fontSize: isMobile ? '0.75rem' : '0.875rem' }}
+                                                            >
                                                                 {subjectMark ? subjectMark.marks : "-"}
                                                             </TableCell>
                                                         );
                                                     })}
-                                                    <TableCell align="right">{student.total_marks}</TableCell>
-                                                    <TableCell align="right">{student.average_marks.toFixed(1)}</TableCell>
-                                                    <TableCell align="right">{student.rank}</TableCell>
+                                                    <TableCell 
+                                                        align="right"
+                                                        sx={{ fontSize: isMobile ? '0.75rem' : '0.875rem' }}
+                                                    >
+                                                        {student.total_marks}
+                                                    </TableCell>
+                                                    <TableCell 
+                                                        align="right"
+                                                        sx={{ fontSize: isMobile ? '0.75rem' : '0.875rem' }}
+                                                    >
+                                                        {student.average_marks.toFixed(1)}
+                                                    </TableCell>
+                                                    <TableCell 
+                                                        align="right"
+                                                        sx={{ fontSize: isMobile ? '0.75rem' : '0.875rem' }}
+                                                    >
+                                                        {student.rank}
+                                                    </TableCell>
                                                 </TableRow>
                                             ))
                                         )}

@@ -4,23 +4,23 @@ import {
   Typography,
   IconButton,
   Toolbar,
-  Badge,
+  // Badge,
   Menu,
   MenuItem,
-  Button,
-  Divider,
+  // Button,
+  // Divider,
   CircularProgress,
 } from "@mui/material";
 import {
   Menu as MenuIcon,
-  Notifications as NotificationsIcon,
+  // Notifications as NotificationsIcon,
   Fullscreen as FullscreenIcon,
   AccountCircle as AccountCircleIcon,
 } from "@mui/icons-material";
 import { useNavigate } from "react-router-dom";
 import { useCustomTheme } from "../context/ThemeContext";
 import AnimatedSwitch from "../components/AnimatedSwitch";
-import { useTeacherProfile } from "../hooks/useTeacherProfile"; // ✅ Import hook
+import { useTeacherProfile } from "../hooks/useTeacherProfile";
 
 interface NavbarProps {
   title: string;
@@ -31,9 +31,8 @@ interface NavbarProps {
 const Navbar = ({ title, sidebarOpen, setSidebarOpen }: NavbarProps) => {
   const { mode, toggleTheme } = useCustomTheme();
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
-  const [notificationAnchorEl, setNotificationAnchorEl] =
-    useState<null | HTMLElement>(null);
-  const [notificationCount] = useState(3);
+  // const [notificationAnchorEl, setNotificationAnchorEl] =useState<null | HTMLElement>(null);
+  // const [notificationCount] = useState(3);
   const navigate = useNavigate();
 
   // ✅ Fetch teacher profile using react-query
@@ -59,19 +58,19 @@ const Navbar = ({ title, sidebarOpen, setSidebarOpen }: NavbarProps) => {
     handleAccountMenuClose();
   };
 
-  // Notifications menu handlers
-  const handleNotificationMenuOpen = (event: React.MouseEvent<HTMLElement>) => {
-    setNotificationAnchorEl(event.currentTarget);
-  };
+  // // Notifications menu handlers
+  // const handleNotificationMenuOpen = (event: React.MouseEvent<HTMLElement>) => {
+  //   setNotificationAnchorEl(event.currentTarget);
+  // };
 
-  const handleNotificationMenuClose = () => {
-    setNotificationAnchorEl(null);
-  };
+  // const handleNotificationMenuClose = () => {
+  //   setNotificationAnchorEl(null);
+  // };
 
-  const handleViewAllNotifications = () => {
-    navigate("/notifications");
-    handleNotificationMenuClose();
-  };
+  // const handleViewAllNotifications = () => {
+  //   navigate("/notifications");
+  //   handleNotificationMenuClose();
+  // };
 
   const toggleFullscreen = () => {
     if (!document.fullscreenElement) {
@@ -116,7 +115,7 @@ const Navbar = ({ title, sidebarOpen, setSidebarOpen }: NavbarProps) => {
           />
         </Box>
 
-        {/* Notifications */}
+        {/* Notifications
         <IconButton onClick={handleNotificationMenuOpen}>
           <Badge badgeContent={notificationCount} color="error">
             <NotificationsIcon />
@@ -148,7 +147,7 @@ const Navbar = ({ title, sidebarOpen, setSidebarOpen }: NavbarProps) => {
               View All Notifications
             </Button>
           </MenuItem>
-        </Menu>
+        </Menu> */}
 
         {/* Fullscreen button */}
         <IconButton onClick={toggleFullscreen}>

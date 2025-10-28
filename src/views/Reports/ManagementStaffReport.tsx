@@ -14,6 +14,7 @@ import {
   TableHead,
   TableRow,
   useTheme,
+  useMediaQuery,
   InputAdornment,
   TextField,
   CircularProgress,
@@ -88,6 +89,8 @@ const transformClassDataForStackedBarChart = (classData: ClassMarks | undefined)
 
 const ManagementStaff: React.FC = () => {
   const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
+  const isTablet = useMediaQuery(theme.breakpoints.down('md'));
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [year, setYear] = useState<string>(years[1]);
   const [grade, setGrade] = useState<string>("");
@@ -105,7 +108,6 @@ const ManagementStaff: React.FC = () => {
       try {
         const grades = await fetchGradesFromApi();
         setGradeOptions(grades);
-        // Set default grade if options exist
         if (grades.length > 0) {
           setGrade(grades[0].value);
         }
@@ -124,7 +126,6 @@ const ManagementStaff: React.FC = () => {
     }
   }, []);
 
-  // Check authentication status on component mount
   useEffect(() => {
     if (!checkAuthStatus()) {
       setSnackbar({
@@ -145,7 +146,6 @@ const ManagementStaff: React.FC = () => {
     queryKey: ["managementReport", year, grade, exam, month],
     queryFn: () => fetchManagementStaffReport(year, grade, exam, month),
     retry: (failureCount, error) => {
-      // Don't retry on auth errors
       if (error.message.includes('login') || error.message.includes('Session expired')) {
         return false;
       }
@@ -154,7 +154,6 @@ const ManagementStaff: React.FC = () => {
     enabled: exam !== "Monthly" || (exam === "Monthly" && !!month),
   });
 
-  // Refetch data when month changes for Monthly exams
   useEffect(() => {
     if (exam === "Monthly" && month) {
       refetch();
@@ -194,17 +193,16 @@ const ManagementStaff: React.FC = () => {
 
   const handleExamChange = (newExam: string) => {
     setExam(newExam);
-    // Reset month to default when switching away from Monthly exam
     if (newExam !== "Monthly") {
       setMonth("01");
     }
   };
 
   return (
-    <Box sx={{ display: "flex", width: "99vw", minHeight: "100vh" }}>
+    <Box sx={{ display: "flex", width: "100%", minHeight: "100vh", overflow: "hidden" }}>
       <CssBaseline />
       <Sidebar open={sidebarOpen} setOpen={setSidebarOpen} />
-      <Box sx={{ flexGrow: 1 }}>
+      <Box sx={{ flexGrow: 1, width: "100%", overflow: "auto" }}>
         <AppBar
           position="static"
           sx={{
@@ -220,15 +218,14 @@ const ManagementStaff: React.FC = () => {
             setSidebarOpen={setSidebarOpen}
           />
         </AppBar>
-        <Stack spacing={3} sx={{ px: 4, py: 3 }}>
+        <Stack spacing={isMobile ? 2 : 3} sx={{ px: isMobile ? 2 : isTablet ? 3 : 4, py: isMobile ? 2 : 3 }}>
           {/* Top Filters */}
-          <Paper elevation={1} sx={{ p: 2 }}>
+          <Paper elevation={1} sx={{ p: isMobile ? 1.5 : 2 }}>
             <Stack
-              direction="row"
+              direction={isMobile ? "column" : "row"}
               justifyContent="space-between"
-              alignItems="center"
-              spacing={3}
-              flexWrap="wrap"
+              alignItems={isMobile ? "stretch" : "center"}
+              spacing={isMobile ? 1.5 : 2}
               sx={{ width: "100%" }}
             >
               {/* Year */}
@@ -247,9 +244,10 @@ const ManagementStaff: React.FC = () => {
                   ),
                 }}
                 sx={{
-                  minWidth: 150,
-                  flex: 1,
-                  maxWidth: 250,
+                  width: isMobile ? "100%" : "auto",
+                  minWidth: isMobile ? "auto" : 150,
+                  flex: isMobile ? "unset" : 1,
+                  maxWidth: isMobile ? "100%" : 250,
                   "& .MuiOutlinedInput-root": {
                     borderRadius: "10px",
                     height: "45px",
@@ -279,9 +277,10 @@ const ManagementStaff: React.FC = () => {
                   ),
                 }}
                 sx={{
-                  minWidth: 150,
-                  flex: 1,
-                  maxWidth: 250,
+                  width: isMobile ? "100%" : "auto",
+                  minWidth: isMobile ? "auto" : 150,
+                  flex: isMobile ? "unset" : 1,
+                  maxWidth: isMobile ? "100%" : 250,
                   "& .MuiOutlinedInput-root": {
                     borderRadius: "10px",
                     height: "45px",
@@ -311,9 +310,10 @@ const ManagementStaff: React.FC = () => {
                   ),
                 }}
                 sx={{
-                  minWidth: 150,
-                  flex: 1,
-                  maxWidth: 250,
+                  width: isMobile ? "100%" : "auto",
+                  minWidth: isMobile ? "auto" : 150,
+                  flex: isMobile ? "unset" : 1,
+                  maxWidth: isMobile ? "100%" : 250,
                   "& .MuiOutlinedInput-root": {
                     borderRadius: "10px",
                     height: "45px",
@@ -343,9 +343,10 @@ const ManagementStaff: React.FC = () => {
                     ),
                   }}
                   sx={{
-                    minWidth: 150,
-                    flex: 1,
-                    maxWidth: 250,
+                    width: isMobile ? "100%" : "auto",
+                    minWidth: isMobile ? "auto" : 150,
+                    flex: isMobile ? "unset" : 1,
+                    maxWidth: isMobile ? "100%" : 250,
                     "& .MuiOutlinedInput-root": {
                       borderRadius: "10px",
                       height: "45px",
@@ -369,7 +370,8 @@ const ManagementStaff: React.FC = () => {
                 sx={{
                   borderRadius: "10px",
                   height: "45px",
-                  minWidth: 120,
+                  width: isMobile ? "100%" : "auto",
+                  minWidth: isMobile ? "auto" : 120,
                 }}
               >
                 Refresh
@@ -379,27 +381,28 @@ const ManagementStaff: React.FC = () => {
 
           {/* Error State */}
           {isError && (
-            <Paper elevation={1} sx={{ p: 3, bgcolor: "error.light", color: "error.contrastText" }}>
-              <Typography variant="body1" align="center">
+            <Paper elevation={1} sx={{ p: isMobile ? 2 : 3, bgcolor: "error.light", color: "error.contrastText" }}>
+              <Typography variant="body1" align="center" sx={{ fontSize: isMobile ? "0.875rem" : "1rem" }}>
                 {error?.message || "Failed to load data"}
               </Typography>
             </Paper>
           )}
 
           {/* Charts Section */}
-          <Stack direction={{ xs: "column", md: "row" }} spacing={3} flexWrap="wrap">
-            <Paper elevation={2} sx={{ p: 3, minWidth: 300, flex: 1 }}>
-              <Typography variant="h6" fontWeight={600} mb={2}>
+          <Stack direction="column" spacing={isMobile ? 2 : 3}>
+            {/* Subject Distribution Chart */}
+            <Paper elevation={2} sx={{ p: isMobile ? 2 : 3, width: "100%" }}>
+              <Typography variant={isMobile ? "subtitle1" : "h6"} fontWeight={600} mb={2}>
                 Subject Distribution
               </Typography>
-              <ResponsiveContainer width="100%" height={350}>
+              <ResponsiveContainer width="100%" height={isMobile ? 280 : 350}>
                 {isLoading ? (
                   <Box
                     sx={{
                       display: "flex",
                       justifyContent: "center",
                       alignItems: "center",
-                      height: 250,
+                      height: "100%",
                     }}
                   >
                     <CircularProgress />
@@ -412,12 +415,15 @@ const ManagementStaff: React.FC = () => {
                       nameKey="subject"
                       cx="50%"
                       cy="50%"
-                      outerRadius={80}
+                      outerRadius={isMobile ? 60 : 80}
                       label={(props) => {
                         const { subject, percentage } = props.payload;
+                        if (isMobile) {
+                          return `${percentage.toFixed(0)}%`;
+                        }
                         return `${subject}: ${percentage.toFixed(0)}%`;
                       }}
-                      labelLine={false}
+                      labelLine={!isMobile}
                     >
                       {(data?.subject_marks || []).map((_entry: SubjectMark, index: number) => (
                         <Cell
@@ -432,100 +438,122 @@ const ManagementStaff: React.FC = () => {
                         props.payload.subject
                       ]}
                     />
-                    <Legend />
+                    <Legend 
+                      wrapperStyle={{ fontSize: isMobile ? "12px" : "14px" }}
+                      iconSize={isMobile ? 10 : 14}
+                    />
                   </PieChart>
                 )}
               </ResponsiveContainer>
             </Paper>
 
-            <Paper elevation={2} sx={{ p: 2, minWidth: 400, flex: 2 }}>
-              <Typography variant="h6" fontWeight={600} mb={2}>
+            {/* Class Performance Chart */}
+            <Paper elevation={2} sx={{ p: isMobile ? 2 : 3, width: "100%" }}>
+              <Typography variant={isMobile ? "subtitle1" : "h6"} fontWeight={600} mb={2}>
                 Class Performance
               </Typography>
-              <ResponsiveContainer width="100%" height={350}>
-                {isLoading ? (
-                  <Box sx={{ display: "flex", justifyContent: "center", alignItems: "center", height: 250 }}>
-                    <CircularProgress />
-                  </Box>
-                ) : (
-                  <BarChart data={transformClassDataForStackedBarChart(data?.class_subject_marks)}>
-                    <XAxis dataKey="name" />
-                    <YAxis
-                      label={{ value: 'Total Marks', angle: -90, position: 'insideLeft' }}
-                      domain={[0, 100]}
-                    />
-                    <RechartsTooltip
-                      formatter={(value: number, name: string) => [
-                        `${value}%`,
-                        name,
-                      ]}
-                    />
-                    <Legend />
-                    <Bar
-                      dataKey="Mathematics"
-                      name="Mathematics"
-                      stackId="1"
-                      fill={BAR_COLORS[0]}
-                      radius={[4, 4, 0, 0]}
-                    />
-                    <Bar
-                      dataKey="Science"
-                      name="Science"
-                      stackId="1"
-                      fill={BAR_COLORS[1]}
-                      radius={[4, 4, 0, 0]}
-                    />
-                    <Bar
-                      dataKey="English"
-                      name="English"
-                      stackId="1"
-                      fill={BAR_COLORS[2]}
-                      radius={[4, 4, 0, 0]}
-                    />
-                    <Bar
-                      dataKey="Sinhala"
-                      name="Sinhala"
-                      stackId="1"
-                      fill={BAR_COLORS[4]}
-                      radius={[4, 4, 0, 0]}
-                    />
-                    <Bar
-                      dataKey="History"
-                      name="History"
-                      stackId="1"
-                      fill={BAR_COLORS[6]}
-                      radius={[4, 4, 0, 0]}
-                    />
-                    <Bar
-                      dataKey="Buddhism"
-                      name="Buddhism"
-                      stackId="1"
-                      fill={BAR_COLORS[0]}
-                      radius={[4, 4, 0, 0]}
-                    />
-                  </BarChart>
-                )}
-              </ResponsiveContainer>
+              <Box sx={{ overflowX: "auto", width: "100%" }}>
+                <ResponsiveContainer width={isMobile ? 600 : "100%"} height={isMobile ? 280 : 350}>
+                  {isLoading ? (
+                    <Box sx={{ display: "flex", justifyContent: "center", alignItems: "center", height: "100%" }}>
+                      <CircularProgress />
+                    </Box>
+                  ) : (
+                    <BarChart data={transformClassDataForStackedBarChart(data?.class_subject_marks)}>
+                      <XAxis 
+                        dataKey="name" 
+                        tick={{ fontSize: isMobile ? 10 : 12 }}
+                        angle={isMobile ? -45 : 0}
+                        textAnchor={isMobile ? "end" : "middle"}
+                        height={isMobile ? 60 : 30}
+                      />
+                      <YAxis
+                        label={{ 
+                          value: 'Total Marks', 
+                          angle: -90, 
+                          position: 'insideLeft',
+                          style: { fontSize: isMobile ? 10 : 12 }
+                        }}
+                        domain={[0, 100]}
+                        tick={{ fontSize: isMobile ? 10 : 12 }}
+                      />
+                      <RechartsTooltip
+                        formatter={(value: number, name: string) => [
+                          `${value}%`,
+                          name,
+                        ]}
+                        contentStyle={{ fontSize: isMobile ? "12px" : "14px" }}
+                      />
+                      <Legend 
+                        wrapperStyle={{ fontSize: isMobile ? "10px" : "12px" }}
+                        iconSize={isMobile ? 10 : 14}
+                      />
+                      <Bar
+                        dataKey="Mathematics"
+                        name="Mathematics"
+                        stackId="1"
+                        fill={BAR_COLORS[0]}
+                        radius={[4, 4, 0, 0]}
+                      />
+                      <Bar
+                        dataKey="Science"
+                        name="Science"
+                        stackId="1"
+                        fill={BAR_COLORS[1]}
+                        radius={[4, 4, 0, 0]}
+                      />
+                      <Bar
+                        dataKey="English"
+                        name="English"
+                        stackId="1"
+                        fill={BAR_COLORS[2]}
+                        radius={[4, 4, 0, 0]}
+                      />
+                      <Bar
+                        dataKey="Sinhala"
+                        name="Sinhala"
+                        stackId="1"
+                        fill={BAR_COLORS[4]}
+                        radius={[4, 4, 0, 0]}
+                      />
+                      <Bar
+                        dataKey="History"
+                        name="History"
+                        stackId="1"
+                        fill={BAR_COLORS[6]}
+                        radius={[4, 4, 0, 0]}
+                      />
+                      <Bar
+                        dataKey="Buddhism"
+                        name="Buddhism"
+                        stackId="1"
+                        fill={BAR_COLORS[0]}
+                        radius={[4, 4, 0, 0]}
+                      />
+                    </BarChart>
+                  )}
+                </ResponsiveContainer>
+              </Box>
             </Paper>
           </Stack>
 
           {/* Table Section */}
-          <Paper elevation={2} sx={{ p: 2, overflow: "auto" }}>
-            <Typography variant="h6" fontWeight={600} mb={2}>
+          <Paper elevation={2} sx={{ p: isMobile ? 1.5 : 2, overflow: "auto" }}>
+            <Typography variant={isMobile ? "subtitle1" : "h6"} fontWeight={600} mb={2} sx={{ px: isMobile ? 1 : 0 }}>
               Detailed Marks Breakdown
             </Typography>
-            <TableContainer>
-              <Table size="small" stickyHeader>
+            <TableContainer sx={{ maxHeight: isMobile ? 400 : 600 }}>
+              <Table size={isMobile ? "small" : "medium"} stickyHeader>
                 <TableHead>
                   <TableRow>
-                    <TableCell sx={{ fontWeight: "bold" }}>Class</TableCell>
-                    <TableCell align="right">English</TableCell>
-                    <TableCell align="right">Mathematics</TableCell>
-                    <TableCell align="right">Science</TableCell>
-                    <TableCell align="right">History</TableCell>
-                    <TableCell align="right">Sinhala</TableCell>
-                    <TableCell align="right">Buddhism</TableCell>
-                    <TableCell align="right">Average</TableCell>
+                    <TableCell sx={{ fontWeight: "bold", fontSize: isMobile ? "0.75rem" : "0.875rem", minWidth: isMobile ? 60 : 80 }}>Class</TableCell>
+                    <TableCell align="right" sx={{ fontSize: isMobile ? "0.75rem" : "0.875rem", minWidth: isMobile ? 50 : 70 }}>Eng</TableCell>
+                    <TableCell align="right" sx={{ fontSize: isMobile ? "0.75rem" : "0.875rem", minWidth: isMobile ? 50 : 70 }}>Math</TableCell>
+                    <TableCell align="right" sx={{ fontSize: isMobile ? "0.75rem" : "0.875rem", minWidth: isMobile ? 50 : 70 }}>Sci</TableCell>
+                    <TableCell align="right" sx={{ fontSize: isMobile ? "0.75rem" : "0.875rem", minWidth: isMobile ? 50 : 70 }}>Hist</TableCell>
+                    <TableCell align="right" sx={{ fontSize: isMobile ? "0.75rem" : "0.875rem", minWidth: isMobile ? 50 : 70 }}>Sin</TableCell>
+                    <TableCell align="right" sx={{ fontSize: isMobile ? "0.75rem" : "0.875rem", minWidth: isMobile ? 50 : 70 }}>Bud</TableCell>
+                    <TableCell align="right" sx={{ fontSize: isMobile ? "0.75rem" : "0.875rem", minWidth: isMobile ? 50 : 70 }}>Avg</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
@@ -538,16 +566,16 @@ const ManagementStaff: React.FC = () => {
                   ) : data?.tableData && data.tableData.length > 0 ? (
                     data.tableData.map((row, idx) => (
                       <TableRow key={idx} hover>
-                        <TableCell sx={{ fontWeight: "bold" }}>
+                        <TableCell sx={{ fontWeight: "bold", fontSize: isMobile ? "0.75rem" : "0.875rem" }}>
                           {row.class}
                         </TableCell>
-                        <TableCell align="right">{row.english}</TableCell>
-                        <TableCell align="right">{row.mathematics}</TableCell>
-                        <TableCell align="right">{row.science}</TableCell>
-                        <TableCell align="right">{row.history}</TableCell>
-                        <TableCell align="right">{row.sinhala}</TableCell>
-                        <TableCell align="right">{row.buddhism}</TableCell>
-                        <TableCell align="right">
+                        <TableCell align="right" sx={{ fontSize: isMobile ? "0.75rem" : "0.875rem" }}>{row.english}</TableCell>
+                        <TableCell align="right" sx={{ fontSize: isMobile ? "0.75rem" : "0.875rem" }}>{row.mathematics}</TableCell>
+                        <TableCell align="right" sx={{ fontSize: isMobile ? "0.75rem" : "0.875rem" }}>{row.science}</TableCell>
+                        <TableCell align="right" sx={{ fontSize: isMobile ? "0.75rem" : "0.875rem" }}>{row.history}</TableCell>
+                        <TableCell align="right" sx={{ fontSize: isMobile ? "0.75rem" : "0.875rem" }}>{row.sinhala}</TableCell>
+                        <TableCell align="right" sx={{ fontSize: isMobile ? "0.75rem" : "0.875rem" }}>{row.buddhism}</TableCell>
+                        <TableCell align="right" sx={{ fontSize: isMobile ? "0.75rem" : "0.875rem" }}>
                           {row.overall_average || 0}
                         </TableCell>
                       </TableRow>
@@ -555,7 +583,7 @@ const ManagementStaff: React.FC = () => {
                   ) : (
                     <TableRow>
                       <TableCell colSpan={8} align="center">
-                        <Typography variant="body2" color="text.secondary">
+                        <Typography variant="body2" color="text.secondary" sx={{ fontSize: isMobile ? "0.75rem" : "0.875rem" }}>
                           No data available for the selected criteria
                         </Typography>
                       </TableCell>

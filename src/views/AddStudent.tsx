@@ -33,6 +33,7 @@ import {
   Snackbar,
   Alert,
   Checkbox,
+  useMediaQuery,
 } from "@mui/material";
 import { Close, Add, Delete } from "@mui/icons-material";
 
@@ -55,6 +56,9 @@ const AddStudent = () => {
   const [hovered] = useState(false);
   const theme = useTheme();
   useCustomTheme();
+  
+  // Responsive breakpoints
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
 
   // Filter states
   const [year, setYear] = useState("");
@@ -117,7 +121,7 @@ const AddStudent = () => {
           setClasses(classesData);
         } catch (error) {
           showSnackbar("Failed to load classes", "error");
-          setClasses([]); // Clear classes on error
+          setClasses([]);
         }
       };
       void loadClassesForGrade();
@@ -127,7 +131,6 @@ const AddStudent = () => {
     }
   }, [grade]);
 
-  // Also add a similar effect for the promotion dialog's next grade
   useEffect(() => {
     if (nextGrade) {
       const loadClassesForNextGrade = async () => {
@@ -156,7 +159,6 @@ const AddStudent = () => {
 
     setLoading(true);
     try {
-      // Use the new endpoint that returns class students for year/grade/class
       const studentsData = await fetchClassStudents(year, grade, classFilter);
       setStudents(studentsData);
     } catch (error) {
@@ -169,23 +171,19 @@ const AddStudent = () => {
 
   const handleOpenDialog = () => {
     setDialogOpen(true);
-    // Set current filters to match main page filters
     setCurrentYearFilter(year);
     setCurrentGradeFilter(grade);
     setCurrentClassFilter(classFilter);
     setSelectedStudents([]);
-
   };
 
   const handleCloseDialog = () => {
     setDialogOpen(false);
     setSelectedStudents([]);
     setSearchTerm("");
-
   };
 
   const handleSelectStudent = (student: Student) => {
-    // prevent duplicates
     setSelectedStudents(prev => {
       if (prev.some(s => s.id === student.id)) return prev;
       return [...prev, student];
@@ -223,9 +221,7 @@ const AddStudent = () => {
       if (result.success) {
         showSnackbar(result.message, "success");
         handleCloseDialog();
-        // Refresh the students list for the same filters
         void loadStudents();
-        // Also clear the uploaded state after a successful promotion (optional)
         setExcelUploaded(false);
         setUploadedStudents([]);
       } else {
@@ -240,7 +236,6 @@ const AddStudent = () => {
     setSnackbar({ open: true, message, severity });
   };
 
-  // Filter students for current year table (exclude selected ones in dialog)
   const filteredStudents = students.filter(student =>
     (!currentYearFilter || student.year === currentYearFilter) &&
     (!currentGradeFilter || student.grade === currentGradeFilter) &&
@@ -252,52 +247,42 @@ const AddStudent = () => {
     !selectedStudents.some(selected => selected.id === student.id)
   );
 
-  // normalize grade/class values before rendering menu items
   const gradeToValue = (g: any) => {
     if (!g && g !== 0) return "";
     if (typeof g === "string") return g;
-    // common shapes: { grade: "Grade 1" } or { id, grade, description, ... }
     return String(g.grade ?? g.name ?? g.value ?? JSON.stringify(g));
   };
 
-  // Dialog display list:
   const dialogDisplayStudents = (excelUploaded ? uploadedStudents : filteredStudents)
-    .filter(student => !selectedStudents.some(s => s.id === student.id)) // exclude already selected
+    .filter(student => !selectedStudents.some(s => s.id === student.id))
     .filter(student =>
       !searchTerm ||
       student.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       student.admissionNo.toLowerCase().includes(searchTerm.toLowerCase())
     );
 
-  // Select all toggle
   const isAllSelected = dialogDisplayStudents.length > 0 && dialogDisplayStudents.every(s => selectedStudents.some(sel => sel.id === s.id));
 
   const handleToggleSelectAll = (checked: boolean) => {
     if (checked) {
-      // add all visible ones (avoid duplicates)
       setSelectedStudents(prev => {
         const existingIds = new Set(prev.map(p => p.id));
         const toAdd = dialogDisplayStudents.filter(s => !existingIds.has(s.id));
         return [...prev, ...toAdd];
       });
     } else {
-      // remove all visible ones from selectedStudents
       setSelectedStudents(prev => prev.filter(s => !dialogDisplayStudents.some(ds => ds.id === s.id)));
     }
   };
 
-  // First, add this function after handleToggleSelectAll
   const handleSelectAllAction = () => {
-    // Get all unselected students from the current display list
     const unselectedStudents = dialogDisplayStudents.filter(
       student => !selectedStudents.some(s => s.id === student.id)
     );
 
-    // Add all unselected students to selection
     if (unselectedStudents.length > 0) {
       setSelectedStudents(prev => [...prev, ...unselectedStudents]);
     } else {
-      // If all are selected, remove all displayed students from selection
       setSelectedStudents(prev =>
         prev.filter(selected =>
           !dialogDisplayStudents.some(ds => ds.id === selected.id)
@@ -306,11 +291,9 @@ const AddStudent = () => {
     }
   };
 
-  // Excel parsing utilities
   const getCellValue = (row: any, variants: string[]) => {
     for (const v of variants) {
       if (row[v] !== undefined && row[v] !== null) return String(row[v]);
-      // also try lowercase / trimmed keys
       const lowerKey = Object.keys(row).find(k => k && k.toLowerCase().replace(/\s+/g, "") === v.toLowerCase().replace(/\s+/g, ""));
       if (lowerKey) return String(row[lowerKey]);
     }
@@ -325,7 +308,6 @@ const AddStudent = () => {
       const worksheet = workbook.Sheets[sheetName];
       const rawJson: any[] = XLSX.utils.sheet_to_json(worksheet, { defval: "" });
 
-      // map rows to Student
       const mapped: Student[] = rawJson.map((row: any, idx: number) => {
         const admissionNo = getCellValue(row, ["admissionNo", "AdmissionNo", "Admission No", "studentAdmissionNo", "student_admission_no"]);
         const name = getCellValue(row, ["name", "Name", "studentName", "student_name"]);
@@ -345,7 +327,6 @@ const AddStudent = () => {
         } as Student;
       });
 
-      // Filter out completely empty rows
       const cleaned = mapped.filter(m => (m.admissionNo || m.name));
 
       if (cleaned.length === 0) {
@@ -365,13 +346,11 @@ const AddStudent = () => {
   const onFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files && e.target.files[0];
     if (!file) return;
-    // basic file type check
     if (!file.name.match(/\.(xlsx|xls|csv)$/i)) {
       showSnackbar("Unsupported file format. Upload .xlsx, .xls or .csv", "error");
       return;
     }
     void parseExcelFile(file);
-    // reset input so same file can be uploaded again if needed
     e.target.value = "";
   };
 
@@ -379,7 +358,6 @@ const AddStudent = () => {
     fileInputRef.current?.click();
   };
 
-  // new: download a sample Excel file with expected headers and one example row
   const downloadSampleExcel = () => {
     try {
       const sample = [
@@ -396,7 +374,6 @@ const AddStudent = () => {
       const worksheet = XLSX.utils.json_to_sheet(sample, { header: ["Admission No", "Name", "Grade", "Class", "Medium", "Year"] });
       const workbook = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(workbook, worksheet, "Students");
-      // triggers browser download
       XLSX.writeFile(workbook, "student_promotion_sample.xlsx");
     } catch (err) {
       console.error("Failed to generate sample Excel", err);
@@ -409,12 +386,10 @@ const AddStudent = () => {
     setUploadedStudents([]);
   };
 
-  // new: clear the main filter dropdowns and clear the students list
   const clearFilters = () => {
     setYear("");
     setGrade("");
     setClassFilter("");
-    // clear currently loaded students (so user knows filters are cleared)
     setStudents([]);
   };
 
@@ -425,7 +400,7 @@ const AddStudent = () => {
         open={sidebarOpen || hovered}
         setOpen={setSidebarOpen}
       />
-      <Box sx={{ flexGrow: 1, display: "flex", flexDirection: "column" }}>
+      <Box sx={{ flexGrow: 1, display: "flex", flexDirection: "column", overflow: 'hidden' }}>
         <AppBar
           position="static"
           sx={{
@@ -443,146 +418,143 @@ const AddStudent = () => {
           />
         </AppBar>
 
-        <Box sx={{ p: 3, flex: 1 }}>
+        <Box sx={{ 
+          p: { xs: 2, sm: 3 }, 
+          flex: 1, 
+          overflow: 'auto',
+          pb: { xs: 3, sm: 3 }
+        }}>
           {/* Header with button */}
-          <Box sx={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', mb: 3 }}>
+          <Box sx={{ 
+            display: 'flex', 
+            justifyContent: 'flex-end', 
+            alignItems: 'center', 
+            mb: { xs: 2, sm: 3 }
+          }}>
             <Button
               variant="contained"
-              startIcon={<Add />}
+              startIcon={!isMobile && <Add />}
               onClick={handleOpenDialog}
-              sx={{ minWidth: 200 }}
+              fullWidth={isMobile}
+              sx={{ minWidth: isMobile ? '100%' : 200 }}
             >
-              Add Students to Next Year
+              {isMobile ? "Add Students" : "Add Students to Next Year"}
             </Button>
           </Box>
 
           {/* Filter Section */}
-          <Paper sx={{ p: 2, mb: 3 }}>
-            <Typography variant="h6" gutterBottom>
+          <Paper sx={{ p: { xs: 1.5, sm: 2 }, mb: { xs: 2, sm: 3 } }}>
+            <Typography variant={isMobile ? "subtitle1" : "h6"} gutterBottom>
               Filter Students
             </Typography>
-            <Stack direction="row" spacing={2} justifyContent="space-between" alignItems="center">
-              {/* First dropdown - Left aligned */}
-              <Stack sx={{ flex: { xs: '1 1 100%', sm: '0 0 auto' } }}>
-                <FormControl
-                  sx={{
-                    minWidth: 250,
-                    maxWidth: 350,
-                    "& .MuiOutlinedInput-root": {
-                      borderRadius: "10px",
-                      height: "50px",
-                    },
-                  }}
+            <Stack 
+              direction={{ xs: "column", sm: "row" }} 
+              spacing={2}
+            >
+              <FormControl
+                fullWidth
+                sx={{
+                  "& .MuiOutlinedInput-root": {
+                    borderRadius: "10px",
+                    height: { xs: "45px", sm: "50px" },
+                  },
+                }}
+              >
+                <InputLabel>Year</InputLabel>
+                <Select
+                  value={year}
+                  label="Year"
+                  onChange={(e) => setYear(e.target.value)}
                 >
-                  <InputLabel>Year</InputLabel>
-                  <Select
-                    value={year}
-                    label="Year"
-                    onChange={(e) => setYear(e.target.value)}
-                  >
-                    {years.map((y) => (
-                      <MenuItem key={y} value={y}>{y}</MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
-              </Stack>
+                  {years.map((y) => (
+                    <MenuItem key={y} value={y}>{y}</MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
 
-              {/* Middle dropdown - Centered */}
-              <Stack sx={{ flex: { xs: '1 1 100%', sm: '0 0 auto' } }}>
-                <FormControl
-                  sx={{
-                    minWidth: 250,
-                    maxWidth: 350,
-                    "& .MuiOutlinedInput-root": {
-                      borderRadius: "10px",
-                      height: "50px",
-                    },
-                  }}
+              <FormControl
+                fullWidth
+                sx={{
+                  "& .MuiOutlinedInput-root": {
+                    borderRadius: "10px",
+                    height: { xs: "45px", sm: "50px" },
+                  },
+                }}
+              >
+                <InputLabel>Grade</InputLabel>
+                <Select
+                  value={grade}
+                  label="Grade"
+                  onChange={(e) => setGrade(e.target.value)}
                 >
-                  <InputLabel>Grade</InputLabel>
-                  <Select
-                    value={grade}
-                    label="Grade"
-                    onChange={(e) => setGrade(e.target.value)}
-                  >
-                    {grades.map((g) => {
-                      const gv = gradeToValue(g);
-                      return (
-                        <MenuItem key={gv || `grade-${grades.indexOf(g)}`} value={gv}>
-                          {gv}
-                        </MenuItem>
-                      );
-                    })}
-                  </Select>
-                </FormControl>
-              </Stack>
+                  {grades.map((g) => {
+                    const gv = gradeToValue(g);
+                    return (
+                      <MenuItem key={gv || `grade-${grades.indexOf(g)}`} value={gv}>
+                        {gv}
+                      </MenuItem>
+                    );
+                  })}
+                </Select>
+              </FormControl>
 
-              {/* Third dropdown - Right aligned */}
-              <Stack sx={{ flex: { xs: '1 1 100%', sm: '0 0 auto' } }}>
-                <FormControl
-                  sx={{
-                    minWidth: 250,
-                    maxWidth: 350,
-                    "& .MuiOutlinedInput-root": {
-                      borderRadius: "10px",
-                      height: "50px",
-                    },
-                  }}
+              <FormControl
+                fullWidth
+                sx={{
+                  "& .MuiOutlinedInput-root": {
+                    borderRadius: "10px",
+                    height: { xs: "45px", sm: "50px" },
+                  },
+                }}
+              >
+                <InputLabel>Class</InputLabel>
+                <Select
+                  value={classFilter}
+                  label="Class"
+                  onChange={(e) => setClassFilter(e.target.value)}
                 >
-                  <InputLabel>Class</InputLabel>
-                  <Select
-                    value={classFilter}
-                    label="Class"
-                    onChange={(e) => setClassFilter(e.target.value)}
-                  >
-                    {classes.map((c) => (
-                      <MenuItem key={c} value={c}>{c}</MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
-              </Stack>
+                  {classes.map((c) => (
+                    <MenuItem key={c} value={c}>{c}</MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
 
-              {/* Clear button styled like the dropdown */}
-              <Stack sx={{ flex: { xs: '1 1 100%', sm: '0 0 auto' } }}>
-                <FormControl
+              <FormControl
+                fullWidth
+                sx={{
+                  "& .MuiOutlinedInput-root": {
+                    borderRadius: "10px",
+                    height: { xs: "45px", sm: "50px" },
+                  },
+                }}
+              >
+                <Button
+                  variant="outlined"
+                  color="primary"
+                  onClick={clearFilters}
                   sx={{
-                    minWidth: 250,
-                    maxWidth: 350,
-                    "& .MuiOutlinedInput-root": {
-                      borderRadius: "10px",
-                      height: "50px",
-                    },
-                  }}
-                >
-                  <Button
-                    variant="outlined"
-                    color="primary"
-                    onClick={clearFilters}
-                    sx={{
-                      borderRadius: "10px",
-                      height: "50px",
-                      width: "100%",
-                      textTransform: "none",
-                      fontWeight: 500,
-                      fontSize: "1rem",
+                    borderRadius: "10px",
+                    height: { xs: "45px", sm: "50px" },
+                    width: "100%",
+                    textTransform: "none",
+                    fontWeight: 500,
+                    fontSize: { xs: "0.9rem", sm: "1rem" },
+                    borderWidth: 2,
+                    "&:hover": {
                       borderWidth: 2,
-                      "&:hover": {
-                        borderWidth: 2,
-                        backgroundColor: "rgba(25, 118, 210, 0.08)", // subtle hover like select
-                      },
-                    }}
-                  >
-                    Clear Filters
-                  </Button>
-                </FormControl>
-              </Stack>
-
+                      backgroundColor: "rgba(25, 118, 210, 0.08)",
+                    },
+                  }}
+                >
+                  Clear Filters
+                </Button>
+              </FormControl>
             </Stack>
           </Paper>
 
           {/* Students Table */}
-          <Paper sx={{ p: 2 }}>
-            <Typography variant="h6" gutterBottom>
+          <Paper sx={{ p: { xs: 1.5, sm: 2 } }}>
+            <Typography variant={isMobile ? "subtitle1" : "h6"} gutterBottom>
               Students List
             </Typography>
             {loading ? (
@@ -590,30 +562,35 @@ const AddStudent = () => {
                 <CircularProgress />
               </Box>
             ) : (
-              <TableContainer>
-                <Table>
+              <TableContainer sx={{ 
+                maxHeight: { xs: 'calc(100vh - 420px)', sm: 'none' },
+                overflowX: 'auto'
+              }}>
+                <Table size={isMobile ? "small" : "medium"}>
                   <TableHead>
                     <TableRow>
-                      <TableCell sx={{ fontWeight: 'bold' }}>Admission No</TableCell>
-                      <TableCell sx={{ fontWeight: 'bold' }}>Name</TableCell>
-                      <TableCell sx={{ fontWeight: 'bold' }}>Grade</TableCell>
-                      <TableCell sx={{ fontWeight: 'bold' }}>Class</TableCell>
-                      <TableCell sx={{ fontWeight: 'bold' }}>Medium</TableCell>
+                      <TableCell sx={{ fontWeight: 'bold', fontSize: { xs: '0.75rem', sm: '0.875rem' } }}>
+                        {isMobile ? "Adm. No" : "Admission No"}
+                      </TableCell>
+                      <TableCell sx={{ fontWeight: 'bold', fontSize: { xs: '0.75rem', sm: '0.875rem' } }}>Name</TableCell>
+                      <TableCell sx={{ fontWeight: 'bold', fontSize: { xs: '0.75rem', sm: '0.875rem' } }}>Grade</TableCell>
+                      <TableCell sx={{ fontWeight: 'bold', fontSize: { xs: '0.75rem', sm: '0.875rem' } }}>Class</TableCell>
+                      {!isMobile && <TableCell sx={{ fontWeight: 'bold' }}>Medium</TableCell>}
                     </TableRow>
                   </TableHead>
                   <TableBody>
                     {students.map((student) => (
                       <TableRow key={student.id}>
-                        <TableCell>{student.admissionNo}</TableCell>
-                        <TableCell>{student.name}</TableCell>
-                        <TableCell>{student.grade}</TableCell>
-                        <TableCell>{student.class}</TableCell>
-                        <TableCell>{student.medium}</TableCell>
+                        <TableCell sx={{ fontSize: { xs: '0.75rem', sm: '0.875rem' } }}>{student.admissionNo}</TableCell>
+                        <TableCell sx={{ fontSize: { xs: '0.75rem', sm: '0.875rem' } }}>{student.name}</TableCell>
+                        <TableCell sx={{ fontSize: { xs: '0.75rem', sm: '0.875rem' } }}>{student.grade}</TableCell>
+                        <TableCell sx={{ fontSize: { xs: '0.75rem', sm: '0.875rem' } }}>{student.class}</TableCell>
+                        {!isMobile && <TableCell>{student.medium}</TableCell>}
                       </TableRow>
                     ))}
                     {students.length === 0 && (
                       <TableRow>
-                        <TableCell colSpan={5} align="center">
+                        <TableCell colSpan={isMobile ? 4 : 5} align="center">
                           No students found. Please select filters.
                         </TableCell>
                       </TableRow>
@@ -632,25 +609,28 @@ const AddStudent = () => {
         onClose={handleCloseDialog}
         maxWidth="lg"
         fullWidth
+        fullScreen={isMobile}
       >
         <DialogTitle>
           <Box display="flex" justifyContent="space-between" alignItems="center">
-            <Typography variant="h6">Promote Students to Next Year</Typography>
+            <Typography variant={isMobile ? "subtitle1" : "h6"}>
+              {isMobile ? "Promote Students" : "Promote Students to Next Year"}
+            </Typography>
             <IconButton onClick={handleCloseDialog}>
               <Close />
             </IconButton>
           </Box>
         </DialogTitle>
 
-        <DialogContent>
+        <DialogContent sx={{ p: { xs: 1.5, sm: 3 } }}>
           {/* Current Year Details */}
-          <Paper sx={{ p: 2, mb: 3 }}>
-            <Box display="flex" justifyContent="space-between" alignItems="center" mb={1}>
-              <Typography variant="h6" gutterBottom>
+          <Paper sx={{ p: { xs: 1.5, sm: 2 }, mb: { xs: 2, sm: 3 } }}>
+            <Box display="flex" flexDirection={{ xs: "column", sm: "row" }} justifyContent="space-between" alignItems={{ xs: "stretch", sm: "center" }} mb={1} gap={{ xs: 2, sm: 0 }}>
+              <Typography variant={isMobile ? "subtitle2" : "h6"} gutterBottom>
                 Current Year Details
               </Typography>
 
-              <Stack direction="row" spacing={1} alignItems="center">
+              <Stack direction={{ xs: "column", sm: "row" }} spacing={1} alignItems="stretch" width={{ xs: "100%", sm: "auto" }}>
                 <input
                   ref={fileInputRef}
                   type="file"
@@ -658,16 +638,16 @@ const AddStudent = () => {
                   style={{ display: "none" }}
                   onChange={onFileInputChange}
                 />
-                <Button variant="outlined" onClick={triggerFileSelect}>
+                <Button variant="outlined" onClick={triggerFileSelect} fullWidth={isMobile} size={isMobile ? "small" : "medium"}>
                   Upload Excel
                 </Button>
 
-                <Button variant="outlined" onClick={downloadSampleExcel}>
-                  Download Sample
+                <Button variant="outlined" onClick={downloadSampleExcel} fullWidth={isMobile} size={isMobile ? "small" : "medium"}>
+                  {isMobile ? "Sample" : "Download Sample"}
                 </Button>
 
                 {excelUploaded && (
-                  <Button color="error" variant="text" onClick={clearUploadedData}>
+                  <Button color="error" variant="text" onClick={clearUploadedData} fullWidth={isMobile} size={isMobile ? "small" : "medium"}>
                     Clear Upload
                   </Button>
                 )}
@@ -675,71 +655,65 @@ const AddStudent = () => {
             </Box>
 
             {/* Filters */}
-            <Stack direction="row" spacing={2}>
-              <Stack sx={{ flex: { xs: '1 1 100%', sm: '1 1 25%' } }}>
-                <FormControl fullWidth size="small">
-                  <InputLabel>Year</InputLabel>
-                  <Select
-                    value={currentYearFilter}
-                    label="Year"
-                    onChange={(e) => setCurrentYearFilter(e.target.value)}
-                  >
-                    {years.map((y) => (
-                      <MenuItem key={y} value={y}>{y}</MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
-              </Stack>
-              <Stack sx={{ flex: { xs: '1 1 100%', sm: '1 1 33.33%' } }}>
-                <FormControl fullWidth size="small">
-                  <InputLabel>Grade</InputLabel>
-                  <Select
-                    value={currentGradeFilter}
-                    label="Grade"
-                    onChange={(e) => setCurrentGradeFilter(e.target.value)}
-                  >
-                    {grades.map((g, index) => {
-                      const gradeValue = typeof g === 'object' ? g.grade : g;
-                      return (
-                        <MenuItem
-                          key={typeof g === 'object' ? g.id : `grade-${index}-${gradeValue}`}
-                          value={gradeValue}
-                        >
-                          {gradeValue}
-                        </MenuItem>
-                      );
-                    })}
-                  </Select>
-                </FormControl>
-              </Stack>
-              <Stack sx={{ flex: { xs: '1 1 100%', sm: '1 1 33.33%' } }}>
+            <Stack direction={{ xs: "column", sm: "row" }} spacing={2} mb={2}>
+              <FormControl fullWidth size="small">
+                <InputLabel>Year</InputLabel>
+                <Select
+                  value={currentYearFilter}
+                  label="Year"
+                  onChange={(e) => setCurrentYearFilter(e.target.value)}
+                >
+                  {years.map((y) => (
+                    <MenuItem key={y} value={y}>{y}</MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
 
-                <FormControl fullWidth size="small" disabled={!currentGradeFilter}>
-                  <InputLabel>Class</InputLabel>
-                  <Select
-                    value={currentClassFilter}
-                    label="Class"
-                    onChange={(e) => setCurrentClassFilter(e.target.value)}
-                  >
-                    {classes.map((c) => (
-                      <MenuItem key={c} value={c}>{c}</MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
-              </Stack>
-              <Stack sx={{ flex: { xs: '1 1 100%', sm: '1 1 33.33%' } }}>
-                <TextField
-                  fullWidth
-                  size="small"
-                  label="Search Students"
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                />
-              </Stack>
+              <FormControl fullWidth size="small">
+                <InputLabel>Grade</InputLabel>
+                <Select
+                  value={currentGradeFilter}
+                  label="Grade"
+                  onChange={(e) => setCurrentGradeFilter(e.target.value)}
+                >
+                  {grades.map((g, index) => {
+                    const gradeValue = typeof g === 'object' ? g.grade : g;
+                    return (
+                      <MenuItem
+                        key={typeof g === 'object' ? g.id : `grade-${index}-${gradeValue}`}
+                        value={gradeValue}
+                      >
+                        {gradeValue}
+                      </MenuItem>
+                    );
+                  })}
+                </Select>
+              </FormControl>
+
+              <FormControl fullWidth size="small" disabled={!currentGradeFilter}>
+                <InputLabel>Class</InputLabel>
+                <Select
+                  value={currentClassFilter}
+                  label="Class"
+                  onChange={(e) => setCurrentClassFilter(e.target.value)}
+                >
+                  {classes.map((c) => (
+                    <MenuItem key={c} value={c}>{c}</MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+
+              <TextField
+                fullWidth
+                size="small"
+                label="Search Students"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
             </Stack>
 
             {/* Students Table */}
-            <TableContainer sx={{ maxHeight: 300 }}>
+            <TableContainer sx={{ maxHeight: { xs: 200, sm: 300 } }}>
               <Table stickyHeader size="small">
                 <TableHead>
                   <TableRow>
@@ -751,16 +725,16 @@ const AddStudent = () => {
                         inputProps={{ 'aria-label': 'select all students' }}
                       />
                     </TableCell>
-                    <TableCell>Name</TableCell>
-                    <TableCell>Admission No</TableCell>
+                    <TableCell sx={{ fontSize: { xs: '0.75rem', sm: '0.875rem' } }}>Name</TableCell>
+                    <TableCell sx={{ fontSize: { xs: '0.75rem', sm: '0.875rem' } }}>{isMobile ? "Adm." : "Admission No"}</TableCell>
                     <TableCell>
                       <Button
                         size="small"
                         variant="outlined"
                         onClick={handleSelectAllAction}
-                        sx={{ minWidth: 85 }}
+                        sx={{ minWidth: { xs: 70, sm: 85 }, fontSize: { xs: '0.7rem', sm: '0.875rem' } }}
                       >
-                        {isAllSelected ? "Unselect All" : "Select All"}
+                        {isAllSelected ? "Unselect" : "Select"}
                       </Button>
                     </TableCell>
                   </TableRow>
@@ -779,15 +753,15 @@ const AddStudent = () => {
                             }}
                           />
                         </TableCell>
-                        <TableCell>{student.name}</TableCell>
-                        <TableCell>{student.admissionNo}</TableCell>
+                        <TableCell sx={{ fontSize: { xs: '0.75rem', sm: '0.875rem' } }}>{student.name}</TableCell>
+                        <TableCell sx={{ fontSize: { xs: '0.75rem', sm: '0.875rem' } }}>{student.admissionNo}</TableCell>
                         <TableCell>
                           <Button
                             variant="outlined"
                             size="small"
                             onClick={() => handleSelectStudent(student)}
                             disabled={alreadySelected}
-                            sx={{ minWidth: 85 }}
+                            sx={{ minWidth: { xs: 70, sm: 85 }, fontSize: { xs: '0.7rem', sm: '0.875rem' } }}
                           >
                             {alreadySelected ? "Selected" : "Select"}
                           </Button>
@@ -808,90 +782,86 @@ const AddStudent = () => {
           </Paper>
 
           {/* Next Year Details */}
-          <Paper sx={{ p: 2, mb: 3 }}>
-            <Typography variant="h6" gutterBottom>
+          <Paper sx={{ p: { xs: 1.5, sm: 2 }, mb: { xs: 2, sm: 3 } }}>
+            <Typography variant={isMobile ? "subtitle2" : "h6"} gutterBottom>
               Next Year Details
             </Typography>
 
             {/* Next Year Filters */}
-            <Stack direction="row" spacing={2}>
-              <Stack sx={{ flex: { xs: '1 1 100%', sm: '1 1 33.33%' } }}>
-                <FormControl fullWidth size="small">
-                  <InputLabel>Next Year</InputLabel>
-                  <Select
-                    value={nextYear}
-                    label="Next Year"
-                    onChange={(e) => setNextYear(e.target.value)}
-                  >
-                    {years.map((y) => (
-                      <MenuItem key={y} value={y}>{y}</MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
-              </Stack>
-              <Stack sx={{ flex: { xs: '1 1 100%', sm: '1 1 33.33%' } }}>
-                <FormControl fullWidth size="small">
-                  <InputLabel>Next Grade</InputLabel>
-                  <Select
-                    value={nextGrade}
-                    label="Next Grade"
-                    onChange={(e) => setNextGrade(e.target.value)}
-                  >
-                    {grades.map((g, index) => {
-                      const gradeValue = typeof g === 'object' ? g.grade : g;
-                      return (
-                        <MenuItem
-                          key={typeof g === 'object' ? g.id : `next-grade-${index}-${gradeValue}`}
-                          value={gradeValue}
-                        >
-                          {gradeValue}
-                        </MenuItem>
-                      );
-                    })}
-                  </Select>
-                </FormControl>
-              </Stack>
-              <Stack sx={{ flex: { xs: '1 1 100%', sm: '1 1 33.33%' } }}>
-                <FormControl fullWidth size="small" disabled={!nextGrade}>
-                  <InputLabel>Next Class</InputLabel>
-                  <Select
-                    value={nextClass}
-                    label="Next Class"
-                    onChange={(e) => setNextClass(e.target.value)}
-                  >
-                    {nextGrade ? classes.map((c) => (
-                      <MenuItem key={c} value={c}>{c}</MenuItem>
-                    )) : []}
-                  </Select>
-                </FormControl>
-              </Stack>
+            <Stack direction={{ xs: "column", sm: "row" }} spacing={2} mb={2}>
+              <FormControl fullWidth size="small">
+                <InputLabel>Next Year</InputLabel>
+                <Select
+                  value={nextYear}
+                  label="Next Year"
+                  onChange={(e) => setNextYear(e.target.value)}
+                >
+                  {years.map((y) => (
+                    <MenuItem key={y} value={y}>{y}</MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+
+              <FormControl fullWidth size="small">
+                <InputLabel>Next Grade</InputLabel>
+                <Select
+                  value={nextGrade}
+                  label="Next Grade"
+                  onChange={(e) => setNextGrade(e.target.value)}
+                >
+                  {grades.map((g, index) => {
+                    const gradeValue = typeof g === 'object' ? g.grade : g;
+                    return (
+                      <MenuItem
+                        key={typeof g === 'object' ? g.id : `next-grade-${index}-${gradeValue}`}
+                        value={gradeValue}
+                      >
+                        {gradeValue}
+                      </MenuItem>
+                    );
+                  })}
+                </Select>
+              </FormControl>
+
+              <FormControl fullWidth size="small" disabled={!nextGrade}>
+                <InputLabel>Next Class</InputLabel>
+                <Select
+                  value={nextClass}
+                  label="Next Class"
+                  onChange={(e) => setNextClass(e.target.value)}
+                >
+                  {nextGrade ? classes.map((c) => (
+                    <MenuItem key={c} value={c}>{c}</MenuItem>
+                  )) : []}
+                </Select>
+              </FormControl>
             </Stack>
 
             {/* Selected Students Table */}
-            <Typography variant="subtitle1" gutterBottom>
+            <Typography variant="subtitle2" gutterBottom>
               Selected Students ({selectedStudents.length})
             </Typography>
-            <TableContainer sx={{ maxHeight: 300 }}>
+            <TableContainer sx={{ maxHeight: { xs: 200, sm: 300 } }}>
               <Table stickyHeader size="small">
                 <TableHead>
                   <TableRow>
-                    <TableCell>Name</TableCell>
-                    <TableCell>Admission No</TableCell>
-                    <TableCell>Action</TableCell>
+                    <TableCell sx={{ fontSize: { xs: '0.75rem', sm: '0.875rem' } }}>Name</TableCell>
+                    <TableCell sx={{ fontSize: { xs: '0.75rem', sm: '0.875rem' } }}>{isMobile ? "Adm." : "Admission No"}</TableCell>
+                    <TableCell sx={{ fontSize: { xs: '0.75rem', sm: '0.875rem' } }}>Action</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
                   {selectedStudents.map((student) => (
                     <TableRow key={student.id}>
-                      <TableCell>{student.name}</TableCell>
-                      <TableCell>{student.admissionNo}</TableCell>
+                      <TableCell sx={{ fontSize: { xs: '0.75rem', sm: '0.875rem' } }}>{student.name}</TableCell>
+                      <TableCell sx={{ fontSize: { xs: '0.75rem', sm: '0.875rem' } }}>{student.admissionNo}</TableCell>
                       <TableCell>
                         <IconButton
                           size="small"
                           color="error"
                           onClick={() => handleRemoveStudent(student.id)}
                         >
-                          <Delete />
+                          <Delete fontSize="small" />
                         </IconButton>
                       </TableCell>
                     </TableRow>
@@ -909,14 +879,24 @@ const AddStudent = () => {
           </Paper>
 
           {/* Action Buttons */}
-          <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 2 }}>
-            <Button onClick={handleCloseDialog}>
+          <Box sx={{ 
+            display: 'flex', 
+            flexDirection: { xs: 'column-reverse', sm: 'row' },
+            justifyContent: 'flex-end', 
+            gap: 2 
+          }}>
+            <Button 
+              onClick={handleCloseDialog}
+              fullWidth={isMobile}
+              variant={isMobile ? "outlined" : "text"}
+            >
               Cancel
             </Button>
             <Button
               variant="contained"
               onClick={handlePromoteStudents}
               disabled={selectedStudents.length === 0 || !nextYear || !nextGrade || !nextClass}
+              fullWidth={isMobile}
             >
               Save Promotion
             </Button>
@@ -929,10 +909,12 @@ const AddStudent = () => {
         open={snackbar.open}
         autoHideDuration={6000}
         onClose={() => setSnackbar({ ...snackbar, open: false })}
+        anchorOrigin={{ vertical: 'bottom', horizontal: isMobile ? 'center' : 'right' }}
       >
         <Alert
           severity={snackbar.severity}
           onClose={() => setSnackbar({ ...snackbar, open: false })}
+          sx={{ width: '100%' }}
         >
           {snackbar.message}
         </Alert>
