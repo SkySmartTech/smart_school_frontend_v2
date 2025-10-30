@@ -195,12 +195,12 @@ const LoginForm = ({ onForgotPasswordClick }: LoginFormProps) => {
       }
 
       // Navigate based on permissions (teacher -> student -> default dashboard)
-      if (allowedPermissions.includes("teacherDashboard")) {
-        navigate("/teacher-dashboard");
-      } else if (allowedPermissions.includes("studentDashboard")) {
-        navigate("/student-dashboard");
+      if (allowedPermissions.includes("managementStaffReport")) {
+        navigate("/managementStaffReport");
+      } else if (allowedPermissions.includes("classTeacherReport")) {
+        navigate("/classTeacherReport");
       } else {
-        navigate("/dashboard");
+        navigate("/parentReport");
       }
 
       enqueueSnackbar("Welcome Back!", {
@@ -285,7 +285,7 @@ const LoginForm = ({ onForgotPasswordClick }: LoginFormProps) => {
           animate={{ scale: 1, opacity: 1 }}
           transition={{ duration: 0.5 }}
         >
-          <img src="/images/schoolLogo.png" alt="Buildtek Logo" width="50px" />
+          <img src="/images/schoolLogo.png" alt="School Logo" width="50px" />
           <Typography variant="subtitle1" fontWeight="bold">
             Student Management System
           </Typography>

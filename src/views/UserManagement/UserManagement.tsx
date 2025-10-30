@@ -29,6 +29,9 @@ import {
   TableRow,
   useMediaQuery
 } from "@mui/material";
+import { FaFileExcel } from 'react-icons/fa';
+import PictureAsPdfIcon from '@mui/icons-material/PictureAsPdf';
+
 import {
   DataGrid,
   GridToolbarContainer,
@@ -42,7 +45,6 @@ import {
   type GridRowParams
 } from "@mui/x-data-grid";
 import {
-  PictureAsPdf as PdfIcon,
   Delete as DeleteIcon,
   Edit as EditIcon,
   Refresh as RefreshIcon,
@@ -51,26 +53,25 @@ import {
   Add,
   Delete as DeleteRowIcon,
   CloudUpload as CloudUploadIcon,
-  TableChart as ExcelIcon,
   DeleteForever as DeleteForeverIcon
 } from "@mui/icons-material";
 import Sidebar from "../../components/Sidebar";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useCustomTheme } from "../../context/ThemeContext";
-import { 
-  type User, 
-  type UserRole, 
+import {
+  type User,
+  type UserRole,
   type Subject,
-  statusOptions, 
-  genderOptions, 
-  userRoleOptions, 
-  userTypeOptions, 
-  gradeOptions, 
-  mediumOptions, 
-  classOptions, 
+  statusOptions,
+  genderOptions,
+  userRoleOptions,
+  userTypeOptions,
+  gradeOptions,
+  mediumOptions,
+  classOptions,
   type TeacherAssignment
 } from "../../types/userManagementTypes";
-import { 
+import {
   bulkDeactivateUsers,
   createUser,
   deactivateUser,
@@ -266,7 +267,7 @@ const UserManagement: React.FC = () => {
       deleteUserMutation.mutate(id);
     }
   };
-  
+
   const showSnackbar = (message: string, severity: "success" | "error") => {
     setSnackbar({ open: true, message, severity });
   };
@@ -562,7 +563,7 @@ const UserManagement: React.FC = () => {
           }
         }
       }
-      
+
       // Auto scroll to top when editing
       scrollToTop();
     }
@@ -586,82 +587,212 @@ const UserManagement: React.FC = () => {
   };
 
   const handleExportPDF = () => {
-    const doc = new jsPDF();
-    const dataToExport = searchTerm ? apiSearchResults : users;
+  const doc = new jsPDF({
+    orientation: "landscape", // ✅ Landscape gives more space for columns
+    unit: "pt",               // ✅ Better precision
+    format: "A4"
+  });
 
-    const tableData = dataToExport.map(user => [
-      user.name,
-      user.username,
-      user.email,
-      user.address || '-',
-      user.birthDay || '-',
-      user.contact || '-',
-      user.gender || '-',
-      activeTab === 'Student' ? user.grade || '-' :
-        activeTab === 'Teacher' ? user.class || '-' : user.profession || '-',
-      activeTab === 'Student' ? user.medium || '-' :
-        activeTab === 'Teacher' ? user.subject || '-' : (user as any).parentContact || '-',
-      user.status ? 'Active' : 'Inactive'
-    ]);
+  const dataToExport = searchTerm ? apiSearchResults : users;
 
-    const headers = [
-      'Name', 'Username', 'Email', 'Address', 'Birthday', 'Phone No', 'Gender',
-      activeTab === 'Student' ? 'Grade' : activeTab === 'Teacher' ? 'Class' : 'Profession',
-      activeTab === 'Student' ? 'Medium' : activeTab === 'Teacher' ? 'Subject' : 'Parent No',
-      'Status'
-    ];
+  const tableData = dataToExport.map(user => {
+    if (activeTab === "Student") {
+      return [
+        user.name,
+        user.username,
+        user.email,
+        user.address || "-",
+        user.birthDay || "-",
+        user.contact || "-",
+        user.gender || "-",
+        user.studentAdmissionNo || "-",
+        user.class || user.grade || "-",
+        user.medium || "-",
+        user.status ? "Active" : "Inactive"
+      ];
+    } else if (activeTab === "Teacher") {
+      return [
+        user.name,
+        user.username,
+        user.email,
+        user.address || "-",
+        user.birthDay || "-",
+        user.contact || "-",
+        user.gender || "-",
+        user.medium || "-",
+        user.grade || user.class || "-",
+        user.subject || "-",
+        user.status ? "Active" : "Inactive"
+      ];
+    } else {
+      // Parent
+      return [
+        user.name,
+        user.username,
+        user.email,
+        user.address || "-",
+        user.birthDay || "-",
+        user.contact || "-",
+        user.gender || "-",
+        user.studentAdmissionNo || "-",
+        user.relation || "-",
+        user.profession || "-",
+        user.parentContact || "-",
+        user.status ? "Active" : "Inactive"
+      ];
+    }
+  });
 
-    doc.text(`${activeTab} Management Report`, 14, 16);
-    autoTable(doc, {
-      head: [headers],
-      body: tableData,
-      startY: 20,
-      styles: {
-        cellPadding: 3,
-        fontSize: 8,
-        valign: 'middle',
-        halign: 'center',
-      },
-      headStyles: {
-        fillColor: [25, 118, 210],
-        textColor: 255,
-        fontStyle: 'bold'
-      },
-      alternateRowStyles: {
-        fillColor: [245, 245, 245]
-      }
-    });
-
-    doc.save(`${activeTab.toLowerCase()}-management-report.pdf`);
+  const headers = {
+    Student: [
+      "Name",
+      "Username",
+      "Email",
+      "Address",
+      "Birthday",
+      "Phone No",
+      "Gender",
+      "Admission No",
+      "Class",
+      "Medium",
+      "Status"
+    ],
+    Teacher: [
+      "Name",
+      "Username",
+      "Email",
+      "Address",
+      "Birthday",
+      "Phone No",
+      "Gender",
+      "Medium",
+      "Grade",
+      "Subject",
+      "Status"
+    ],
+    Parent: [
+      "Name",
+      "Username",
+      "Email",
+      "Address",
+      "Birthday",
+      "Phone No",
+      "Gender",
+      "Admission No",
+      "Relation",
+      "Profession",
+      "Parent No",
+      "Status"
+    ]
   };
+
+  // ✅ Add a title with better styling
+  doc.setFontSize(16);
+  doc.text(`${activeTab} Management Report`, 40, 40);
+
+  // ✅ Build the table neatly
+  autoTable(doc, {
+    startY: 60,
+    head: [headers[activeTab]],
+    body: tableData,
+    theme: "grid",
+    styles: {
+      fontSize: 9,
+      cellPadding: 5,
+      valign: "middle",
+      halign: "center",
+      textColor: [0, 0, 0],
+      lineWidth: 0.2
+    },
+    headStyles: {
+      fillColor: [25, 118, 210],
+      textColor: 255,
+      fontStyle: "bold",
+      halign: "center",
+    },
+    alternateRowStyles: {
+      fillColor: [245, 245, 245],
+    },
+    didDrawPage: (data) => {
+      // ✅ Add footer (optional)
+      const pageCount = (doc as any).getNumberOfPages
+        ? (doc as any).getNumberOfPages()
+        : ((doc as any).internal?.pages?.length ?? 1);
+      doc.setFontSize(10);
+      doc.text(
+        `Page ${data.pageNumber} of ${pageCount}`,
+        doc.internal.pageSize.width - 100,
+        doc.internal.pageSize.height - 20
+      );
+    },
+  });
+
+  // ✅ Save PDF with meaningful filename
+  doc.save(`${activeTab.toLowerCase()}-management-report.pdf`);
+};
 
   const handleExportExcel = () => {
     const dataToExport = searchTerm ? apiSearchResults : users;
 
-    const excelData = dataToExport.map(user => ({
-      'Name': user.name,
-      'Username': user.username,
-      'Email': user.email,
-      'Address': user.address || '-',
-      'Birthday': user.birthDay || '-',
-      'Phone No': user.contact || '-',
-      'Gender': user.gender || '-',
-      [activeTab === 'Student' ? 'Grade' : activeTab === 'Teacher' ? 'Class' : 'Profession']:
-        activeTab === 'Student' ? user.grade || '-' :
-        activeTab === 'Teacher' ? user.class || '-' : user.profession || '-',
-      [activeTab === 'Student' ? 'Medium' : activeTab === 'Teacher' ? 'Subject' : 'Parent No']:
-        activeTab === 'Student' ? user.medium || '-' :
-        activeTab === 'Teacher' ? user.subject || '-' : (user as any).parentContact || '-',
-      'Status': user.status ? 'Active' : 'Inactive'
-    }));
+    const excelData = dataToExport.map(user => {
+      // Student data
+      if (activeTab === 'Student') {
+        return {
+          'Name': user.name,
+          'Username': user.username,
+          'Email': user.email,
+          'Address': user.address || '-',
+          'Birthday': user.birthDay || '-',
+          'Phone No': user.contact || '-',
+          'Gender': user.gender || '-',
+          'Admission No': user.studentAdmissionNo || '-',
+          'Class': user.class || user.grade || '-',
+          'Medium': user.medium || '-',
+          'Status': user.status ? 'Active' : 'Inactive'
+        };
+      }
+      // Teacher data
+      else if (activeTab === 'Teacher') {
+        return {
+          'Name': user.name,
+          'Username': user.username,
+          'Email': user.email,
+          'Address': user.address || '-',
+          'Birthday': user.birthDay || '-',
+          'Phone No': user.contact || '-',
+          'Gender': user.gender || '-',
+          'Medium': user.medium || '-',
+          'Grade': user.grade || user.class || '-',
+          'Subject': user.subject || '-',
+          'Status': user.status ? 'Active' : 'Inactive'
+        };
+      }
+      // Parent data
+      else {
+        return {
+          'Name': user.name,
+          'Username': user.username,
+          'Email': user.email,
+          'Address': user.address || '-',
+          'Birthday': user.birthDay || '-',
+          'Phone No': user.contact || '-',
+          'Gender': user.gender || '-',
+          'Admission No': user.studentAdmissionNo || '-',
+          'Relation': user.relation || '-',
+          'Profession': user.profession || '-',
+          'Parent No': (user as any).parentContact || '-',
+          'Status': user.status ? 'Active' : 'Inactive'
+        };
+      }
+    });
 
     const worksheet = XLSX.utils.json_to_sheet(excelData);
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, `${activeTab}s`);
-    
+
     // Set column widths
     const maxWidth = excelData.reduce((w: any, r: any) => {
-      return Object.keys(r).map((k, i) => 
+      return Object.keys(r).map((k, i) =>
         Math.max(w[i] || 10, String(r[k]).length)
       );
     }, []);
@@ -670,7 +801,6 @@ const UserManagement: React.FC = () => {
     XLSX.writeFile(workbook, `${activeTab.toLowerCase()}-management-report.xlsx`);
     showSnackbar("Excel file exported successfully!", "success");
   };
-
   const handleClearSearch = () => {
     setSearchTerm("");
   };
@@ -705,7 +835,7 @@ const UserManagement: React.FC = () => {
     updateUserMutation.isPending ||
     deactivateUserMutation.isPending ||
     bulkDeactivateMutation.isPending ||
-    deleteUserMutation.isPending;  
+    deleteUserMutation.isPending;
 
   const getColumns = (): GridColDef<User>[] => {
     const commonColumns: GridColDef<User>[] = [
@@ -813,7 +943,7 @@ const UserManagement: React.FC = () => {
 
   function CustomToolbar() {
     return (
-      <GridToolbarContainer sx={{ 
+      <GridToolbarContainer sx={{
         justifyContent: 'space-between',
         flexDirection: isMobile ? 'column' : 'row',
         gap: isMobile ? 1 : 0,
@@ -826,13 +956,13 @@ const UserManagement: React.FC = () => {
             </IconButton>
           </Tooltip>
           <Tooltip title="Export PDF">
-            <IconButton onClick={handleExportPDF} size={isMobile ? 'small' : 'medium'}>
-              <PdfIcon />
+            <IconButton onClick={handleExportPDF} size={isMobile ? 'small' : 'medium'} color="default">
+              <PictureAsPdfIcon />
             </IconButton>
           </Tooltip>
           <Tooltip title="Export Excel">
             <IconButton onClick={handleExportExcel} size={isMobile ? 'small' : 'medium'} color="success">
-              <ExcelIcon />
+              <FaFileExcel />
             </IconButton>
           </Tooltip>
           {rowSelectionModel.length > 0 && (
@@ -861,10 +991,10 @@ const UserManagement: React.FC = () => {
 
   const renderFormFields = () => {
     const commonFields = (
-      <Box sx={{ 
-        display: 'grid', 
+      <Box sx={{
+        display: 'grid',
         gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)', md: 'repeat(3, 1fr)' },
-        gap: 2 
+        gap: 2
       }}>
         <TextField
           label="Name*"
@@ -1032,7 +1162,7 @@ const UserManagement: React.FC = () => {
             name="status"
             value={form.status.toString()}
             onChange={(e) => handleSelectChange(e, "status")}
-            sx={{ 
+            sx={{
               minWidth: 120,
               gridColumn: { md: 'span 2' }
             }}
@@ -1053,10 +1183,10 @@ const UserManagement: React.FC = () => {
         return (
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
             {commonFields}
-            <Box sx={{ 
-              display: 'grid', 
+            <Box sx={{
+              display: 'grid',
               gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)', md: 'repeat(3, 1fr)' },
-              gap: 2 
+              gap: 2
             }}>
               <TextField
                 select
@@ -1118,7 +1248,7 @@ const UserManagement: React.FC = () => {
         return (
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
             {commonFields}
-            
+
             <TextField
               label="Staff Number"
               name="staffNo"
@@ -1128,10 +1258,10 @@ const UserManagement: React.FC = () => {
               size="small"
             />
 
-            <Box sx={{ 
-              display: 'grid', 
+            <Box sx={{
+              display: 'grid',
               gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)', md: 'repeat(4, 1fr)' },
-              gap: 2 
+              gap: 2
             }}>
               <TextField
                 select
@@ -1245,11 +1375,11 @@ const UserManagement: React.FC = () => {
         return (
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
             {commonFields}
-            
-            <Box sx={{ 
-              display: 'grid', 
+
+            <Box sx={{
+              display: 'grid',
               gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)', md: 'repeat(4, 1fr)' },
-              gap: 2 
+              gap: 2
             }}>
               <TextField
                 label="Profession"

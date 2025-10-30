@@ -550,12 +550,40 @@ export const searchUsers = async (searchTerm: string, userType: UserType): Promi
       }
     );
 
-    // Transform the response data to match User type
-    return Array.isArray(response.data.data) 
-      ? response.data.data 
-      : Array.isArray(response.data) 
-        ? response.data 
-        : [];
+    // Normalize/unwrap response into an array of raw user objects
+    const rawArray = Array.isArray(response.data?.data)
+      ? response.data.data
+      : Array.isArray(response.data)
+        ? response.data
+        : (response.data?.data && Array.isArray(response.data?.data)) ? response.data.data : [];
+
+    if (!Array.isArray(rawArray)) return [];
+
+    // Map/normalize each raw user into the UI User shape (same as fetchUsers)
+    return rawArray.map((user: any) => ({
+      id: user.id,
+      name: user.name || '',
+      username: user.username || '',
+      email: user.email || '',
+      status: user.status ?? true,
+      userType,
+      userRole: user.userRole || getUserRole(userType),
+      address: user.address || '',
+      birthDay: user.birthDay || '',
+      contact: user.contact || '',
+      gender: user.gender || '',
+      photo: user.photo || '',
+      grade: '',
+      class: '',
+      medium: '',
+      studentAdmissionNo: '',
+      subject: '',
+      staffNo: '',
+      profession: '',
+      parentContact: '',
+      relation: user.relation || user.parent?.relation || '',
+      ...getTypeSpecificFields(user, userType)
+    }));
         
   } catch (error) {
     console.error('Search users error:', error);
