@@ -644,7 +644,7 @@ const SystemManagement = () => {
             disabled={loading.form}
             startIcon={loading.form ? <CircularProgress size={20} color="inherit" /> : null}
           >
-            {loading.form ? 'Saving...' : 'Save'}
+            {loading.form ? 'Saving....' : 'Save'}
           </Button>
         </DialogActions>
       </Dialog>
