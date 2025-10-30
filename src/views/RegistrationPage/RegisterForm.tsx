@@ -7,7 +7,6 @@ import {
   CircularProgress,
   IconButton,
   InputAdornment,
-  // Avatar,
   Stepper,
   Step,
   StepLabel,
@@ -32,7 +31,6 @@ import {
   Work,
   Home,
   Cake,
-  // CloudUpload,
   AssignmentInd,
   School,
   Class,
@@ -47,11 +45,9 @@ import { useForm } from "react-hook-form";
 import { useMutation } from "@tanstack/react-query";
 import { registerUser, registerStudent, registerTeacher, registerParent } from "../../api/userApi";
 import { useState, useEffect, useMemo } from "react";
-
 import { useQuery } from '@tanstack/react-query';
 import axios from 'axios';
 
-// Update the Subject interface
 interface Subject {
   id: number;
   subjectId: number | null;
@@ -70,7 +66,6 @@ interface RegisterFormProps {
 }
 
 const RegisterForm = ({ onSuccess = () => { }, onError = () => { } }: RegisterFormProps) => {
-  // Add the subjects query inside the component, after the state declarations
   const { data: subjects = [], isLoading: isLoadingSubjects } = useQuery<Subject[]>({
     queryKey: ['subjects'],
     queryFn: async () => {
@@ -79,26 +74,10 @@ const RegisterForm = ({ onSuccess = () => { }, onError = () => { } }: RegisterFo
     }
   });
 
-  // Add the useMemo hook to get unique subjects
   const uniqueMainSubjects = useMemo(() => {
     const mainSubjects = subjects.map(subject => subject.mainSubject);
     return [...new Set(mainSubjects)];
   }, [subjects]);
-
-  // ... rest of your component code ...
-  // import { styled } from '@mui/material/styles';
-
-  // const VisuallyHiddenInput = styled('input')({
-  //   clip: 'rect(0 0 0 0)',
-  //   clipPath: 'inset(50%)',
-  //   height: 1,
-  //   overflow: 'hidden',
-  //   position: 'absolute',
-  //   bottom: 0,
-  //   left: 0,
-  //   whiteSpace: 'nowrap',
-  //   width: 1,
-  // });
 
   const gender = ["Male", "Female"];
   const roles = ["Teacher", "Student", "Parent"];
@@ -109,7 +88,6 @@ const RegisterForm = ({ onSuccess = () => { }, onError = () => { } }: RegisterFo
   const steps: string[] = ['Basic Information', 'Role Details'];
 
   interface FormData {
-    // Base User properties (excluding photo)
     name: string;
     email: string;
     address: string;
@@ -118,15 +96,11 @@ const RegisterForm = ({ onSuccess = () => { }, onError = () => { } }: RegisterFo
     userType: string;
     username: string;
     password: string;
-    location?: string | null; // Changed to optional
+    location?: string | null;
     userRole: string;
     gender: string;
-
-    // Form-specific properties
     photo: FileList | null;
     password_confirmation: string;
-
-    // Role-specific optional properties
     grade?: string;
     studentGrade?: string;
     studentClass?: string;
@@ -155,9 +129,7 @@ const RegisterForm = ({ onSuccess = () => { }, onError = () => { } }: RegisterFo
     status?: boolean;
   };
 
-  // Add this alias so RegisterFormValues is defined and matches the form shape
   type RegisterFormValues = FormData;
-
 
   type TeacherAssignment = {
     grades: string[];
@@ -167,21 +139,16 @@ const RegisterForm = ({ onSuccess = () => { }, onError = () => { } }: RegisterFo
     id: string;
   };
 
-  // Moved component logic here
   const [activeStep, setActiveStep] = useState(0);
   const navigate = useNavigate();
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [passwordFocused, setPasswordFocused] = useState(false);
   const [confirmPasswordFocused, setConfirmPasswordFocused] = useState(false);
-  // const [previewImage, setPreviewImage] = useState<string | null>(null);
   const [selectedRole, setSelectedRole] = useState<string>("");
   const [registeredUser, setRegisteredUser] = useState<{ userId: number; userType: string } | null>(null);
   const [teacherAssignments, setTeacherAssignments] = useState<TeacherAssignment[]>([]);
   const [parentEntries, setParentEntries] = useState<ParentEntry[]>([]);
-  // const fileInputRef = useRef<HTMLInputElement>(null);
-
-  // Add state for success/error messages
   const [successMessage, setSuccessMessage] = useState<string>("");
   const [errorMessage, setErrorMessage] = useState<string>("");
   const [showSuccessSnackbar, setShowSuccessSnackbar] = useState(false);
@@ -200,7 +167,7 @@ const RegisterForm = ({ onSuccess = () => { }, onError = () => { } }: RegisterFo
       teacherClass: [],
       subjects: [],
       medium: [],
-      location: "", // Keep as empty string but optional
+      location: "",
       userRole: "user",
     }
   });
@@ -212,7 +179,6 @@ const RegisterForm = ({ onSuccess = () => { }, onError = () => { } }: RegisterFo
     setSelectedRole(userType);
   }, [userType]);
 
-  // Helper function to extract error message from API response
   const extractErrorMessage = (error: any): string => {
     if (error?.response?.data?.message) {
       return error.response.data.message;
@@ -226,21 +192,18 @@ const RegisterForm = ({ onSuccess = () => { }, onError = () => { } }: RegisterFo
     return "An unexpected error occurred. Please try again.";
   };
 
-  // Helper function to show error
   const showError = (message: string) => {
     setErrorMessage(message);
     setShowErrorSnackbar(true);
     onError(message);
   };
 
-  // Helper function to show success
   const showSuccess = (message: string) => {
     setSuccessMessage(message);
     setShowSuccessSnackbar(true);
     onSuccess();
   };
 
-  // Step 1: Register basic user data
   const { mutate: registerBasicUser, isPending: isRegisteringBasic } = useMutation({
     mutationFn: registerUser,
     onSuccess: (data) => {
@@ -253,12 +216,10 @@ const RegisterForm = ({ onSuccess = () => { }, onError = () => { } }: RegisterFo
     },
   });
 
-  // Step 2: Register role-specific data
   const { mutate: registerStudentData, isPending: isRegisteringStudent } = useMutation({
     mutationFn: registerStudent,
     onSuccess: () => {
       showSuccess("Registration successful! Please contact the Admin to get access to Login.");
-      // Navigate after a delay to allow user to read the message
       setTimeout(() => {
         navigate("/login");
       }, 5000);
@@ -273,7 +234,6 @@ const RegisterForm = ({ onSuccess = () => { }, onError = () => { } }: RegisterFo
     mutationFn: registerTeacher,
     onSuccess: () => {
       showSuccess("Registration successful! Please contact the Admin to get access to Login.");
-      // Navigate after a delay to allow user to read the message
       setTimeout(() => {
         navigate("/login");
       }, 3000);
@@ -288,7 +248,6 @@ const RegisterForm = ({ onSuccess = () => { }, onError = () => { } }: RegisterFo
     mutationFn: registerParent,
     onSuccess: () => {
       showSuccess("Registration successful! Please contact the Admin to get access to Login.");
-      // Navigate after a delay to allow user to read the message
       setTimeout(() => {
         navigate("/login");
       }, 3000);
@@ -314,16 +273,13 @@ const RegisterForm = ({ onSuccess = () => { }, onError = () => { } }: RegisterFo
         "password",
         "password_confirmation",
         "gender"
-        // Removed "location" from validation
       ]);
     } else if (activeStep === 1) {
       if (selectedRole === "Teacher") {
         isValid = await trigger(["teacherGrades", "subjects", "teacherClass", "staffNo", "medium"]);
       } else if (selectedRole === "Student") {
-        // validate student fields
         isValid = await trigger(["studentGrade", "studentAdmissionNo", "studentClass", "medium", "parentProfession", "parentContact"]);
       } else if (selectedRole === "Parent") {
-        // validate parent fields
         isValid = await trigger(["profession", "parentContact", "studentAdmissionNo", "relation"]);
       }
     }
@@ -334,7 +290,6 @@ const RegisterForm = ({ onSuccess = () => { }, onError = () => { } }: RegisterFo
       const formData = new FormData();
       const formValues = watch();
 
-      // Handle non-array fields
       Object.entries(formValues)
         .filter(([key]) => !['teacherGrades', 'teacherClass', 'subjects', 'medium'].includes(key))
         .forEach(([key, value]) => {
@@ -347,7 +302,6 @@ const RegisterForm = ({ onSuccess = () => { }, onError = () => { } }: RegisterFo
           }
         });
 
-      // Handle array fields
       const arrayFields = ['teacherGrades', 'teacherClass', 'subjects', 'medium'];
       arrayFields.forEach(field => {
         const fieldValue = formValues[field as keyof FormData];
@@ -358,7 +312,6 @@ const RegisterForm = ({ onSuccess = () => { }, onError = () => { } }: RegisterFo
         }
       });
 
-      // Add userRole field
       formData.append('userRole', 'user');
 
       registerBasicUser(formData);
@@ -370,27 +323,23 @@ const RegisterForm = ({ onSuccess = () => { }, onError = () => { } }: RegisterFo
   const handleBack = async () => {
     if (activeStep === 1 && registeredUser && registeredUser.userId) {
       try {
-        // Make API call to delete the registered user
         await axios.delete(`${import.meta.env.VITE_API_BASE_URL}/api/delete-register`, {
           data: {
-            userId: registeredUser.userId  // Send as part of request body
+            userId: registeredUser.userId
           },
           headers: {
             'Content-Type': 'application/json',
-            'userId': String(registeredUser.userId),  // Also send in headers as string
-            'userType': registeredUser.userType // Include userType if needed by backend
+            'userId': String(registeredUser.userId),
+            'userType': registeredUser.userType
           }
         });
 
-        // Reset states
         setRegisteredUser(null);
         setActiveStep((prevActiveStep) => prevActiveStep - 1);
         
-        // Clear any role-specific data
         setTeacherAssignments([]);
         setParentEntries([]);
         
-        // Reset form values for role-specific fields
         setValue("teacherGrades", []);
         setValue("subjects", []);
         setValue("teacherClass", []);
@@ -409,12 +358,10 @@ const RegisterForm = ({ onSuccess = () => { }, onError = () => { } }: RegisterFo
         const errorMessage = error?.response?.data?.message || "Failed to clear user data";
         showError(errorMessage);
         
-        // If there's a server error, still go back but warn the user
         setActiveStep((prevActiveStep) => prevActiveStep - 1);
         setRegisteredUser(null);
       }
     } else {
-      // If not on step 1 or no registered user, just go back normally
       setActiveStep((prevActiveStep) => prevActiveStep - 1);
     }
   };
@@ -423,7 +370,6 @@ const RegisterForm = ({ onSuccess = () => { }, onError = () => { } }: RegisterFo
     if (!registeredUser) return;
 
     const formData = new FormData();
-    // ensure these are strings
     formData.append('userId', String(registeredUser.userId));
     formData.append('userType', String(registeredUser.userType));
 
@@ -432,7 +378,6 @@ const RegisterForm = ({ onSuccess = () => { }, onError = () => { } }: RegisterFo
     if (role === "teacher") {
       formData.append('staffNo', data.staffNo || '');
 
-      // ensure userId/userType are strings inside each assignment
       const teacherPayload = teacherAssignments.map(assignment => ({
         teacherGrade: assignment.grades[0],
         teacherClass: assignment.classes[0],
@@ -446,8 +391,6 @@ const RegisterForm = ({ onSuccess = () => { }, onError = () => { } }: RegisterFo
       formData.append('teacherAssignments', JSON.stringify(teacherPayload));
     }
     else if (role === "parent") {
-      // Prefer using parentEntries (added via "Add to List") if any exist.
-      // Fallback to the single-row form data (useful if user didn't click "Add").
       const parentAssignments = parentEntries && parentEntries.length > 0
         ? parentEntries.map(entry => ({
           studentAdmissionNo: entry.studentAdmissionNo,
@@ -472,9 +415,7 @@ const RegisterForm = ({ onSuccess = () => { }, onError = () => { } }: RegisterFo
           updated_at: new Date().toISOString()
         }];
 
-      // Basic client-side validation before sending to API
       if (!parentAssignments.length || !parentAssignments[0].studentAdmissionNo) {
-        // Reuse existing snackbar helper to show the error
         showError("Please provide at least one parent entry with a Student Admission Number");
         return;
       }
@@ -482,7 +423,6 @@ const RegisterForm = ({ onSuccess = () => { }, onError = () => { } }: RegisterFo
       formData.append('parentData', JSON.stringify(parentAssignments));
     }
     else if (role === "student") {
-      // Handle student data similarly and ensure userId/userType are strings
       const studentAssignments = [{
         studentGrade: data.studentGrade,
         studentClass: data.studentClass,
@@ -497,19 +437,10 @@ const RegisterForm = ({ onSuccess = () => { }, onError = () => { } }: RegisterFo
       formData.append('studentData', JSON.stringify(studentAssignments));
     }
 
-    // Call the appropriate registration function
     if (role === "student") registerStudentData(formData);
     else if (role === "teacher") registerTeacherData(formData);
     else if (role === "parent") registerParentData(formData);
   };
-
-  // const handleImageChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-  //   if (event.target.files && event.target.files.length > 0) {
-  //     const file = event.target.files[0];
-  //     setValue("photo", event.target.files);
-  //     setPreviewImage(URL.createObjectURL(file));
-  //   }
-  // };
 
   const handleClickShowPassword = () => {
     setShowPassword(!showPassword);
@@ -540,7 +471,6 @@ const RegisterForm = ({ onSuccess = () => { }, onError = () => { } }: RegisterFo
 
       setTeacherAssignments(prev => [...prev, newAssignment]);
 
-      // Clear the current selections
       setValue("teacherGrades", []);
       setValue("subjects", []);
       setValue("teacherClass", []);
@@ -555,7 +485,6 @@ const RegisterForm = ({ onSuccess = () => { }, onError = () => { } }: RegisterFo
     const parentContact = watch("parentContact") || "";
 
     if (!studentAdmissionNo && !profession && !relation && !parentContact) {
-      // you can replace alert with your snackbar helper if available
       alert("Please fill at least one parent field before adding");
       return;
     }
@@ -573,7 +502,6 @@ const RegisterForm = ({ onSuccess = () => { }, onError = () => { } }: RegisterFo
 
     setParentEntries(prev => [...prev, newEntry]);
 
-    // clear the single-field inputs via setValue (react-hook-form)
     setValue("studentAdmissionNo", "");
     setValue("profession", "");
     setValue("relation", "");
@@ -591,8 +519,12 @@ const RegisterForm = ({ onSuccess = () => { }, onError = () => { } }: RegisterFo
   const isPending = isRegisteringBasic || isRegisteringStudent || isRegisteringTeacher || isRegisteringParent;
 
   return (
-    <Box sx={{ width: "100%", maxWidth: 500, overflowY: "auto" }}>
-      {/* Success Snackbar */}
+    <Box sx={{ 
+      width: "100%", 
+      maxWidth: { xs: "100%", sm: 500 },
+      overflowY: "auto",
+      px: { xs: 2, sm: 0 }
+    }}>
       <Snackbar
         open={showSuccessSnackbar}
         autoHideDuration={6000}
@@ -609,7 +541,6 @@ const RegisterForm = ({ onSuccess = () => { }, onError = () => { } }: RegisterFo
         </Alert>
       </Snackbar>
 
-      {/* Error Snackbar */}
       <Snackbar
         open={showErrorSnackbar}
         autoHideDuration={6000}
@@ -626,7 +557,16 @@ const RegisterForm = ({ onSuccess = () => { }, onError = () => { } }: RegisterFo
         </Alert>
       </Snackbar>
 
-      <Stepper activeStep={activeStep} sx={{ mb: 3 }}>
+      <Stepper 
+        activeStep={activeStep} 
+        sx={{ 
+          mb: 3,
+          flexDirection: { xs: 'column', sm: 'row' },
+          '& .MuiStepLabel-label': {
+            fontSize: { xs: '0.75rem', sm: '0.875rem' }
+          }
+        }}
+      >
         {steps.map((label) => (
           <Step key={label}>
             <StepLabel>{label}</StepLabel>
@@ -643,7 +583,6 @@ const RegisterForm = ({ onSuccess = () => { }, onError = () => { } }: RegisterFo
       <form onSubmit={handleSubmit(onSubmit)} encType="multipart/form-data">
         {activeStep === 0 && (
           <Stack spacing={2}>
-            {/* Full Name */}
             <motion.div
               initial={{ x: -20, opacity: 0 }}
               animate={{ x: 0, opacity: 1 }}
@@ -672,7 +611,6 @@ const RegisterForm = ({ onSuccess = () => { }, onError = () => { } }: RegisterFo
               />
             </motion.div>
 
-            {/* Address */}
             <motion.div
               initial={{ x: -20, opacity: 0 }}
               animate={{ x: 0, opacity: 1 }}
@@ -701,51 +639,47 @@ const RegisterForm = ({ onSuccess = () => { }, onError = () => { } }: RegisterFo
               />
             </motion.div>
 
-            {/* Email */}
             <motion.div
               initial={{ x: -20, opacity: 0 }}
               animate={{ x: 0, opacity: 1 }}
               transition={{ delay: 0.4, duration: 0.5 }}
             >
-              <Stack direction="row" spacing={2}>
-                <TextField
-                  label="Email"
-                  type="email"
-                  fullWidth
-                  variant="outlined"
-                  {...register("email", {
-                    required: "Email is required",
-                    pattern: {
-                      value: /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i,
-                      message: "Invalid email address",
-                    },
-                  })}
-                  error={!!errors.email}
-                  helperText={errors.email?.message}
-                  InputProps={{
-                    startAdornment: (
-                      <InputAdornment position="start">
-                        <Email color={errors.email ? "error" : "action"} />
-                      </InputAdornment>
-                    ),
-                  }}
-                  sx={{
-                    "& .MuiOutlinedInput-root": {
-                      borderRadius: "10px",
-                      height: "40px"
-                    }
-                  }}
-                />
-              </Stack>
+              <TextField
+                label="Email"
+                type="email"
+                fullWidth
+                variant="outlined"
+                {...register("email", {
+                  required: "Email is required",
+                  pattern: {
+                    value: /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i,
+                    message: "Invalid email address",
+                  },
+                })}
+                error={!!errors.email}
+                helperText={errors.email?.message}
+                InputProps={{
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <Email color={errors.email ? "error" : "action"} />
+                    </InputAdornment>
+                  ),
+                }}
+                sx={{
+                  "& .MuiOutlinedInput-root": {
+                    borderRadius: "10px",
+                    height: "40px"
+                  }
+                }}
+              />
             </motion.div>
 
-            {/* Birthday and Phone Number */}
             <motion.div
               initial={{ x: -20, opacity: 0 }}
               animate={{ x: 0, opacity: 1 }}
               transition={{ delay: 0.6, duration: 0.5 }}
             >
-              <Stack direction="row" spacing={2}>
+              <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
                 <TextField
                   label="Birthday"
                   type="date"
@@ -793,13 +727,12 @@ const RegisterForm = ({ onSuccess = () => { }, onError = () => { } }: RegisterFo
               </Stack>
             </motion.div>
 
-            {/* Role and Gender */}
             <motion.div
               initial={{ x: -20, opacity: 0 }}
               animate={{ x: 0, opacity: 1 }}
               transition={{ delay: 0.8, duration: 0.5 }}
             >
-              <Stack direction="row" spacing={2}>
+              <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
                 <TextField
                   select
                   label="Role"
@@ -864,81 +797,46 @@ const RegisterForm = ({ onSuccess = () => { }, onError = () => { } }: RegisterFo
               </Stack>
             </motion.div>
 
-            {/* Username and Image Upload */}
             <motion.div
               initial={{ x: -20, opacity: 0 }}
               animate={{ x: 0, opacity: 1 }}
               transition={{ delay: 0.7, duration: 0.5 }}
             >
-              <Stack direction="row" spacing={2}>
-                <TextField
-                  label="Username"
-                  fullWidth
-                  variant="outlined"
-                  {...register("username", {
-                    required: "Username is required",
-                    minLength: {
-                      value: 3,
-                      message: "Username must be at least 3 characters",
-                    },
-                  })}
-                  error={!!errors.username}
-                  helperText={errors.username?.message}
-                  InputProps={{
-                    startAdornment: (
-                      <InputAdornment position="start">
-                        <AccountCircle color={errors.username ? "error" : "action"} />
-                      </InputAdornment>
-                    ),
-                  }}
-                  sx={{
-                    "& .MuiOutlinedInput-root": {
-                      borderRadius: "10px",
-                      height: "40px"
-                    }
-                  }}
-                />
-                {/* Image Upload */}
-                {/* <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                  <Button
-                    component="label"
-                    variant="outlined"
-                    startIcon={<CloudUpload />}
-                    fullWidth
-                    sx={{
-                      height: '40px',
-                      borderRadius: '10px',
-                      textTransform: 'none',
-                      width: '225px'
-                    }}
-                  >
-                    Upload Profile Picture
-                    <VisuallyHiddenInput
-                      type="file"
-                      accept="image/*"
-                      ref={fileInputRef}
-                      onChange={handleImageChange}
-                      name="photo"
-                      required
-                    />
-                  </Button>
-                  {previewImage && (
-                    <Avatar
-                      src={previewImage}
-                      sx={{ width: 100, height: 100, mt: 2 }}
-                    />
-                  )}
-                </Box> */}
-              </Stack>
+              <TextField
+                label="Username"
+                fullWidth
+                variant="outlined"
+                {...register("username", {
+                  required: "Username is required",
+                  minLength: {
+                    value: 3,
+                    message: "Username must be at least 3 characters",
+                  },
+                })}
+                error={!!errors.username}
+                helperText={errors.username?.message}
+                InputProps={{
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <AccountCircle color={errors.username ? "error" : "action"} />
+                    </InputAdornment>
+                  ),
+                }}
+                sx={{
+                  "& .MuiOutlinedInput-root": {
+                    borderRadius: "10px",
+                    height: "40px"
+                  }
+                }}
+              />
             </motion.div>
 
-            {/* Password */}
             <motion.div
               initial={{ x: -20, opacity: 0 }}
               animate={{ x: 0, opacity: 1 }}
               transition={{ delay: 1.1, duration: 0.5 }}
             >
-              <Stack direction="row" spacing={2}>
+              <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
                 <TextField
                   label="Password"
                   type={showPassword ? "text" : "password"}
@@ -1026,12 +924,12 @@ const RegisterForm = ({ onSuccess = () => { }, onError = () => { } }: RegisterFo
             </motion.div>
           </Stack>
         )}
-        {/*Teacher Field*/}
+
         {activeStep === 1 && (
           <Stack spacing={2.5}>
             {selectedRole === "Teacher" && (
               <>
-                <Stack direction="row" spacing={2}>
+                <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
                   <TextField
                     label="Staff Number"
                     fullWidth
@@ -1089,7 +987,7 @@ const RegisterForm = ({ onSuccess = () => { }, onError = () => { } }: RegisterFo
                   </TextField>
                 </Stack>
 
-                <Stack direction="row" spacing={2}>
+                <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
                   <TextField
                     select
                     label="Classes"
@@ -1195,10 +1093,8 @@ const RegisterForm = ({ onSuccess = () => { }, onError = () => { } }: RegisterFo
                       </MenuItem>
                     ))}
                   </TextField>
-
-
-
                 </Stack>
+
                 <Button
                   variant="contained"
                   onClick={handleAddAssignment}
@@ -1212,33 +1108,33 @@ const RegisterForm = ({ onSuccess = () => { }, onError = () => { } }: RegisterFo
                   Add to List
                 </Button>
 
-                {/* Assignments Grid */}
                 {teacherAssignments.length > 0 && (
                   <Box sx={{ mt: 2, width: '100%' }}>
                     <TableContainer
                       component={Paper}
                       sx={{
-                        maxHeight: 220, // Set the height for scrolling
-                        overflowY: 'auto'
+                        maxHeight: 220,
+                        overflowY: 'auto',
+                        overflowX: { xs: 'auto', sm: 'hidden' }
                       }}
                     >
-                      <Table stickyHeader>
+                      <Table stickyHeader sx={{ minWidth: { xs: 500, sm: 'auto' } }}>
                         <TableHead>
                           <TableRow>
-                            <TableCell>Grades</TableCell>
-                            <TableCell>Classes</TableCell>
-                            <TableCell>Medium</TableCell>
-                            <TableCell>Subjects</TableCell>
-                            <TableCell>Actions</TableCell>
+                            <TableCell sx={{ fontSize: { xs: '0.75rem', sm: '0.875rem' } }}>Grades</TableCell>
+                            <TableCell sx={{ fontSize: { xs: '0.75rem', sm: '0.875rem' } }}>Classes</TableCell>
+                            <TableCell sx={{ fontSize: { xs: '0.75rem', sm: '0.875rem' } }}>Medium</TableCell>
+                            <TableCell sx={{ fontSize: { xs: '0.75rem', sm: '0.875rem' } }}>Subjects</TableCell>
+                            <TableCell sx={{ fontSize: { xs: '0.75rem', sm: '0.875rem' } }}>Actions</TableCell>
                           </TableRow>
                         </TableHead>
                         <TableBody>
                           {teacherAssignments.map((assignment) => (
                             <TableRow key={assignment.id}>
-                              <TableCell>{assignment.grades.join(", ")}</TableCell>
-                              <TableCell>{assignment.classes.join(", ")}</TableCell>
-                              <TableCell>{assignment.medium.join(", ")}</TableCell>
-                              <TableCell>{assignment.subjects.join(", ")}</TableCell>
+                              <TableCell sx={{ fontSize: { xs: '0.75rem', sm: '0.875rem' } }}>{assignment.grades.join(", ")}</TableCell>
+                              <TableCell sx={{ fontSize: { xs: '0.75rem', sm: '0.875rem' } }}>{assignment.classes.join(", ")}</TableCell>
+                              <TableCell sx={{ fontSize: { xs: '0.75rem', sm: '0.875rem' } }}>{assignment.medium.join(", ")}</TableCell>
+                              <TableCell sx={{ fontSize: { xs: '0.75rem', sm: '0.875rem' } }}>{assignment.subjects.join(", ")}</TableCell>
                               <TableCell>
                                 <IconButton
                                   onClick={() => {
@@ -1259,13 +1155,12 @@ const RegisterForm = ({ onSuccess = () => { }, onError = () => { } }: RegisterFo
                     </TableContainer>
                   </Box>
                 )}
-
               </>
             )}
 
             {selectedRole === "Student" && (
               <>
-                <Stack direction="row" spacing={2}>
+                <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
                   <TextField
                     select
                     label="Grade"
@@ -1293,7 +1188,7 @@ const RegisterForm = ({ onSuccess = () => { }, onError = () => { } }: RegisterFo
                   </TextField>
                 </Stack>
 
-                <Stack direction="row" spacing={2}>
+                <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
                   <TextField
                     select
                     label="Medium"
@@ -1322,7 +1217,7 @@ const RegisterForm = ({ onSuccess = () => { }, onError = () => { } }: RegisterFo
 
             {selectedRole === "Parent" && (
               <>
-                <Stack direction="row" spacing={2}>
+                <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
                   <TextField
                     label="Student Admission Number"
                     fullWidth
@@ -1343,7 +1238,7 @@ const RegisterForm = ({ onSuccess = () => { }, onError = () => { } }: RegisterFo
                   />
                 </Stack>
 
-                <Stack direction="row" spacing={2}>
+                <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
                   <TextField
                     label="Profession"
                     fullWidth
@@ -1377,27 +1272,33 @@ const RegisterForm = ({ onSuccess = () => { }, onError = () => { } }: RegisterFo
                   Add to List
                 </Button>
 
-                {/* Parent entries table */}
                 {parentEntries.length > 0 && (
                   <Box sx={{ mt: 2, width: '100%' }}>
-                    <TableContainer component={Paper} sx={{ maxHeight: 220, overflowY: 'auto' }}>
-                      <Table stickyHeader>
+                    <TableContainer 
+                      component={Paper} 
+                      sx={{ 
+                        maxHeight: 220, 
+                        overflowY: 'auto',
+                        overflowX: { xs: 'auto', sm: 'hidden' }
+                      }}
+                    >
+                      <Table stickyHeader sx={{ minWidth: { xs: 500, sm: 'auto' } }}>
                         <TableHead>
                           <TableRow>
-                            <TableCell>Admission No</TableCell>
-                            <TableCell>Profession</TableCell>
-                            <TableCell>Relation</TableCell>
-                            <TableCell>Contact</TableCell>
-                            <TableCell>Actions</TableCell>
+                            <TableCell sx={{ fontSize: { xs: '0.75rem', sm: '0.875rem' } }}>Admission No</TableCell>
+                            <TableCell sx={{ fontSize: { xs: '0.75rem', sm: '0.875rem' } }}>Profession</TableCell>
+                            <TableCell sx={{ fontSize: { xs: '0.75rem', sm: '0.875rem' } }}>Relation</TableCell>
+                            <TableCell sx={{ fontSize: { xs: '0.75rem', sm: '0.875rem' } }}>Contact</TableCell>
+                            <TableCell sx={{ fontSize: { xs: '0.75rem', sm: '0.875rem' } }}>Actions</TableCell>
                           </TableRow>
                         </TableHead>
                         <TableBody>
                           {parentEntries.map((p) => (
                             <TableRow key={p.id}>
-                              <TableCell>{p.studentAdmissionNo}</TableCell>
-                              <TableCell>{p.profession}</TableCell>
-                              <TableCell>{p.relation}</TableCell>
-                              <TableCell>{p.parentContact}</TableCell>
+                              <TableCell sx={{ fontSize: { xs: '0.75rem', sm: '0.875rem' } }}>{p.studentAdmissionNo}</TableCell>
+                              <TableCell sx={{ fontSize: { xs: '0.75rem', sm: '0.875rem' } }}>{p.profession}</TableCell>
+                              <TableCell sx={{ fontSize: { xs: '0.75rem', sm: '0.875rem' } }}>{p.relation}</TableCell>
+                              <TableCell sx={{ fontSize: { xs: '0.75rem', sm: '0.875rem' } }}>{p.parentContact}</TableCell>
                               <TableCell>
                                 <IconButton
                                   onClick={() => setParentEntries(prev => prev.filter(x => x.id !== p.id))}
@@ -1419,28 +1320,44 @@ const RegisterForm = ({ onSuccess = () => { }, onError = () => { } }: RegisterFo
           </Stack>
         )}
 
-        <Box sx={{ display: 'flex', flexDirection: 'row', pt: 2 }}>
+        <Box sx={{ 
+          display: 'flex', 
+          flexDirection: { xs: 'column', sm: 'row' }, 
+          gap: { xs: 1, sm: 0 },
+          pt: 2 
+        }}>
           <Button
             color="inherit"
             disabled={activeStep === 0}
             onClick={handleBack}
-            sx={{ mr: 1 }}
+            sx={{ 
+              mr: { sm: 1 },
+              order: { xs: 2, sm: 1 }
+            }}
             startIcon={isPending && <CircularProgress size={20} />}
           >
             Back
           </Button>
-          <Box sx={{ flex: '1 1 auto' }} />
+          <Box sx={{ flex: '1 1 auto', display: { xs: 'none', sm: 'block' } }} />
 
           {activeStep === steps.length - 1 ? (
             <Button
               type="submit"
               variant="contained"
               disabled={isPending}
+              fullWidth={true}
+              sx={{ order: { xs: 1, sm: 2 }, width: { sm: 'auto' } }}
             >
               {isPending ? <CircularProgress size={24} /> : 'Sign Up'}
             </Button>
           ) : (
-            <Button onClick={handleNext} variant="contained" disabled={isPending}>
+            <Button 
+              onClick={handleNext} 
+              variant="contained" 
+              disabled={isPending}
+              fullWidth={true}
+              sx={{ order: { xs: 1, sm: 2 }, width: { sm: 'auto' } }}
+            >
               {isPending ? <CircularProgress size={24} /> : 'Next'}
             </Button>
           )}
@@ -1461,4 +1378,3 @@ const RegisterForm = ({ onSuccess = () => { }, onError = () => { } }: RegisterFo
 };
 
 export default RegisterForm;
-

@@ -105,11 +105,23 @@ const SystemManagement = () => {
           case 1: // Subjects
             const subjectsData = await fetchSubjects();
             console.log('Subjects data from API:', subjectsData);
-            setSubjects(subjectsData);
+            // Sort subjects alphabetically by mainSubject or subjectName
+            const sortedSubjects = [...subjectsData].sort((a, b) => {
+              const nameA = (a.mainSubject || a.subjectName || '').toLowerCase();
+              const nameB = (b.mainSubject || b.subjectName || '').toLowerCase();
+              return nameA.localeCompare(nameB);
+            });
+            setSubjects(sortedSubjects);
             break;
           case 2: // Classes
             const classesData = await fetchClasses();
-            setClasses(classesData);
+            // Sort classes alphabetically by class name
+            const sortedClasses = [...classesData].sort((a, b) => {
+              const nameA = (a.class || '').toLowerCase();
+              const nameB = (b.class || '').toLowerCase();
+              return nameA.localeCompare(nameB);
+            });
+            setClasses(sortedClasses);
             break;
           case 3: // Common Settings
             const commonSettingsData = await fetchCommonSettings();
@@ -171,10 +183,30 @@ const SystemManagement = () => {
 
       // Refresh data
       switch (activeTab) {
-        case 0: setGrades(await fetchGrades()); break;
-        case 1: setSubjects(await fetchSubjects()); break;
-        case 2: setClasses(await fetchClasses()); break;
-        case 3: setCommonSettings(await fetchCommonSettings()); break;
+        case 0: 
+          setGrades(await fetchGrades()); 
+          break;
+        case 1: 
+          const subjectsData = await fetchSubjects();
+          const sortedSubjects = [...subjectsData].sort((a, b) => {
+            const nameA = (a.mainSubject || a.subjectName || '').toLowerCase();
+            const nameB = (b.mainSubject || b.subjectName || '').toLowerCase();
+            return nameA.localeCompare(nameB);
+          });
+          setSubjects(sortedSubjects);
+          break;
+        case 2: 
+          const classesDataDeleted = await fetchClasses();
+          const sortedClassesDeleted = [...classesDataDeleted].sort((a, b) => {
+            const nameA = (a.class || '').toLowerCase();
+            const nameB = (b.class || '').toLowerCase();
+            return nameA.localeCompare(nameB);
+          });
+          setClasses(sortedClassesDeleted);
+          break;
+        case 3: 
+          setCommonSettings(await fetchCommonSettings()); 
+          break;
       }
     } catch (error) {
       console.error('Error deleting item:', error);
@@ -220,10 +252,30 @@ const SystemManagement = () => {
 
       // Refresh data
       switch (activeTab) {
-        case 0: setGrades(await fetchGrades()); break;
-        case 1: setSubjects(await fetchSubjects()); break;
-        case 2: setClasses(await fetchClasses()); break;
-        case 3: setCommonSettings(await fetchCommonSettings()); break;
+        case 0: 
+          setGrades(await fetchGrades()); 
+          break;
+        case 1: 
+          const subjectsData = await fetchSubjects();
+          const sortedSubjects = [...subjectsData].sort((a, b) => {
+            const nameA = (a.mainSubject || a.subjectName || '').toLowerCase();
+            const nameB = (b.mainSubject || b.subjectName || '').toLowerCase();
+            return nameA.localeCompare(nameB);
+          });
+          setSubjects(sortedSubjects);
+          break;
+        case 2: 
+          const classesDataSubmit = await fetchClasses();
+          const sortedClassesSubmit = [...classesDataSubmit].sort((a, b) => {
+            const nameA = (a.class || '').toLowerCase();
+            const nameB = (b.class || '').toLowerCase();
+            return nameA.localeCompare(nameB);
+          });
+          setClasses(sortedClassesSubmit);
+          break;
+        case 3: 
+          setCommonSettings(await fetchCommonSettings()); 
+          break;
       }
     } catch (error: any) {
       console.error('Error saving data:', error);
@@ -788,7 +840,7 @@ const SystemManagement = () => {
             fullWidth={isMobile}
             size={isMobile ? 'medium' : 'large'}
           >
-            {loading.form ? 'Saving...' : 'Save'}
+            {loading.form ? 'Saving....' : 'Save'}
           </Button>
         </DialogActions>
       </Dialog>

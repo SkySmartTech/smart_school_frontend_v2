@@ -24,10 +24,11 @@ import { useSnackbar } from "notistack";
 import { Link, useNavigate } from "react-router-dom";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { login, validateUser } from "../../services/authService";
+import { sendForgotPasswordOtp, verifyForgotPasswordOtp, resetForgotPassword } from "../../api/userApi";
 import { motion } from "framer-motion";
 
 interface LoginFormProps {
-  onForgotPasswordClick: () => void;
+  onForgotPasswordClick?: () => void;
 }
 
 interface LoginFormData {
@@ -185,7 +186,7 @@ const LoginForm = ({ onForgotPasswordClick }: LoginFormProps) => {
       // Persist canonical permission array used by the rest of the app
       localStorage.setItem("userPermissions", JSON.stringify(allowedPermissions || []));
 
-      // If still empty, show the Unauthorized page (no permissions)y
+      // If still empty, show the Unauthorized page (no permissions)
       if (!allowedPermissions || allowedPermissions.length === 0) {
         enqueueSnackbar("No permissions assigned to your account. Please contact administrator.", {
           variant: "warning",
@@ -277,16 +278,81 @@ const LoginForm = ({ onForgotPasswordClick }: LoginFormProps) => {
     event.preventDefault();
   };
 
+  const handleForgotPasswordFlow = async () => {
+    try {
+      const email = window.prompt("Enter your email for password reset:");
+      if (!email) {
+        enqueueSnackbar("Email is required", { variant: "warning" });
+        return;
+      }
+
+      await sendForgotPasswordOtp({ email });
+      enqueueSnackbar("OTP sent to your email", { variant: "info" });
+
+      const otp = window.prompt("Enter the OTP you received:");
+      if (!otp) {
+        enqueueSnackbar("OTP is required", { variant: "warning" });
+        return;
+      }
+
+      await verifyForgotPasswordOtp({ email, otp });
+      enqueueSnackbar("OTP verified. Please set your new password.", { variant: "success" });
+
+      const password = window.prompt("New password (min 6 chars):");
+      if (!password || password.length < 6) {
+        enqueueSnackbar("Password must be at least 6 characters", { variant: "warning" });
+        return;
+      }
+
+      const password_confirmation = window.prompt("Confirm new password:");
+      if (password_confirmation !== password) {
+        enqueueSnackbar("Passwords do not match", { variant: "error" });
+        return;
+      }
+
+      await resetForgotPassword({ email, password, password_confirmation });
+      enqueueSnackbar("Password reset successful. You may now sign in.", { variant: "success" });
+    } catch (err: any) {
+      enqueueSnackbar(err?.message || "Forgot password flow failed", { variant: "error" });
+    }
+  };
+
   return (
-    <Box sx={{ width: "100%", maxWidth: 500 }}>
-      <CardContent sx={{ textAlign: "center" }}>
+    <Box 
+      sx={{ 
+        width: "100%", 
+        maxWidth: 500,
+        px: { xs: 2, sm: 3 },
+        mx: "auto"
+      }}
+    >
+      <CardContent 
+        sx={{ 
+          textAlign: "center",
+          px: { xs: 1, sm: 3 },
+          py: { xs: 2, sm: 3 }
+        }}
+      >
         <motion.div
           initial={{ scale: 0.8, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
           transition={{ duration: 0.5 }}
         >
-          <img src="/images/schoolLogo.png" alt="School Logo" width="50px" />
-          <Typography variant="subtitle1" fontWeight="bold">
+          <img 
+            src="/images/schoolLogo.png" 
+            alt="School Logo" 
+            style={{
+              width: "50px",
+              maxWidth: "100%"
+            }}
+          />
+          <Typography 
+            variant="subtitle1" 
+            fontWeight="bold"
+            sx={{
+              fontSize: { xs: "0.875rem", sm: "1rem" }
+            }}
+          >
             Student Management System
           </Typography>
         </motion.div>
@@ -299,7 +365,10 @@ const LoginForm = ({ onForgotPasswordClick }: LoginFormProps) => {
             variant="h6"
             fontWeight="bold"
             mt={1}
-            sx={{ textAlign: "left" }}
+            sx={{ 
+              textAlign: "left",
+              fontSize: { xs: "1.125rem", sm: "1.25rem" }
+            }}
           >
             Sign In
           </Typography>
@@ -318,6 +387,7 @@ const LoginForm = ({ onForgotPasswordClick }: LoginFormProps) => {
               mb: 2,
               borderRadius: "10px",
               alignItems: "center",
+              fontSize: { xs: "0.813rem", sm: "0.875rem" }
             }}
             onClose={() => setBackendError(null)}
           >
@@ -345,16 +415,25 @@ const LoginForm = ({ onForgotPasswordClick }: LoginFormProps) => {
             mb: 2,
             "& .MuiOutlinedInput-root": {
               borderRadius: "10px",
-              height: "55px",
+              height: { xs: "50px", sm: "55px" },
             },
+            "& .MuiInputLabel-root": {
+              fontSize: { xs: "0.875rem", sm: "1rem" }
+            },
+            "& .MuiInputBase-input": {
+              fontSize: { xs: "0.875rem", sm: "1rem" }
+            },
+            "& .MuiFormHelperText-root": {
+              fontSize: { xs: "0.75rem", sm: "0.813rem" }
+            }
           }}
           autoComplete="username"
-          autoFocus
           InputProps={{
             startAdornment: (
               <InputAdornment position="start">
                 <AccountCircle
                   color={errors.username ? "error" : "action"}
+                  sx={{ fontSize: { xs: "1.25rem", sm: "1.5rem" } }}
                 />
               </InputAdornment>
             ),
@@ -380,8 +459,17 @@ const LoginForm = ({ onForgotPasswordClick }: LoginFormProps) => {
             mb: 2,
             "& .MuiOutlinedInput-root": {
               borderRadius: "10px",
-              height: "55px",
+              height: { xs: "50px", sm: "55px" },
             },
+            "& .MuiInputLabel-root": {
+              fontSize: { xs: "0.875rem", sm: "1rem" }
+            },
+            "& .MuiInputBase-input": {
+              fontSize: { xs: "0.875rem", sm: "1rem" }
+            },
+            "& .MuiFormHelperText-root": {
+              fontSize: { xs: "0.75rem", sm: "0.813rem" }
+            }
           }}
           autoComplete="current-password"
           onFocus={() => setPasswordFocused(true)}
@@ -397,6 +485,7 @@ const LoginForm = ({ onForgotPasswordClick }: LoginFormProps) => {
                       ? "primary"
                       : "action"
                   }
+                  sx={{ fontSize: { xs: "1.25rem", sm: "1.5rem" } }}
                 />
               </InputAdornment>
             ),
@@ -407,8 +496,13 @@ const LoginForm = ({ onForgotPasswordClick }: LoginFormProps) => {
                   onClick={handleClickShowPassword}
                   onMouseDown={handleMouseDownPassword}
                   edge="end"
+                  size="small"
                 >
-                  {showPassword ? <VisibilityOff /> : <Visibility />}
+                  {showPassword ? (
+                    <VisibilityOff sx={{ fontSize: { xs: "1.25rem", sm: "1.5rem" } }} />
+                  ) : (
+                    <Visibility sx={{ fontSize: { xs: "1.25rem", sm: "1.5rem" } }} />
+                  )}
                 </IconButton>
               </InputAdornment>
             ),
@@ -421,9 +515,14 @@ const LoginForm = ({ onForgotPasswordClick }: LoginFormProps) => {
               checked={rememberMe}
               onChange={(e) => setRememberMe(e.target.checked)}
               color="primary"
+              size="small"
             />
           }
-          label="Remember me"
+          label={
+            <Typography sx={{ fontSize: { xs: "0.875rem", sm: "1rem" } }}>
+              Remember me
+            </Typography>
+          }
           sx={{ mb: 2 }}
         />
 
@@ -435,9 +534,9 @@ const LoginForm = ({ onForgotPasswordClick }: LoginFormProps) => {
           disabled={isPending}
           sx={{
             mb: 2,
-            height: 48,
+            height: { xs: 44, sm: 48 },
             borderRadius: "9px",
-            fontSize: "1rem",
+            fontSize: { xs: "0.938rem", sm: "1rem" },
             fontWeight: "bold",
             textTransform: "none",
             boxShadow: "0 4px 6px rgba(0, 0, 0, 0.1)",
@@ -456,17 +555,21 @@ const LoginForm = ({ onForgotPasswordClick }: LoginFormProps) => {
         <Box
           sx={{
             display: "flex",
+            flexDirection: { xs: "column", sm: "row" },
             justifyContent: "space-between",
-            alignItems: "center",
+            alignItems: { xs: "stretch", sm: "center" },
+            gap: { xs: 1, sm: 0 },
             mt: 2,
           }}
         >
           <Button
-            startIcon={<Info />}
-            onClick={onForgotPasswordClick}
+            startIcon={<Info sx={{ fontSize: { xs: "1.125rem", sm: "1.25rem" } }} />}
+            onClick={onForgotPasswordClick ?? handleForgotPasswordFlow}
             sx={{
               textTransform: "none",
               color: "text.secondary",
+              fontSize: { xs: "0.813rem", sm: "0.875rem" },
+              justifyContent: { xs: "center", sm: "flex-start" },
               "&:hover": {
                 color: "primary.main",
               },
@@ -476,10 +579,12 @@ const LoginForm = ({ onForgotPasswordClick }: LoginFormProps) => {
           </Button>
           <Link to="/register" style={{ textDecoration: "none" }}>
             <Button
-              startIcon={<AccountCircle />}
+              startIcon={<AccountCircle sx={{ fontSize: { xs: "1.125rem", sm: "1.25rem" } }} />}
               sx={{
                 textTransform: "none",
                 color: "primary.main",
+                fontSize: { xs: "0.813rem", sm: "0.875rem" },
+                width: { xs: "100%", sm: "auto" },
                 "&:hover": {
                   color: "primary.dark",
                 },
