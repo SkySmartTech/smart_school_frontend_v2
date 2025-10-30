@@ -128,7 +128,7 @@ const HelpPage: React.FC = () => {
                     }}
                 >
                     <Navbar
-                        title="Help & Manuals"
+                        title="Help Page"
                         sidebarOpen={sidebarOpen}
                         setSidebarOpen={setSidebarOpen}
                     />
