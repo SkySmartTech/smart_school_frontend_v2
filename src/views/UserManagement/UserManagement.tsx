@@ -1,5 +1,7 @@
 import React, { useState, useRef, useEffect } from "react";
 import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
+import * as XLSX from 'xlsx';
 import {
   Box,
   Button,
@@ -24,8 +26,12 @@ import {
   TableCell,
   TableContainer,
   TableHead,
-  TableRow
+  TableRow,
+  useMediaQuery
 } from "@mui/material";
+import { FaFileExcel } from 'react-icons/fa';
+import PictureAsPdfIcon from '@mui/icons-material/PictureAsPdf';
+
 import {
   DataGrid,
   GridToolbarContainer,
@@ -39,41 +45,42 @@ import {
   type GridRowParams
 } from "@mui/x-data-grid";
 import {
-  PictureAsPdf as PdfIcon,
   Delete as DeleteIcon,
   Edit as EditIcon,
   Refresh as RefreshIcon,
   Search as SearchIcon,
   Clear as ClearIcon,
   Add,
-  Delete,
-  CloudUpload as CloudUploadIcon
+  Delete as DeleteRowIcon,
+  CloudUpload as CloudUploadIcon,
+  DeleteForever as DeleteForeverIcon
 } from "@mui/icons-material";
 import Sidebar from "../../components/Sidebar";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useCustomTheme } from "../../context/ThemeContext";
-import { 
-  type User, 
-  type UserRole, 
-  type Subject, // This import is now used
-  statusOptions, 
-  genderOptions, 
-  userRoleOptions, 
-  userTypeOptions, 
-  gradeOptions, 
-  mediumOptions, 
-  classOptions, 
+import {
+  type User,
+  type UserRole,
+  type Subject,
+  statusOptions,
+  genderOptions,
+  userRoleOptions,
+  userTypeOptions,
+  gradeOptions,
+  mediumOptions,
+  classOptions,
   type TeacherAssignment
 } from "../../types/userManagementTypes";
-import { 
-  bulkDeactivateUsers, 
-  createUser, 
-  deactivateUser, 
-  fetchUsers, 
-  getUserRole, 
+import {
+  bulkDeactivateUsers,
+  createUser,
+  deactivateUser,
+  fetchUsers,
+  getUserRole,
   searchUsers,
   fetchSubjects,
-  updateUser // Add this import
+  updateUser,
+  deleteUser
 } from "../../api/userManagementApi";
 import Navbar from "../../components/Navbar";
 import { debounce } from 'lodash';
@@ -139,14 +146,25 @@ const UserManagement: React.FC = () => {
   const [teacherAssignments, setTeacherAssignments] = useState<TeacherAssignment[]>([]);
   const [parentEntries, setParentEntries] = useState<ParentEntry[]>([]);
   const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
   const dataGridRef = useRef<any>(null);
+  const formTopRef = useRef<HTMLDivElement>(null);
   useCustomTheme();
 
   const queryClient = useQueryClient();
 
+  // Scroll to top function
+  const scrollToTop = () => {
+    formTopRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
+
   const { data: allUsers = [], isLoading: isDataLoading, refetch } = useQuery<User[]>({
     queryKey: ["users", activeTab],
-    queryFn: () => fetchUsers(activeTab),
+    queryFn: async () => {
+      const data = await fetchUsers(activeTab);
+      // Sort by ID descending to show newest first
+      return data.sort((a, b) => (b.id || 0) - (a.id || 0));
+    },
   });
 
   const users = allUsers;
@@ -168,6 +186,8 @@ const UserManagement: React.FC = () => {
       queryClient.invalidateQueries({ queryKey: ["users"] });
       showSnackbar("User created successfully!", "success");
       handleClear();
+      // Scroll to top after creating user
+      scrollToTop();
     },
     onError: (error: any) => {
       console.error('Create user error:', error);
@@ -190,6 +210,8 @@ const UserManagement: React.FC = () => {
       queryClient.invalidateQueries({ queryKey: ["users"] });
       showSnackbar("User updated successfully!", "success");
       handleClear();
+      // Scroll to top after updating user
+      scrollToTop();
     },
     onError: (error: any) => {
       const errorMessage = error.response?.data?.message || "Failed to update user";
@@ -224,6 +246,27 @@ const UserManagement: React.FC = () => {
       showSnackbar("Error deactivating some users", "error");
     }
   });
+
+  const deleteUserMutation = useMutation({
+    mutationFn: (id: number) => deleteUser(id, activeTab),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["users", activeTab] });
+      showSnackbar("User deleted successfully!", "success");
+      setRowSelectionModel([]); // Clear any selections
+    },
+    onError: (error: any) => {
+      const message = error.response?.data?.message || "Failed to delete user";
+      showSnackbar(message, "error");
+    }
+  });
+
+  // delete handler uses deleteUserMutation (must be inside component)
+  const handleDelete = (id: number) => {
+    if (!id) return;
+    if (window.confirm("Are you sure you want to permanently delete this user? This action cannot be undone.")) {
+      deleteUserMutation.mutate(id);
+    }
+  };
 
   const showSnackbar = (message: string, severity: "success" | "error") => {
     setSnackbar({ open: true, message, severity });
@@ -313,14 +356,13 @@ const UserManagement: React.FC = () => {
       }
     }
 
-    // Use form.userRole instead of getUserRole(activeTab)
     const baseUserData: Omit<User, 'id'> = {
       name: form.name,
       username: form.username,
       email: form.email,
       password: form.password,
       userType: activeTab,
-      userRole: form.userRole, // CHANGED: Use the role from form state
+      userRole: form.userRole,
       status: form.status,
       contact: form.contact || '',
       address: form.address || '',
@@ -330,7 +372,6 @@ const UserManagement: React.FC = () => {
       parentContact: form.parentContact || ''
     };
 
-    // ... rest of the function remains the same
     let userData: User;
 
     switch (activeTab) {
@@ -454,6 +495,7 @@ const UserManagement: React.FC = () => {
   const handleEdit = (id: number) => {
     const userToEdit = (searchTerm ? apiSearchResults : users).find(user => user.id === id);
     if (userToEdit) {
+      // Set the form data first
       setForm({
         ...userToEdit,
         photo: userToEdit.photo || '',
@@ -479,7 +521,7 @@ const UserManagement: React.FC = () => {
       if (userToEdit.userType === 'Parent') {
         const rawParentArray =
           (userToEdit as any).parentEntries ||
-          (userToEdit as any).parent_data || // NEW: Handle parent_data array from backend
+          (userToEdit as any).parent_data ||
           (userToEdit as any).parent ||
           (userToEdit as any).parentData ||
           [];
@@ -487,9 +529,7 @@ const UserManagement: React.FC = () => {
         const arr = Array.isArray(rawParentArray) ? rawParentArray : rawParentArray ? [rawParentArray] : [];
 
         if (arr.length > 0) {
-          // NEW: Handle the nested parent_data structure
           const parentEntriesData = arr.flatMap((parentItem: any) => {
-            // If it's the new backend structure with parent_info and students_info
             if (parentItem.parent_info && parentItem.students_info) {
               return parentItem.students_info.map((student: any) => ({
                 id: Math.random().toString(36).substr(2, 9),
@@ -499,7 +539,6 @@ const UserManagement: React.FC = () => {
                 studentAdmissionNo: student.studentAdmissionNo || ''
               }));
             }
-            // If it's the old flat structure
             return {
               id: Math.random().toString(36).substr(2, 9),
               relation: parentItem.relation || '',
@@ -524,6 +563,9 @@ const UserManagement: React.FC = () => {
           }
         }
       }
+
+      // Auto scroll to top when editing
+      scrollToTop();
     }
   };
 
@@ -545,54 +587,220 @@ const UserManagement: React.FC = () => {
   };
 
   const handleExportPDF = () => {
-    const doc = new jsPDF();
+  const doc = new jsPDF({
+    orientation: "landscape", // ✅ Landscape gives more space for columns
+    unit: "pt",               // ✅ Better precision
+    format: "A4"
+  });
+
+  const dataToExport = searchTerm ? apiSearchResults : users;
+
+  const tableData = dataToExport.map(user => {
+    if (activeTab === "Student") {
+      return [
+        user.name,
+        user.username,
+        user.email,
+        user.address || "-",
+        user.birthDay || "-",
+        user.contact || "-",
+        user.gender || "-",
+        user.studentAdmissionNo || "-",
+        user.class || user.grade || "-",
+        user.medium || "-",
+        user.status ? "Active" : "Inactive"
+      ];
+    } else if (activeTab === "Teacher") {
+      return [
+        user.name,
+        user.username,
+        user.email,
+        user.address || "-",
+        user.birthDay || "-",
+        user.contact || "-",
+        user.gender || "-",
+        user.medium || "-",
+        user.grade || user.class || "-",
+        user.subject || "-",
+        user.status ? "Active" : "Inactive"
+      ];
+    } else {
+      // Parent
+      return [
+        user.name,
+        user.username,
+        user.email,
+        user.address || "-",
+        user.birthDay || "-",
+        user.contact || "-",
+        user.gender || "-",
+        user.studentAdmissionNo || "-",
+        user.relation || "-",
+        user.profession || "-",
+        user.parentContact || "-",
+        user.status ? "Active" : "Inactive"
+      ];
+    }
+  });
+
+  const headers = {
+    Student: [
+      "Name",
+      "Username",
+      "Email",
+      "Address",
+      "Birthday",
+      "Phone No",
+      "Gender",
+      "Admission No",
+      "Class",
+      "Medium",
+      "Status"
+    ],
+    Teacher: [
+      "Name",
+      "Username",
+      "Email",
+      "Address",
+      "Birthday",
+      "Phone No",
+      "Gender",
+      "Medium",
+      "Grade",
+      "Subject",
+      "Status"
+    ],
+    Parent: [
+      "Name",
+      "Username",
+      "Email",
+      "Address",
+      "Birthday",
+      "Phone No",
+      "Gender",
+      "Admission No",
+      "Relation",
+      "Profession",
+      "Parent No",
+      "Status"
+    ]
+  };
+
+  // ✅ Add a title with better styling
+  doc.setFontSize(16);
+  doc.text(`${activeTab} Management Report`, 40, 40);
+
+  // ✅ Build the table neatly
+  autoTable(doc, {
+    startY: 60,
+    head: [headers[activeTab]],
+    body: tableData,
+    theme: "grid",
+    styles: {
+      fontSize: 9,
+      cellPadding: 5,
+      valign: "middle",
+      halign: "center",
+      textColor: [0, 0, 0],
+      lineWidth: 0.2
+    },
+    headStyles: {
+      fillColor: [25, 118, 210],
+      textColor: 255,
+      fontStyle: "bold",
+      halign: "center",
+    },
+    alternateRowStyles: {
+      fillColor: [245, 245, 245],
+    },
+    didDrawPage: (data) => {
+      // ✅ Add footer (optional)
+      const pageCount = (doc as any).getNumberOfPages
+        ? (doc as any).getNumberOfPages()
+        : ((doc as any).internal?.pages?.length ?? 1);
+      doc.setFontSize(10);
+      doc.text(
+        `Page ${data.pageNumber} of ${pageCount}`,
+        doc.internal.pageSize.width - 100,
+        doc.internal.pageSize.height - 20
+      );
+    },
+  });
+
+  // ✅ Save PDF with meaningful filename
+  doc.save(`${activeTab.toLowerCase()}-management-report.pdf`);
+};
+
+  const handleExportExcel = () => {
     const dataToExport = searchTerm ? apiSearchResults : users;
 
-    const tableData = dataToExport.map(user => [
-      user.name,
-      user.username,
-      user.email,
-      user.address || '-',
-      user.birthDay || '-',
-      user.contact || '-',
-      user.gender || '-',
-      activeTab === 'Student' ? user.grade || '-' :
-        activeTab === 'Teacher' ? user.class || '-' : user.profession || '-',
-      activeTab === 'Student' ? user.medium || '-' :
-        activeTab === 'Teacher' ? user.subject || '-' : (user as any).parentContact || '-',
-    ]);
-
-    const headers = [
-      'Name', 'Username', 'Email', 'Address', 'Birthday', 'Phone No', 'Gender',
-      activeTab === 'Student' ? 'Grade' : activeTab === 'Teacher' ? 'Class' : 'Profession',
-      activeTab === 'Student' ? 'Medium' : activeTab === 'Teacher' ? 'Subject' : 'Parent No',
-      'Status'
-    ];
-
-    doc.text(`${activeTab} Management Report`, 14, 16);
-    autoTable(doc, {
-      head: [headers],
-      body: tableData,
-      startY: 20,
-      styles: {
-        cellPadding: 3,
-        fontSize: 8,
-        valign: 'middle',
-        halign: 'center',
-      },
-      headStyles: {
-        fillColor: [25, 118, 210],
-        textColor: 255,
-        fontStyle: 'bold'
-      },
-      alternateRowStyles: {
-        fillColor: [245, 245, 245]
+    const excelData = dataToExport.map(user => {
+      // Student data
+      if (activeTab === 'Student') {
+        return {
+          'Name': user.name,
+          'Username': user.username,
+          'Email': user.email,
+          'Address': user.address || '-',
+          'Birthday': user.birthDay || '-',
+          'Phone No': user.contact || '-',
+          'Gender': user.gender || '-',
+          'Admission No': user.studentAdmissionNo || '-',
+          'Class': user.class || user.grade || '-',
+          'Medium': user.medium || '-',
+          'Status': user.status ? 'Active' : 'Inactive'
+        };
+      }
+      // Teacher data
+      else if (activeTab === 'Teacher') {
+        return {
+          'Name': user.name,
+          'Username': user.username,
+          'Email': user.email,
+          'Address': user.address || '-',
+          'Birthday': user.birthDay || '-',
+          'Phone No': user.contact || '-',
+          'Gender': user.gender || '-',
+          'Medium': user.medium || '-',
+          'Grade': user.grade || user.class || '-',
+          'Subject': user.subject || '-',
+          'Status': user.status ? 'Active' : 'Inactive'
+        };
+      }
+      // Parent data
+      else {
+        return {
+          'Name': user.name,
+          'Username': user.username,
+          'Email': user.email,
+          'Address': user.address || '-',
+          'Birthday': user.birthDay || '-',
+          'Phone No': user.contact || '-',
+          'Gender': user.gender || '-',
+          'Admission No': user.studentAdmissionNo || '-',
+          'Relation': user.relation || '-',
+          'Profession': user.profession || '-',
+          'Parent No': (user as any).parentContact || '-',
+          'Status': user.status ? 'Active' : 'Inactive'
+        };
       }
     });
 
-    doc.save(`${activeTab.toLowerCase()}-management-report.pdf`);
-  };
+    const worksheet = XLSX.utils.json_to_sheet(excelData);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, `${activeTab}s`);
 
+    // Set column widths
+    const maxWidth = excelData.reduce((w: any, r: any) => {
+      return Object.keys(r).map((k, i) =>
+        Math.max(w[i] || 10, String(r[k]).length)
+      );
+    }, []);
+    worksheet['!cols'] = maxWidth.map((w: number) => ({ wch: w + 2 }));
+
+    XLSX.writeFile(workbook, `${activeTab.toLowerCase()}-management-report.xlsx`);
+    showSnackbar("Excel file exported successfully!", "success");
+  };
   const handleClearSearch = () => {
     setSearchTerm("");
   };
@@ -602,7 +810,6 @@ const UserManagement: React.FC = () => {
     setForm(prev => ({
       ...prev,
       userType: newValue,
-      // Only set default role if we're creating a new user, otherwise keep existing role
       userRole: editId === null ? getUserRole(newValue) : prev.userRole
     }));
     setSearchTerm("");
@@ -627,24 +834,25 @@ const UserManagement: React.FC = () => {
   const isMutating = createUserMutation.isPending ||
     updateUserMutation.isPending ||
     deactivateUserMutation.isPending ||
-    bulkDeactivateMutation.isPending;
+    bulkDeactivateMutation.isPending ||
+    deleteUserMutation.isPending;
 
   const getColumns = (): GridColDef<User>[] => {
     const commonColumns: GridColDef<User>[] = [
-      { field: 'name', headerName: 'Name', width: 150, flex: 1 },
-      { field: 'username', headerName: 'Username', width: 120, flex: 1 },
-      { field: 'email', headerName: 'Email', width: 180, flex: 1 },
-      { field: 'address', headerName: 'Address', width: 150, flex: 1 },
-      { field: 'birthDay', headerName: 'Birthday', width: 100, flex: 1 },
-      { field: 'contact', headerName: 'Phone No', width: 120, flex: 1 },
-      { field: 'gender', headerName: 'Gender', width: 100, flex: 1 },
+      { field: 'name', headerName: 'Name', width: isMobile ? 120 : 150, flex: isMobile ? 0 : 1 },
+      { field: 'username', headerName: 'Username', width: isMobile ? 100 : 120, flex: isMobile ? 0 : 1 },
+      { field: 'email', headerName: 'Email', width: isMobile ? 150 : 180, flex: isMobile ? 0 : 1 },
+      { field: 'address', headerName: 'Address', width: isMobile ? 120 : 150, flex: isMobile ? 0 : 1 },
+      { field: 'birthDay', headerName: 'Birthday', width: isMobile ? 100 : 100, flex: isMobile ? 0 : 1 },
+      { field: 'contact', headerName: 'Phone No', width: isMobile ? 110 : 120, flex: isMobile ? 0 : 1 },
+      { field: 'gender', headerName: 'Gender', width: isMobile ? 80 : 100, flex: isMobile ? 0 : 1 },
     ];
 
     const statusColumn: GridColDef<User> = {
       field: 'status',
       headerName: 'Status',
-      width: 120,
-      flex: 1,
+      width: isMobile ? 100 : 120,
+      flex: isMobile ? 0 : 1,
       type: 'boolean',
       renderCell: (params) => (
         <Box
@@ -672,7 +880,7 @@ const UserManagement: React.FC = () => {
       field: 'actions',
       headerName: 'Actions',
       type: 'actions',
-      width: 120,
+      width: isMobile ? 80 : 140,
       getActions: (params: GridRowParams) => [
         <GridActionsCellItem
           icon={<EditIcon />}
@@ -686,6 +894,12 @@ const UserManagement: React.FC = () => {
           onClick={() => handleDeactivate(params.id as number)}
           showInMenu
         />,
+        <GridActionsCellItem
+          icon={<DeleteForeverIcon color="error" />}
+          label="Delete"
+          onClick={() => handleDelete(params.id as number)}
+          showInMenu
+        />,
       ],
     };
 
@@ -693,30 +907,30 @@ const UserManagement: React.FC = () => {
       case 'Student':
         return [
           ...commonColumns,
-          { field: 'grade', headerName: 'Grade', width: 100, flex: 1 },
-          { field: 'medium', headerName: 'Medium', width: 100, flex: 1 },
-          { field: 'class', headerName: 'Class', width: 100, flex: 1 },
-          { field: 'studentAdmissionNo', headerName: 'Student Admission No', width: 150, flex: 1 },
+          { field: 'grade', headerName: 'Grade', width: isMobile ? 80 : 100, flex: isMobile ? 0 : 1 },
+          { field: 'medium', headerName: 'Medium', width: isMobile ? 80 : 100, flex: isMobile ? 0 : 1 },
+          { field: 'class', headerName: 'Class', width: isMobile ? 80 : 100, flex: isMobile ? 0 : 1 },
+          { field: 'studentAdmissionNo', headerName: 'Admission No', width: isMobile ? 120 : 150, flex: isMobile ? 0 : 1 },
           statusColumn,
           actionColumn
         ];
       case 'Teacher':
         return [
           ...commonColumns,
-          { field: 'grade', headerName: 'Grade', width: 100, flex: 1 },
-          { field: 'class', headerName: 'Class', width: 100, flex: 1 },
-          { field: 'subject', headerName: 'Subject', width: 120, flex: 1 },
-          { field: 'medium', headerName: 'Medium', width: 100, flex: 1 },
+          { field: 'grade', headerName: 'Grade', width: isMobile ? 80 : 100, flex: isMobile ? 0 : 1 },
+          { field: 'class', headerName: 'Class', width: isMobile ? 80 : 100, flex: isMobile ? 0 : 1 },
+          { field: 'subject', headerName: 'Subject', width: isMobile ? 100 : 120, flex: isMobile ? 0 : 1 },
+          { field: 'medium', headerName: 'Medium', width: isMobile ? 80 : 100, flex: isMobile ? 0 : 1 },
           statusColumn,
           actionColumn
         ];
       case 'Parent':
         return [
           ...commonColumns,
-          { field: 'profession', headerName: 'Profession', width: 120, flex: 1 },
-          { field: 'parentContact', headerName: 'Parent No', width: 120, flex: 1 },
-          { field: 'studentAdmissionNo', headerName: 'Student Admission No', width: 150, flex: 1 },
-          { field: 'relation', headerName: 'Relation', width: 120, flex: 1 },
+          { field: 'profession', headerName: 'Profession', width: isMobile ? 100 : 120, flex: isMobile ? 0 : 1 },
+          { field: 'parentContact', headerName: 'Parent No', width: isMobile ? 110 : 120, flex: isMobile ? 0 : 1 },
+          { field: 'studentAdmissionNo', headerName: 'Admission No', width: isMobile ? 120 : 150, flex: isMobile ? 0 : 1 },
+          { field: 'relation', headerName: 'Relation', width: isMobile ? 100 : 120, flex: isMobile ? 0 : 1 },
           statusColumn,
           actionColumn
         ];
@@ -729,16 +943,26 @@ const UserManagement: React.FC = () => {
 
   function CustomToolbar() {
     return (
-      <GridToolbarContainer sx={{ justifyContent: 'space-between' }}>
-        <Box>
+      <GridToolbarContainer sx={{
+        justifyContent: 'space-between',
+        flexDirection: isMobile ? 'column' : 'row',
+        gap: isMobile ? 1 : 0,
+        p: 1
+      }}>
+        <Stack direction={isMobile ? 'column' : 'row'} spacing={1} sx={{ width: isMobile ? '100%' : 'auto' }}>
           <Tooltip title="Refresh data">
-            <IconButton onClick={() => refetch()}>
+            <IconButton onClick={() => refetch()} size={isMobile ? 'small' : 'medium'}>
               <RefreshIcon />
             </IconButton>
           </Tooltip>
           <Tooltip title="Export PDF">
-            <IconButton onClick={handleExportPDF}>
-              <PdfIcon />
+            <IconButton onClick={handleExportPDF} size={isMobile ? 'small' : 'medium'} color="default">
+              <PictureAsPdfIcon />
+            </IconButton>
+          </Tooltip>
+          <Tooltip title="Export Excel">
+            <IconButton onClick={handleExportExcel} size={isMobile ? 'small' : 'medium'} color="success">
+              <FaFileExcel />
             </IconButton>
           </Tooltip>
           {rowSelectionModel.length > 0 && (
@@ -747,18 +971,18 @@ const UserManagement: React.FC = () => {
               startIcon={<DeleteIcon />}
               onClick={handleBulkDeactivate}
               size="small"
-              sx={{ ml: 1 }}
+              fullWidth={isMobile}
             >
               Deactivate Selected
             </Button>
           )}
-        </Box>
-        <Box>
+        </Stack>
+        <Stack direction="row" spacing={0.5} sx={{ width: isMobile ? '100%' : 'auto', justifyContent: isMobile ? 'center' : 'flex-end' }}>
           <GridToolbarColumnsButton />
           <GridToolbarFilterButton />
           <GridToolbarDensitySelector />
           <GridToolbarExport />
-        </Box>
+        </Stack>
       </GridToolbarContainer>
     );
   }
@@ -767,13 +991,17 @@ const UserManagement: React.FC = () => {
 
   const renderFormFields = () => {
     const commonFields = (
-      <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2 }}>
+      <Box sx={{
+        display: 'grid',
+        gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)', md: 'repeat(3, 1fr)' },
+        gap: 2
+      }}>
         <TextField
           label="Name*"
           name="name"
           value={form.name}
           onChange={handleChange}
-          sx={{ flex: '1 1 calc(33.33% - 16px)', minWidth: 120 }}
+          sx={{ minWidth: 120 }}
           size="small"
         />
         <TextField
@@ -781,7 +1009,7 @@ const UserManagement: React.FC = () => {
           name="username"
           value={form.username}
           onChange={handleChange}
-          sx={{ flex: '1 1 calc(33.33% - 16px)', minWidth: 120 }}
+          sx={{ minWidth: 120 }}
           size="small"
         />
         <TextField
@@ -789,7 +1017,7 @@ const UserManagement: React.FC = () => {
           name="email"
           value={form.email}
           onChange={handleChange}
-          sx={{ flex: '1 1 calc(33.33% - 16px)', minWidth: 120 }}
+          sx={{ minWidth: 120 }}
           size="small"
         />
         <TextField
@@ -797,7 +1025,7 @@ const UserManagement: React.FC = () => {
           name="address"
           value={form.address || ''}
           onChange={handleChange}
-          sx={{ flex: '1 1 calc(33.33% - 16px)', minWidth: 120 }}
+          sx={{ minWidth: 120 }}
           size="small"
         />
         <TextField
@@ -807,7 +1035,7 @@ const UserManagement: React.FC = () => {
           value={form.birthDay || ''}
           onChange={handleChange}
           InputLabelProps={{ shrink: true }}
-          sx={{ flex: '1 1 calc(33.33% - 16px)', minWidth: 120 }}
+          sx={{ minWidth: 120 }}
           size="small"
         />
         <TextField
@@ -815,10 +1043,9 @@ const UserManagement: React.FC = () => {
           name="contact"
           value={form.contact || ''}
           onChange={handleChange}
-          sx={{ flex: '1 1 calc(33.33% - 16px)', minWidth: 120 }}
+          sx={{ minWidth: 120 }}
           size="small"
         />
-
         <TextField
           type="file"
           label="Upload Photo"
@@ -838,10 +1065,7 @@ const UserManagement: React.FC = () => {
             }
           }}
           InputLabelProps={{ shrink: true }}
-          sx={{
-            flex: '1 1 calc(33.33% - 16px)',
-            minWidth: 120
-          }}
+          sx={{ minWidth: 120 }}
           size="small"
           InputProps={{
             startAdornment: (
@@ -864,7 +1088,7 @@ const UserManagement: React.FC = () => {
           name="userRole"
           value={form.userRole || ''}
           onChange={(e) => handleSelectChange(e, "userRole")}
-          sx={{ flex: '1 1 calc(33.33% - 16px)', minWidth: 120 }}
+          sx={{ minWidth: 120 }}
           size="small"
         >
           {userRoleOptions.map((userRole: string) => (
@@ -879,7 +1103,7 @@ const UserManagement: React.FC = () => {
           name="userType"
           value={form.userType || ''}
           onChange={(e) => handleSelectChange(e, "userType")}
-          sx={{ flex: '1 1 calc(33.33% - 16px)', minWidth: 120 }}
+          sx={{ minWidth: 120 }}
           size="small"
         >
           {userTypeOptions.map((userType: string) => (
@@ -894,7 +1118,7 @@ const UserManagement: React.FC = () => {
           name="gender"
           value={form.gender || ''}
           onChange={(e) => handleSelectChange(e, "gender")}
-          sx={{ flex: '1 1 calc(33.33% - 16px)', minWidth: 120 }}
+          sx={{ minWidth: 120 }}
           size="small"
         >
           {genderOptions.map((gender: string) => (
@@ -904,300 +1128,335 @@ const UserManagement: React.FC = () => {
           ))}
         </TextField>
 
-        {editId === null && (
+        {editId === null ? (
+          <>
+            <TextField
+              label="Password*"
+              name="password"
+              type="password"
+              value={form.password || ''}
+              onChange={handleChange}
+              sx={{ minWidth: 120 }}
+              size="small"
+            />
+            <TextField
+              select
+              label="Status"
+              name="status"
+              value={form.status.toString()}
+              onChange={(e) => handleSelectChange(e, "status")}
+              sx={{ minWidth: 120 }}
+              size="small"
+            >
+              {statusOptions.map((option) => (
+                <MenuItem key={option.label} value={option.value.toString()}>
+                  {option.label}
+                </MenuItem>
+              ))}
+            </TextField>
+          </>
+        ) : (
           <TextField
-            label="Password*"
-            name="password"
-            type="password"
-            value={form.password || ''}
-            onChange={handleChange}
-            sx={{ flex: '1 1 calc(33.33% - 16px)', minWidth: 120 }}
+            select
+            label="Status"
+            name="status"
+            value={form.status.toString()}
+            onChange={(e) => handleSelectChange(e, "status")}
+            sx={{
+              minWidth: 120,
+              gridColumn: { md: 'span 2' }
+            }}
             size="small"
-          />
+          >
+            {statusOptions.map((option) => (
+              <MenuItem key={option.label} value={option.value.toString()}>
+                {option.label}
+              </MenuItem>
+            ))}
+          </TextField>
         )}
-        <TextField
-          select
-          label="Status"
-          name="status"
-          value={form.status.toString()}
-          onChange={(e) => handleSelectChange(e, "status")}
-          sx={{ flex: '1 1 calc(33.33% - 16px)', minWidth: 120 }}
-          size="small"
-        >
-          {statusOptions.map((option) => (
-            <MenuItem key={option.label} value={option.value.toString()}>
-              {option.label}
-            </MenuItem>
-          ))}
-        </TextField>
       </Box>
     );
 
     switch (activeTab) {
       case 'Student':
         return (
-          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2 }}>
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
             {commonFields}
-            <TextField
-              select
-              label="Grade"
-              name="grade"
-              value={form.grade || ''}
-              onChange={(e) => handleSelectChange(e, "grade")}
-              sx={{ flex: '1 1 calc(33.33% - 16px)', minWidth: 120 }}
-              size="small"
-            >
-              {gradeOptions.map((grade: string) => (
-                <MenuItem key={grade} value={grade}>
-                  {grade}
-                </MenuItem>
-              ))}
-            </TextField>
-            <TextField
-              select
-              label="Medium"
-              name="medium"
-              value={form.medium || ''}
-              onChange={(e) => handleSelectChange(e, "medium")}
-              sx={{ flex: '1 1 calc(33.33% - 16px)', minWidth: 120 }}
-              size="small"
-            >
-              {mediumOptions.map((medium: string) => (
-                <MenuItem key={medium} value={medium}>
-                  {medium}
-                </MenuItem>
-              ))}
-            </TextField>
-            <TextField
-              label="Student Admission No"
-              name="studentAdmissionNo"
-              value={form.studentAdmissionNo || ''}
-              onChange={handleChange}
-              sx={{ flex: '1 1 calc(33.33% - 16px)', minWidth: 120 }}
-              size="small"
-            />
-            <TextField
-              select
-              label="Class"
-              name="class"
-              value={form.class || ''}
-              onChange={(e) => handleSelectChange(e, "class")}
-              sx={{ flex: '1 1 calc(33.33% - 16px)', minWidth: 120 }}
-              size="small"
-            >
-              {classOptions.map((cls: string) => (
-                <MenuItem key={cls} value={cls}>
-                  {cls}
-                </MenuItem>
-              ))}
-            </TextField>
+            <Box sx={{
+              display: 'grid',
+              gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)', md: 'repeat(3, 1fr)' },
+              gap: 2
+            }}>
+              <TextField
+                select
+                label="Grade"
+                name="grade"
+                value={form.grade || ''}
+                onChange={(e) => handleSelectChange(e, "grade")}
+                sx={{ minWidth: 120 }}
+                size="small"
+              >
+                {gradeOptions.map((grade: string) => (
+                  <MenuItem key={grade} value={grade}>
+                    {grade}
+                  </MenuItem>
+                ))}
+              </TextField>
+              <TextField
+                select
+                label="Medium"
+                name="medium"
+                value={form.medium || ''}
+                onChange={(e) => handleSelectChange(e, "medium")}
+                sx={{ minWidth: 120 }}
+                size="small"
+              >
+                {mediumOptions.map((medium: string) => (
+                  <MenuItem key={medium} value={medium}>
+                    {medium}
+                  </MenuItem>
+                ))}
+              </TextField>
+              <TextField
+                label="Student Admission No"
+                name="studentAdmissionNo"
+                value={form.studentAdmissionNo || ''}
+                onChange={handleChange}
+                sx={{ minWidth: 120 }}
+                size="small"
+              />
+              <TextField
+                select
+                label="Class"
+                name="class"
+                value={form.class || ''}
+                onChange={(e) => handleSelectChange(e, "class")}
+                fullWidth
+                size="small"
+              >
+                {classOptions.map((cls: string) => (
+                  <MenuItem key={cls} value={cls}>
+                    {cls}
+                  </MenuItem>
+                ))}
+              </TextField>
+            </Box>
           </Box>
         );
       case 'Teacher':
         return (
-          <>
-            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-              {commonFields}
-              <Stack spacing={2}>
-                <TextField
-                  label="Staff Number"
-                  name="staffNo"
-                  value={form.staffNo || ''}
-                  onChange={handleChange}
-                  sx={{ flex: '1 1 calc(33.33% - 16px)', minWidth: 120 }}
-                  size="small"
-                />
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+            {commonFields}
 
-                <Stack direction="row" spacing={2}>
-                  <TextField
-                    select
-                    label="Grade"
-                    name="grade"
-                    value={form.grade || ''}
-                    onChange={(e) => handleSelectChange(e, "grade")}
-                    sx={{ flex: '1 1 calc(25% - 16px)', minWidth: 120 }}
-                    size="small"
-                  >
-                    {gradeOptions.map(grade => (
-                      <MenuItem key={grade} value={grade}>{grade}</MenuItem>
-                    ))}
-                  </TextField>
+            <TextField
+              label="Staff Number"
+              name="staffNo"
+              value={form.staffNo || ''}
+              onChange={handleChange}
+              fullWidth
+              size="small"
+            />
 
-                  <TextField
-                    select
-                    label="Class"
-                    name="class"
-                    value={form.class || ''}
-                    onChange={(e) => handleSelectChange(e, "class")}
-                    sx={{ flex: '1 1 calc(25% - 16px)', minWidth: 120 }}
-                    size="small"
-                  >
-                    {classOptions.map(cls => (
-                      <MenuItem key={cls} value={cls}>{cls}</MenuItem>
-                    ))}
-                  </TextField>
+            <Box sx={{
+              display: 'grid',
+              gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)', md: 'repeat(4, 1fr)' },
+              gap: 2
+            }}>
+              <TextField
+                select
+                label="Grade"
+                name="grade"
+                value={form.grade || ''}
+                onChange={(e) => handleSelectChange(e, "grade")}
+                sx={{ minWidth: 120 }}
+                size="small"
+              >
+                {gradeOptions.map(grade => (
+                  <MenuItem key={grade} value={grade}>{grade}</MenuItem>
+                ))}
+              </TextField>
 
-                  <TextField
-                    select
-                    label="Subject"
-                    name="subject"
-                    value={form.subject || ''}
-                    onChange={(e) => handleSelectChange(e, "subject")}
-                    sx={{ flex: '1 1 calc(25% - 16px)', minWidth: 120 }}
-                    size="small"
-                    disabled={isLoadingSubjects}
-                  >
-                    {subjects.map((subject: Subject) => (
-                      <MenuItem key={subject.id} value={subject.mainSubject}>
-                        {subject.mainSubject}
-                      </MenuItem>
-                    ))}
-                  </TextField>
+              <TextField
+                select
+                label="Class"
+                name="class"
+                value={form.class || ''}
+                onChange={(e) => handleSelectChange(e, "class")}
+                sx={{ minWidth: 120 }}
+                size="small"
+              >
+                {classOptions.map(cls => (
+                  <MenuItem key={cls} value={cls}>{cls}</MenuItem>
+                ))}
+              </TextField>
 
-                  <TextField
-                    select
-                    label="Medium"
-                    name="medium"
-                    value={form.medium || ''}
-                    onChange={(e) => handleSelectChange(e, "medium")}
-                    sx={{ flex: '1 1 calc(25% - 16px)', minWidth: 120 }}
-                    size="small"
-                  >
-                    {mediumOptions.map(med => (
-                      <MenuItem key={med} value={med}>{med}</MenuItem>
-                    ))}
-                  </TextField>
-                </Stack>
+              <TextField
+                select
+                label="Subject"
+                name="subject"
+                value={form.subject || ''}
+                onChange={(e) => handleSelectChange(e, "subject")}
+                sx={{ minWidth: 120 }}
+                size="small"
+                disabled={isLoadingSubjects}
+              >
+                {subjects.map((subject: Subject) => (
+                  <MenuItem key={subject.id} value={subject.mainSubject}>
+                    {subject.mainSubject}
+                  </MenuItem>
+                ))}
+              </TextField>
 
-                <Button
-                  variant="contained"
-                  onClick={handleAddAssignment}
-                  startIcon={<Add />}
-                >
-                  Add to list
-                </Button>
-
-                {teacherAssignments.length > 0 && (
-                  <TableContainer component={Paper}>
-                    <MuiTable>
-                      <TableHead>
-                        <TableRow>
-                          <TableCell>Grade</TableCell>
-                          <TableCell>Class</TableCell>
-                          <TableCell>Subject</TableCell>
-                          <TableCell>Medium</TableCell>
-                          <TableCell>Actions</TableCell>
-                        </TableRow>
-                      </TableHead>
-                      <TableBody>
-                        {teacherAssignments.map((assignment) => (
-                          <TableRow key={assignment.id}>
-                            <TableCell>{assignment.teacherGrade}</TableCell>
-                            <TableCell>{assignment.teacherClass}</TableCell>
-                            <TableCell>{assignment.subject}</TableCell>
-                            <TableCell>{assignment.medium}</TableCell>
-                            <TableCell>
-                              <IconButton
-                                onClick={() => {
-                                  setTeacherAssignments(prev =>
-                                    prev.filter(a => a.id !== assignment.id)
-                                  );
-                                }}
-                              >
-                                <Delete />
-                              </IconButton>
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </MuiTable>
-                  </TableContainer>
-                )}
-              </Stack>
+              <TextField
+                select
+                label="Medium"
+                name="medium"
+                value={form.medium || ''}
+                onChange={(e) => handleSelectChange(e, "medium")}
+                sx={{ minWidth: 120 }}
+                size="small"
+              >
+                {mediumOptions.map(med => (
+                  <MenuItem key={med} value={med}>{med}</MenuItem>
+                ))}
+              </TextField>
             </Box>
-          </>
+
+            <Button
+              variant="contained"
+              onClick={handleAddAssignment}
+              startIcon={<Add />}
+              sx={{ maxWidth: 200 }}
+            >
+              Add to list
+            </Button>
+
+            {teacherAssignments.length > 0 && (
+              <TableContainer component={Paper} sx={{ maxWidth: '100%', overflowX: 'auto' }}>
+                <MuiTable size={isMobile ? "small" : "medium"}>
+                  <TableHead>
+                    <TableRow>
+                      <TableCell>Grade</TableCell>
+                      <TableCell>Class</TableCell>
+                      <TableCell>Subject</TableCell>
+                      <TableCell>Medium</TableCell>
+                      <TableCell>Actions</TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {teacherAssignments.map((assignment) => (
+                      <TableRow key={assignment.id}>
+                        <TableCell>{assignment.teacherGrade}</TableCell>
+                        <TableCell>{assignment.teacherClass}</TableCell>
+                        <TableCell>{assignment.subject}</TableCell>
+                        <TableCell>{assignment.medium}</TableCell>
+                        <TableCell>
+                          <IconButton
+                            onClick={() => {
+                              setTeacherAssignments(prev =>
+                                prev.filter(a => a.id !== assignment.id)
+                              );
+                            }}
+                            size={isMobile ? "small" : "medium"}
+                          >
+                            <DeleteRowIcon />
+                          </IconButton>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </MuiTable>
+              </TableContainer>
+            )}
+          </Box>
         );
       case 'Parent':
         return (
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
             {commonFields}
-            <Stack spacing={2}>
-              <Stack direction="row" spacing={2}>
-                <TextField
-                  label="Profession"
-                  name="profession"
-                  value={form.profession || ''}
-                  onChange={handleChange}
-                  sx={{ flex: '1 1 calc(33.33% - 16px)', minWidth: 120 }}
-                  size="small"
-                />
-                <TextField
-                  label="Relation"
-                  name="relation"
-                  value={form.relation || ''}
-                  onChange={handleChange}
-                  sx={{ flex: '1 1 calc(33.33% - 16px)', minWidth: 120 }}
-                  size="small"
-                />
-                <TextField
-                  label="Parent Contact"
-                  name="parentContact"
-                  value={form.parentContact || ''}
-                  onChange={handleChange}
-                  sx={{ flex: '1 1 calc(33.33% - 16px)', minWidth: 120 }}
-                  size="small"
-                />
-                <TextField
-                  label="Student Admission No"
-                  name="studentAdmissionNo"
-                  value={form.studentAdmissionNo || ''}
-                  onChange={handleChange}
-                  sx={{ flex: '1 1 calc(33.33% - 16px)', minWidth: 120 }}
-                  size="small"
-                />
-              </Stack>
 
-              <Button
-                variant="contained"
-                onClick={handleAddParent}
-                startIcon={<Add />}
-              >
-                Add to list
-              </Button>
+            <Box sx={{
+              display: 'grid',
+              gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)', md: 'repeat(4, 1fr)' },
+              gap: 2
+            }}>
+              <TextField
+                label="Profession"
+                name="profession"
+                value={form.profession || ''}
+                onChange={handleChange}
+                sx={{ minWidth: 120 }}
+                size="small"
+              />
+              <TextField
+                label="Relation"
+                name="relation"
+                value={form.relation || ''}
+                onChange={handleChange}
+                sx={{ minWidth: 120 }}
+                size="small"
+              />
+              <TextField
+                label="Parent Contact"
+                name="parentContact"
+                value={form.parentContact || ''}
+                onChange={handleChange}
+                sx={{ minWidth: 120 }}
+                size="small"
+              />
+              <TextField
+                label="Student Admission No"
+                name="studentAdmissionNo"
+                value={form.studentAdmissionNo || ''}
+                onChange={handleChange}
+                sx={{ minWidth: 120 }}
+                size="small"
+              />
+            </Box>
 
-              {parentEntries.length > 0 && (
-                <TableContainer component={Paper}>
-                  <MuiTable>
-                    <TableHead>
-                      <TableRow>
-                        <TableCell>Relation</TableCell>
-                        <TableCell>Profession</TableCell>
-                        <TableCell>Parent Contact</TableCell>
-                        <TableCell>Student Admission No</TableCell>
-                        <TableCell>Actions</TableCell>
+            <Button
+              variant="contained"
+              onClick={handleAddParent}
+              startIcon={<Add />}
+              sx={{ maxWidth: 200 }}
+            >
+              Add to list
+            </Button>
+
+            {parentEntries.length > 0 && (
+              <TableContainer component={Paper} sx={{ maxWidth: '100%', overflowX: 'auto' }}>
+                <MuiTable size={isMobile ? "small" : "medium"}>
+                  <TableHead>
+                    <TableRow>
+                      <TableCell>Relation</TableCell>
+                      <TableCell>Profession</TableCell>
+                      <TableCell>Parent Contact</TableCell>
+                      <TableCell>Student Admission No</TableCell>
+                      <TableCell>Actions</TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {parentEntries.map((p) => (
+                      <TableRow key={p.id}>
+                        <TableCell>{p.relation}</TableCell>
+                        <TableCell>{p.profession}</TableCell>
+                        <TableCell>{p.parentContact}</TableCell>
+                        <TableCell>{p.studentAdmissionNo}</TableCell>
+                        <TableCell>
+                          <IconButton
+                            onClick={() => setParentEntries(prev => prev.filter(x => x.id !== p.id))}
+                            size={isMobile ? "small" : "medium"}
+                          >
+                            <DeleteRowIcon />
+                          </IconButton>
+                        </TableCell>
                       </TableRow>
-                    </TableHead>
-                    <TableBody>
-                      {parentEntries.map((p) => (
-                        <TableRow key={p.id}>
-                          <TableCell>{p.relation}</TableCell>
-                          <TableCell>{p.profession}</TableCell>
-                          <TableCell>{p.parentContact}</TableCell>
-                          <TableCell>{p.studentAdmissionNo}</TableCell>
-                          <TableCell>
-                            <IconButton
-                              onClick={() => setParentEntries(prev => prev.filter(x => x.id !== p.id))}
-                            >
-                              <Delete />
-                            </IconButton>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </MuiTable>
-                </TableContainer>
-              )}
-            </Stack>
+                    ))}
+                  </TableBody>
+                </MuiTable>
+              </TableContainer>
+            )}
           </Box>
         );
       default:
@@ -1206,11 +1465,11 @@ const UserManagement: React.FC = () => {
   };
 
   return (
-    <Box sx={{ display: "flex", width: "100vw", height: "100vh", minHeight: "100vh" }}>
+    <Box sx={{ display: "flex", width: "100%", minHeight: "100vh" }}>
       <CssBaseline />
       <Sidebar open={sidebarOpen} setOpen={setSidebarOpen} />
 
-      <Box sx={{ flexGrow: 1, display: "flex", flexDirection: "column" }}>
+      <Box sx={{ flexGrow: 1, display: "flex", flexDirection: "column", width: '100%' }}>
         <AppBar
           position="static"
           sx={{
@@ -1228,24 +1487,22 @@ const UserManagement: React.FC = () => {
           />
         </AppBar>
 
-        <Stack spacing={3} sx={{ p: 3, overflow: 'auto' }}>
-          <Paper sx={{ p: 3, borderRadius: 2 }}>
-            <Typography variant="h6" sx={{ mb: 3, color: theme.palette.primary.main }}>
+        <Stack spacing={isMobile ? 2 : 3} sx={{ p: isMobile ? 2 : 3, overflow: 'auto', width: '100%' }}>
+          <Paper ref={formTopRef} sx={{ p: isMobile ? 2 : 3, borderRadius: 2 }}>
+            <Typography variant={isMobile ? "subtitle1" : "h6"} sx={{ mb: 2, color: theme.palette.primary.main, fontWeight: 600 }}>
               {editId !== null ? "Edit User" : "Create New User"}
             </Typography>
 
             <Stack spacing={2}>
-              <Stack direction="row" spacing={2} flexWrap="wrap" useFlexGap>
-                {renderFormFields()}
-              </Stack>
+              {renderFormFields()}
 
-              <Stack direction="row" spacing={2} justifyContent="flex-end">
+              <Stack direction={isMobile ? "column" : "row"} spacing={2} justifyContent="flex-end" sx={{ pt: 2 }}>
                 <Button
                   variant="contained"
                   onClick={handleSave}
                   disabled={isMutating}
                   startIcon={isMutating ? <CircularProgress size={20} /> : null}
-                  sx={{ minWidth: 150 }}
+                  fullWidth={isMobile}
                 >
                   {editId !== null ? "Update User" : "Create User"}
                 </Button>
@@ -1253,7 +1510,7 @@ const UserManagement: React.FC = () => {
                   variant="outlined"
                   onClick={handleClear}
                   disabled={isMutating}
-                  sx={{ minWidth: 100 }}
+                  fullWidth={isMobile}
                 >
                   Clear
                 </Button>
@@ -1261,33 +1518,32 @@ const UserManagement: React.FC = () => {
             </Stack>
           </Paper>
 
-          <Paper sx={{ p: 2, borderRadius: 2, height: 720, minWidth: '300', display: 'flex', flexDirection: 'column' }}>
-            <Box sx={{
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              mb: 2
-            }}>
-              <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 2 }}>
+          <Paper sx={{ p: isMobile ? 1 : 2, borderRadius: 2, height: isMobile ? 600 : 720, display: 'flex', flexDirection: 'column' }}>
+            <Stack spacing={2}>
+              <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
                 <Tabs
                   value={activeTab}
                   onChange={handleTabChange}
-                  variant="fullWidth"
+                  variant={isMobile ? "fullWidth" : "standard"}
+                  scrollButtons={isMobile ? "auto" : false}
+                  allowScrollButtonsMobile
                 >
                   <Tab label="Students" value="Student" />
                   <Tab label="Teachers" value="Teacher" />
                   <Tab label="Parents" value="Parent" />
                 </Tabs>
               </Box>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+
+              <Stack direction={isMobile ? "column" : "row"} spacing={2} alignItems={isMobile ? "stretch" : "center"} justifyContent="space-between">
                 <TextField
                   placeholder={`Search ${activeTab.toLowerCase()}s...`}
                   variant="outlined"
                   size="small"
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
+                  fullWidth={isMobile}
                   sx={{
-                    width: 300,
+                    width: isMobile ? '100%' : 300,
                     '& .MuiOutlinedInput-root': {
                       pr: 1,
                     },
@@ -1302,65 +1558,76 @@ const UserManagement: React.FC = () => {
                       <IconButton
                         size="small"
                         onClick={handleClearSearch}
-                        sx={{ visibility: searchTerm ? 'visible' : 'hidden' }}
                       >
                         <ClearIcon fontSize="small" />
                       </IconButton>
                     ),
                   }}
                 />
-              </Box>
+              </Stack>
+            </Stack>
+
+            <Box sx={{ flexGrow: 1, mt: 2, overflow: 'hidden' }}>
+              <DataGrid
+                rows={displayData}
+                columns={columns}
+                loading={Boolean(isDataLoading || isMutating || (searchTerm && isSearching))}
+                slots={{ toolbar: CustomToolbar }}
+                checkboxSelection
+                disableRowSelectionOnClick
+                rowSelectionModel={rowSelectionModel}
+                onRowSelectionModelChange={(newSelection) => setRowSelectionModel([...newSelection])}
+                pageSizeOptions={[5, 10, 25, 50, 100]}
+                initialState={{
+                  pagination: {
+                    paginationModel: { pageSize: isMobile ? 5 : 10, page: 0 },
+                  },
+                }}
+                sx={{
+                  border: 'none',
+                  height: '100%',
+                  '& .MuiDataGrid-cell': {
+                    borderBottom: `1px solid ${theme.palette.divider}`,
+                    fontSize: isMobile ? '0.75rem' : '0.875rem',
+                    padding: isMobile ? '4px 8px' : '8px 16px',
+                  },
+                  '& .MuiDataGrid-columnHeaders': {
+                    backgroundColor: theme.palette.background.paper,
+                    borderBottom: `1px solid ${theme.palette.divider}`,
+                    fontSize: isMobile ? '0.75rem' : '0.875rem',
+                  },
+                  '& .MuiDataGrid-toolbarContainer': {
+                    padding: theme.spacing(1),
+                    borderBottom: `1px solid ${theme.palette.divider}`,
+                  },
+                  '& .MuiDataGrid-virtualScroller': {
+                    overflow: 'auto',
+                    '&::-webkit-scrollbar': {
+                      width: '8px',
+                      height: '8px',
+                    },
+                    '&::-webkit-scrollbar-track': {
+                      background: '#f1f1f1',
+                      borderRadius: '4px',
+                    },
+                    '&::-webkit-scrollbar-thumb': {
+                      background: '#888',
+                      borderRadius: '4px',
+                    },
+                    '&::-webkit-scrollbar-thumb:hover': {
+                      background: '#666',
+                    },
+                  },
+                  '& .MuiDataGrid-columnHeader': {
+                    padding: isMobile ? '4px 8px' : '8px 16px',
+                  },
+                  '& .MuiDataGrid-row': {
+                    minHeight: isMobile ? '40px !important' : '52px !important',
+                  },
+                }}
+                ref={dataGridRef}
+              />
             </Box>
-            <DataGrid
-              rows={displayData}
-              columns={columns}
-              loading={Boolean(isDataLoading || isMutating || (searchTerm && isSearching))}
-              slots={{ toolbar: CustomToolbar }}
-              checkboxSelection
-              disableRowSelectionOnClick
-              rowSelectionModel={rowSelectionModel}
-              onRowSelectionModelChange={(newSelection) => setRowSelectionModel([...newSelection])}
-              pageSizeOptions={[5, 10, 25, 50, 100]}
-              initialState={{
-                pagination: {
-                  paginationModel: { pageSize: 10, page: 0 },
-                },
-              }}
-              sx={{
-                border: 'none',
-                height: '100%',
-                '& .MuiDataGrid-cell': {
-                  borderBottom: `1px solid ${theme.palette.divider}`,
-                },
-                '& .MuiDataGrid-columnHeaders': {
-                  backgroundColor: theme.palette.background.paper,
-                  borderBottom: `1px solid ${theme.palette.divider}`,
-                },
-                '& .MuiDataGrid-toolbarContainer': {
-                  padding: theme.spacing(1),
-                  borderBottom: `1px solid ${theme.palette.divider}`,
-                },
-                '& .MuiDataGrid-virtualScroller': {
-                  overflow: 'auto',
-                  '&::-webkit-scrollbar': {
-                    width: '8px',
-                    height: '8px',
-                  },
-                  '&::-webkit-scrollbar-track': {
-                    background: '#f1f1f1',
-                    borderRadius: '4px',
-                  },
-                  '&::-webkit-scrollbar-thumb': {
-                    background: '#888',
-                    borderRadius: '4px',
-                  },
-                  '&::-webkit-scrollbar-thumb:hover': {
-                    background: '#666',
-                  },
-                },
-              }}
-              ref={dataGridRef}
-            />
           </Paper>
         </Stack>
 
@@ -1368,7 +1635,7 @@ const UserManagement: React.FC = () => {
           open={snackbar.open}
           autoHideDuration={6000}
           onClose={() => setSnackbar({ ...snackbar, open: false })}
-          anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+          anchorOrigin={{ vertical: 'bottom', horizontal: isMobile ? 'center' : 'right' }}
         >
           <Alert
             onClose={() => setSnackbar({ ...snackbar, open: false })}
@@ -1444,6 +1711,4 @@ const processImage = async (file: File): Promise<string | null> => {
   });
 };
 
-function autoTable(_doc: any, _arg1: { head: string[][]; body: any[][]; startY: number; styles: { cellPadding: number; fontSize: number; valign: string; halign: string; }; headStyles: { fillColor: number[]; textColor: number; fontStyle: string; }; alternateRowStyles: { fillColor: number[]; }; }) {
-  throw new Error("Function not implemented.");
-}
+

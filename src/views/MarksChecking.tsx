@@ -13,6 +13,7 @@ import {
     TextField,
     InputAdornment,
     MenuItem,
+    useMediaQuery,
 } from "@mui/material";
 import DateRange from "@mui/icons-material/DateRange";
 import School from "@mui/icons-material/School";
@@ -60,6 +61,9 @@ const MarksChecking = () => {
     const [hovered] = useState(false);
     const theme = useTheme();
     useCustomTheme();
+
+    // Responsive breakpoints
+    const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
 
     // dropdown states
     const [year, setYear] = useState<string>(hardcodedYears[0]);
@@ -149,7 +153,7 @@ const MarksChecking = () => {
         <Box sx={{ display: "flex", width: "100vw", height: "100vh", minHeight: "100vh", bgcolor: theme.palette.background.default }}>
             <CssBaseline />
             <Sidebar open={sidebarOpen || hovered} setOpen={setSidebarOpen} />
-            <Box sx={{ flexGrow: 1, display: "flex", flexDirection: "column" }}>
+            <Box sx={{ flexGrow: 1, display: "flex", flexDirection: "column", overflow: 'hidden' }}>
                 <AppBar
                     position="static"
                     sx={{
@@ -163,16 +167,17 @@ const MarksChecking = () => {
                     <Navbar title="Marks Checking" sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} />
                 </AppBar>
 
-                <Box sx={{ p: 3 }}>
-                    <Stack spacing={3} sx={{ px: 4, py: 3 }}>
+                <Box sx={{ 
+                    p: { xs: 1, sm: 2, md: 3 },
+                    overflowY: 'auto',
+                    height: '100%'
+                }}>
+                    <Stack spacing={{ xs: 2, md: 3 }} sx={{ px: { xs: 1, sm: 2, md: 4 }, py: { xs: 2, md: 3 } }}>
                         {/* Top Filters */}
-                        <Paper elevation={1} sx={{ p: 2 }}>
+                        <Paper elevation={1} sx={{ p: { xs: 1.5, sm: 2 } }}>
                             <Stack
-                                direction="row"
-                                justifyContent="space-between"
-                                alignItems="center"
-                                spacing={3}
-                                flexWrap="wrap"
+                                direction={{ xs: 'column', md: 'row' }}
+                                spacing={{ xs: 2, md: 3 }}
                                 sx={{ width: "100%" }}
                             >
                                 {/* Year */}
@@ -191,9 +196,10 @@ const MarksChecking = () => {
                                         ),
                                     }}
                                     sx={{
-                                        minWidth: 150,
-                                        flex: 1,
-                                        maxWidth: 250,
+                                        width: { xs: '100%', md: 'auto' },
+                                        minWidth: { md: 150 },
+                                        flex: { md: 1 },
+                                        maxWidth: { md: 250 },
                                         "& .MuiOutlinedInput-root": {
                                             borderRadius: "10px",
                                             height: "45px",
@@ -224,9 +230,10 @@ const MarksChecking = () => {
                                         ),
                                     }}
                                     sx={{
-                                        minWidth: 150,
-                                        flex: 1,
-                                        maxWidth: 250,
+                                        width: { xs: '100%', md: 'auto' },
+                                        minWidth: { md: 150 },
+                                        flex: { md: 1 },
+                                        maxWidth: { md: 250 },
                                         "& .MuiOutlinedInput-root": {
                                             borderRadius: "10px",
                                             height: "45px",
@@ -265,9 +272,10 @@ const MarksChecking = () => {
                                         ),
                                     }}
                                     sx={{
-                                        minWidth: 150,
-                                        flex: 1,
-                                        maxWidth: 250,
+                                        width: { xs: '100%', md: 'auto' },
+                                        minWidth: { md: 150 },
+                                        flex: { md: 1 },
+                                        maxWidth: { md: 250 },
                                         "& .MuiOutlinedInput-root": {
                                             borderRadius: "10px",
                                             height: "45px",
@@ -297,9 +305,10 @@ const MarksChecking = () => {
                                         ),
                                     }}
                                     sx={{
-                                        minWidth: 150,
-                                        flex: 1,
-                                        maxWidth: 250,
+                                        width: { xs: '100%', md: 'auto' },
+                                        minWidth: { md: 150 },
+                                        flex: { md: 1 },
+                                        maxWidth: { md: 250 },
                                         "& .MuiOutlinedInput-root": {
                                             borderRadius: "10px",
                                             height: "45px",
@@ -329,9 +338,10 @@ const MarksChecking = () => {
                                             ),
                                         }}
                                         sx={{
-                                            minWidth: 150,
-                                            flex: 1,
-                                            maxWidth: 250,
+                                            width: { xs: '100%', md: 'auto' },
+                                            minWidth: { md: 150 },
+                                            flex: { md: 1 },
+                                            maxWidth: { md: 250 },
                                             "& .MuiOutlinedInput-root": {
                                                 borderRadius: "10px",
                                                 height: "45px",
@@ -348,10 +358,10 @@ const MarksChecking = () => {
                             </Stack>
                         </Paper>
 
-                        <Paper sx={{ p: 2 }}>
+                        <Paper sx={{ p: { xs: 1.5, sm: 2 } }}>
                             <Stack spacing={1}>
-                                <Stack direction="row" alignItems="center" justifyContent="space-between">
-                                    <Typography variant="h6">Marks Submission Status</Typography>
+                                <Stack direction="row" alignItems="center" justifyContent="space-between" flexWrap="wrap" gap={1}>
+                                    <Typography variant={isMobile ? "subtitle1" : "h6"}>Marks Submission Status</Typography>
                                     <Stack direction="row" spacing={1} alignItems="center">
                                         {loading && <CircularProgress size={20} />}
                                         {!loading && (
@@ -376,60 +386,114 @@ const MarksChecking = () => {
                                     </Typography>
                                 )}
 
-                                {/* Header Row */}
-                                {!loading && rows.length > 0 && (
-                                    <Stack direction="row" spacing={1} sx={{ fontWeight: 600, py: 1 }}>
-                                        <Box sx={{ flex: 1 / 6, minWidth: 120 }}>Staff No</Box>
-                                        <Box sx={{ flex: 2 / 6, minWidth: 160 }}>Teacher</Box>
-                                        <Box sx={{ flex: 1 / 6, minWidth: 140 }}>Grade</Box>
-                                        <Box sx={{ flex: 1 / 6, minWidth: 140 }}>Subject</Box>
-                                        <Box sx={{ flex: 1 / 6, minWidth: 120 }}>Class</Box>
-                                        <Box sx={{ flex: 1 / 6, minWidth: 140, textAlign: 'center' }}>Student Count</Box>
-                                        <Box sx={{ flex: 1 / 6, minWidth: 140, textAlign: 'center' }}>Given Marks</Box>
-                                        <Box sx={{ flex: 1 / 6, minWidth: 140, textAlign: 'center' }}>Submitted</Box>
+                                {/* Desktop Header Row */}
+                                {!isMobile && !loading && rows.length > 0 && (
+                                    <Stack direction="row" spacing={1} sx={{ fontWeight: 600, py: 1, display: { xs: 'none', md: 'flex' } }}>
+                                        <Box sx={{ flex: 1 / 8, minWidth: 100 }}>Staff No</Box>
+                                        <Box sx={{ flex: 2 / 8, minWidth: 140 }}>Teacher</Box>
+                                        <Box sx={{ flex: 1 / 8, minWidth: 100 }}>Grade</Box>
+                                        <Box sx={{ flex: 1 / 8, minWidth: 120 }}>Subject</Box>
+                                        <Box sx={{ flex: 1 / 8, minWidth: 80 }}>Class</Box>
+                                        <Box sx={{ flex: 1 / 8, minWidth: 100, textAlign: 'center' }}>Students</Box>
+                                        <Box sx={{ flex: 1 / 8, minWidth: 100, textAlign: 'center' }}>Given</Box>
+                                        <Box sx={{ flex: 1 / 8, minWidth: 100, textAlign: 'center' }}>Status</Box>
                                     </Stack>
                                 )}
 
-                                {/* Rows (use Stack) */}
+                                {/* Rows */}
                                 <Stack spacing={1}>
                                     {rows.map((r, idx) => (
-                                        <Paper key={`${r.staffNo}-${r.subject}-${idx}`} variant="outlined" sx={{ p: 1 }}>
-                                            <Stack direction="row" alignItems="center" spacing={1}>
-                                                <Box sx={{ flex: 1 / 6, minWidth: 120 }}>
+                                        <Paper key={`${r.staffNo}-${r.subject}-${idx}`} variant="outlined" sx={{ p: { xs: 1.5, sm: 1 } }}>
+                                            {/* Desktop Layout */}
+                                            <Stack 
+                                                direction="row" 
+                                                alignItems="center" 
+                                                spacing={1}
+                                                sx={{ display: { xs: 'none', md: 'flex' } }}
+                                            >
+                                                <Box sx={{ flex: 1 / 8, minWidth: 100 }}>
                                                     <Typography variant="body2">{r.staffNo}</Typography>
                                                 </Box>
 
-                                                <Box sx={{ flex: 2 / 6, minWidth: 160 }}>
+                                                <Box sx={{ flex: 2 / 8, minWidth: 140 }}>
                                                     <Typography variant="body2">{r.teacher_name ?? "—"}</Typography>
                                                 </Box>
 
-                                                <Box sx={{ flex: 1 / 6, minWidth: 140 }}>
+                                                <Box sx={{ flex: 1 / 8, minWidth: 100 }}>
                                                     <Typography variant="body2">{r.teacherGrade}</Typography>
                                                 </Box>
 
-                                                <Box sx={{ flex: 1 / 6, minWidth: 140 }}>
+                                                <Box sx={{ flex: 1 / 8, minWidth: 120 }}>
                                                     <Typography variant="body2">{r.subject}</Typography>
                                                 </Box>
 
-                                                <Box sx={{ flex: 1 / 6, minWidth: 120 }}>
+                                                <Box sx={{ flex: 1 / 8, minWidth: 80 }}>
                                                     <Typography variant="body2">{r.teacherClass}</Typography>
                                                 </Box>
 
-                                                <Box sx={{ flex: 1 / 6, minWidth: 140, textAlign: 'center' }}>
+                                                <Box sx={{ flex: 1 / 8, minWidth: 100, textAlign: 'center' }}>
                                                     <Typography variant="body2">{r.student_count}</Typography>
                                                 </Box>
 
-                                                <Box sx={{ flex: 1 / 6, minWidth: 140, textAlign: 'center' }}>
+                                                <Box sx={{ flex: 1 / 8, minWidth: 100, textAlign: 'center' }}>
                                                     <Typography variant="body2">{r.given_marks_count}</Typography>
                                                 </Box>
 
-                                                <Box sx={{ flex: 1 / 6, minWidth: 140, display: 'flex', justifyContent: 'center' }}>
+                                                <Box sx={{ flex: 1 / 8, minWidth: 100, display: 'flex', justifyContent: 'center' }}>
                                                     {r.marks_submitted ? (
                                                         <Chip label="Submitted" color="success" size="small" />
                                                     ) : (
                                                         <Chip label="Pending" color="warning" size="small" />
                                                     )}
                                                 </Box>
+                                            </Stack>
+
+                                            {/* Mobile/Tablet Layout */}
+                                            <Stack spacing={1.5} sx={{ display: { xs: 'flex', md: 'none' } }}>
+                                                <Stack direction="row" justifyContent="space-between" alignItems="center">
+                                                    <Stack spacing={0.5}>
+                                                        <Typography variant="body2" fontWeight={600}>
+                                                            {r.teacher_name ?? "—"}
+                                                        </Typography>
+                                                        <Typography variant="caption" color="text.secondary">
+                                                            Staff No: {r.staffNo}
+                                                        </Typography>
+                                                    </Stack>
+                                                    {r.marks_submitted ? (
+                                                        <Chip label="Submitted" color="success" size="small" />
+                                                    ) : (
+                                                        <Chip label="Pending" color="warning" size="small" />
+                                                    )}
+                                                </Stack>
+
+                                                <Divider />
+
+                                                <Stack spacing={1}>
+                                                    <Stack direction="row" justifyContent="space-between">
+                                                        <Typography variant="caption" color="text.secondary">Grade:</Typography>
+                                                        <Typography variant="body2">{r.teacherGrade}</Typography>
+                                                    </Stack>
+                                                    
+                                                    <Stack direction="row" justifyContent="space-between">
+                                                        <Typography variant="caption" color="text.secondary">Subject:</Typography>
+                                                        <Typography variant="body2">{r.subject}</Typography>
+                                                    </Stack>
+                                                    
+                                                    <Stack direction="row" justifyContent="space-between">
+                                                        <Typography variant="caption" color="text.secondary">Class:</Typography>
+                                                        <Typography variant="body2">{r.teacherClass}</Typography>
+                                                    </Stack>
+                                                    
+                                                    <Stack direction="row" justifyContent="space-between">
+                                                        <Typography variant="caption" color="text.secondary">Students:</Typography>
+                                                        <Typography variant="body2">{r.student_count}</Typography>
+                                                    </Stack>
+                                                    
+                                                    <Stack direction="row" justifyContent="space-between">
+                                                        <Typography variant="caption" color="text.secondary">Given Marks:</Typography>
+                                                        <Typography variant="body2">{r.given_marks_count}</Typography>
+                                                    </Stack>
+                                                </Stack>
                                             </Stack>
                                         </Paper>
                                     ))}

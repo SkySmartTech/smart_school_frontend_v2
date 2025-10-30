@@ -19,8 +19,16 @@ import {
   Paper,
   Skeleton,
   Stack,
+  useMediaQuery,
+  IconButton,
+  Collapse,
 } from "@mui/material";
-import { Edit as EditIcon, PhotoCamera, Refresh } from "@mui/icons-material";
+import { 
+  Edit as EditIcon, 
+  PhotoCamera, 
+  Refresh,
+  ExpandMore as ExpandMoreIcon,
+} from "@mui/icons-material";
 import Sidebar from "../components/Sidebar";
 import { motion } from "framer-motion";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -46,7 +54,6 @@ const Dialog: React.FC<{
 
   useEffect(() => {
     if (open && dialogRef.current) {
-      // Small delay to ensure the dialog is fully rendered
       setTimeout(() => {
         const focusableElements = dialogRef.current?.querySelectorAll(
           'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
@@ -103,7 +110,13 @@ const UserProfile: React.FC = () => {
     Partial<Record<keyof User, string>>
   >({});
 
-  // New local state for editable "other profile data"
+  // Expandable sections state for mobile
+  const [expandedSections, setExpandedSections] = useState({
+    personal: true,
+    contact: false,
+    additional: false,
+  });
+
   const [editingTeacher, setEditingTeacher] = useState(false);
   const [editingParent, setEditingParent] = useState(false);
   const [editingStudent, setEditingStudent] = useState(false);
@@ -113,10 +126,10 @@ const UserProfile: React.FC = () => {
   const [localStudentData, setLocalStudentData] = useState<StudentData | null>(null);
 
   const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
   useCustomTheme();
   const queryClient = useQueryClient();
 
-  // Check authentication status on component mount
   useEffect(() => {
     if (!checkAuthStatus()) {
       showSnackbar("Please login to view your profile", "warning");
@@ -145,7 +158,6 @@ const UserProfile: React.FC = () => {
     }
   }, [user]);
 
-  // Initialize local editable data when Other dialog opens
   useEffect(() => {
     if (openOther && user) {
       setLocalTeacherData(user.teacher_data ? JSON.parse(JSON.stringify(user.teacher_data)) : null);
@@ -164,7 +176,6 @@ const UserProfile: React.FC = () => {
     }
   }, [openOther, user]);
 
-  // Handle query errors
   useEffect(() => {
     if (isError && error) {
       const isAuthError = error.message.includes("login") || error.message.includes("Session expired");
@@ -199,14 +210,12 @@ const UserProfile: React.FC = () => {
     },
   });
 
-  // Mutation for other profile details (teacher/parent/student nested data)
   const otherProfileMutation = useMutation({
     mutationFn: ({ id, payload }: { id: number; payload: Record<string, any> }) =>
       updateUserProfileDetails(id, payload),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["user-profile"] });
       showSnackbar("Profile details updated successfully!!", "success");
-      // after successful save, stop editing
       setEditingTeacher(false);
       setEditingParent(false);
       setEditingStudent(false);
@@ -320,45 +329,37 @@ const UserProfile: React.FC = () => {
 
   const isMutating = updateProfileMutation.isPending || uploadPhotoMutation.isPending || otherProfileMutation.isPending;
 
-  // Loading skeleton component
   const LoadingSkeleton = () => (
-    <Box sx={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 2 }}>
-      {[...Array(13)].map((_, i) => (
+    <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr" }, gap: 2 }}>
+      {[...Array(isMobile ? 6 : 13)].map((_, i) => (
         <Skeleton key={i} variant="text" height={24} />
       ))}
     </Box>
   );
 
-  // CRITICAL FIX: Handle teacher data structure properly
   const getTeacherInfoArray = (teacherData: TeacherData | null | undefined): TeacherInfo[] => {
     if (!teacherData) return [];
     
-    // Handle both old array format and new object format with teacher_info array
     if (Array.isArray(teacherData)) {
-      return teacherData as any; // Legacy format
+      return teacherData as any;
     } else if (teacherData.teacher_info && Array.isArray(teacherData.teacher_info)) {
       return teacherData.teacher_info;
     } else if (teacherData.id) {
-      // Single teacher info object - convert to array
       return [teacherData as any];
     }
     
     return [];
   };
 
-  // Editable handlers for teacher data
   const handleTeacherFieldChange = (index: number, field: keyof TeacherInfo, value: any) => {
     setLocalTeacherData((prev) => {
-      // parse a deep copy safely and type it
       const copy = prev ? (JSON.parse(JSON.stringify(prev)) as TeacherData) : ({ teacher_info: [] } as TeacherData);
-
       const teacherInfoArray = getTeacherInfoArray(copy);
 
       if (!teacherInfoArray[index]) {
         teacherInfoArray[index] = {} as TeacherInfo;
       }
 
-      // field is a known key, but the runtime object may be a plain object - cast only where needed
       (teacherInfoArray[index] as any)[field] = value;
       copy.teacher_info = teacherInfoArray;
       return copy;
@@ -415,7 +416,7 @@ const UserProfile: React.FC = () => {
             };
           }
           current = current.students_info[studentIndex];
-          i++; // Skip the next index since we've handled it
+          i++;
         } else {
           if (!current[key]) current[key] = {};
           current = current[key];
@@ -432,19 +433,12 @@ const UserProfile: React.FC = () => {
   const handleStudentFieldChange = (field: keyof StudentData, value: any) => {
     setLocalStudentData((prev) => {
       const copy = prev ? (JSON.parse(JSON.stringify(prev)) as StudentData) : ({} as StudentData);
-      // single-field assignment, cast only here to keep types elsewhere
       (copy as any)[field] = value;
       return copy;
     });
   };
 
-  /**
-   * Build a full payload for /api/user/{id}/profile-update by merging
-   * top-level required fields from the current user with only the nested changes.
-   * This avoids server validation errors when backend expects required top-level fields.
-   */
   const buildFullPayload = (user: User, changes: Record<string, any>) => {
-    // top-level fields the backend validates as required
     const requiredTopLevel = [
       "name",
       "address",
@@ -455,7 +449,6 @@ const UserProfile: React.FC = () => {
       "username",
     ];
 
-    // include a few commonly used optional fields to be safe
     const optionalTopLevel = [
       "birthDay",
       "location",
@@ -476,10 +469,8 @@ const UserProfile: React.FC = () => {
       if ((user as any)[k] !== undefined) base[k] = (user as any)[k];
     });
 
-    // merge nested changes (teacher_data/parent_data/student_data) on top
     const merged = { ...base, ...changes };
 
-    // ensure we don't send unintended 'access' or other admin-only fields
     if (merged.access) {
       delete merged.access;
     }
@@ -510,21 +501,17 @@ const UserProfile: React.FC = () => {
       return;
     }
 
-    // Build a full payload including required top-level fields from current user
     const payloadToSend = buildFullPayload(user, changes);
 
     try {
       await otherProfileMutation.mutateAsync({ id: user.id, payload: payloadToSend });
-      // onSuccess handles invalidation and UI feedback
     } catch (err) {
       console.error("Failed to save other profile data", err);
-      // error handling already in mutation onError, but keep a fallback message
       showSnackbar("Failed to save profile details", "error");
     }
   };
 
   const handleCancelOtherEdit = () => {
-    // revert to last fetched user data
     setLocalTeacherData(user?.teacher_data ? JSON.parse(JSON.stringify(user.teacher_data)) : null);
     setLocalParentData(user?.parent_data ? JSON.parse(JSON.stringify(user.parent_data)) : []);
     setLocalStudentData(user?.student_data ? JSON.parse(JSON.stringify(user.student_data)) : null);
@@ -533,7 +520,13 @@ const UserProfile: React.FC = () => {
     setEditingStudent(false);
   };
 
-  // CRITICAL FIX: Updated renderTeacherEditable function
+  const toggleSection = (section: keyof typeof expandedSections) => {
+    setExpandedSections(prev => ({
+      ...prev,
+      [section]: !prev[section]
+    }));
+  };
+
   const renderTeacherEditable = (teacherData: TeacherData | undefined | null) => {
     const dataToRender = editingTeacher ? localTeacherData : teacherData;
     const teacherInfoArray = getTeacherInfoArray(dataToRender);
@@ -543,7 +536,7 @@ const UserProfile: React.FC = () => {
         <Stack spacing={2}>
           <Typography>No teacher profile data available.</Typography>
           {editingTeacher && (
-            <Button variant="outlined" onClick={addTeacherRow} disabled={isMutating}>
+            <Button variant="outlined" onClick={addTeacherRow} disabled={isMutating} fullWidth={isMobile}>
               Add Teacher Entry
             </Button>
           )}
@@ -554,7 +547,7 @@ const UserProfile: React.FC = () => {
     return (
       <Stack spacing={2}>
         {teacherInfoArray.map((t, idx) => (
-          <Paper key={t.id ?? `t-${idx}`} variant="outlined" sx={{ p: 2 }}>
+          <Paper key={t.id ?? `t-${idx}`} variant="outlined" sx={{ p: { xs: 1.5, sm: 2 } }}>
             <Stack spacing={2}>
               <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
                 {editingTeacher ? (
@@ -564,12 +557,14 @@ const UserProfile: React.FC = () => {
                       value={t.subject || ""}
                       onChange={(e) => handleTeacherFieldChange(idx, "subject", e.target.value)}
                       fullWidth
+                      size={isMobile ? "small" : "medium"}
                     />
                     <TextField
                       label="Staff No"
                       value={t.staffNo || ""}
                       onChange={(e) => handleTeacherFieldChange(idx, "staffNo", e.target.value)}
                       fullWidth
+                      size={isMobile ? "small" : "medium"}
                     />
                   </>
                 ) : (
@@ -584,7 +579,7 @@ const UserProfile: React.FC = () => {
                 )}
               </Stack>
 
-              <Stack direction={{ xs: "column", sm: "row" }} spacing={2} justifyContent="space-between" alignItems="center">
+              <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
                 {editingTeacher ? (
                   <>
                     <TextField
@@ -592,18 +587,21 @@ const UserProfile: React.FC = () => {
                       value={t.teacherGrade || ""}
                       onChange={(e) => handleTeacherFieldChange(idx, "teacherGrade", e.target.value)}
                       fullWidth
+                      size={isMobile ? "small" : "medium"}
                     />
                     <TextField
                       label="Class"
                       value={t.teacherClass || ""}
                       onChange={(e) => handleTeacherFieldChange(idx, "teacherClass", e.target.value)}
                       fullWidth
+                      size={isMobile ? "small" : "medium"}
                     />
                     <TextField
                       label="Medium"
                       value={t.medium || ""}
                       onChange={(e) => handleTeacherFieldChange(idx, "medium", e.target.value)}
                       fullWidth
+                      size={isMobile ? "small" : "medium"}
                     />
                   </>
                 ) : (
@@ -613,20 +611,30 @@ const UserProfile: React.FC = () => {
                     <Typography variant="body2"><strong>Medium:</strong> {t.medium || "-"}</Typography>
                   </>
                 )}
-
-                {editingTeacher && (
-                  <Box>
-                    <Button color="error" onClick={() => removeTeacherRow(idx)} disabled={isMutating}>
-                      Remove
-                    </Button>
-                  </Box>
-                )}
               </Stack>
+
+              {editingTeacher && (
+                <Button 
+                  color="error" 
+                  onClick={() => removeTeacherRow(idx)} 
+                  disabled={isMutating}
+                  size={isMobile ? "small" : "medium"}
+                  fullWidth={isMobile}
+                >
+                  Remove
+                </Button>
+              )}
             </Stack>
           </Paper>
         ))}
         {editingTeacher && (
-          <Button variant="outlined" onClick={addTeacherRow} disabled={isMutating}>
+          <Button 
+            variant="outlined" 
+            onClick={addTeacherRow} 
+            disabled={isMutating}
+            fullWidth={isMobile}
+            size={isMobile ? "small" : "medium"}
+          >
             Add Teacher Entry
           </Button>
         )}
@@ -635,7 +643,6 @@ const UserProfile: React.FC = () => {
   };
 
   const renderParentEditable = (parentData: ParentData[] | undefined | null) => {
-    // Handle both edit mode and view mode data consistently
     const data = editingParent 
       ? localParentData 
       : (Array.isArray(parentData) 
@@ -652,58 +659,53 @@ const UserProfile: React.FC = () => {
       <Stack spacing={3}>
         {data.map((parentEntry, parentIndex) => (
           <Stack key={parentEntry.parent_info?.id || parentIndex} spacing={2}>
-            {/* Parent Information Card */}
-            <Paper variant="outlined" sx={{ p: 2 }}>
+            <Paper variant="outlined" sx={{ p: { xs: 1.5, sm: 2 } }}>
               <Stack spacing={2}>
-                <Typography variant="h6" gutterBottom>
+                <Typography variant="h6" fontSize={{ xs: "1rem", sm: "1.25rem" }} gutterBottom>
                   Parent Information #{parentIndex + 1}
                 </Typography>
                 
                 <Stack spacing={2}>
-                  <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                    {editingParent ? (
-                      <>
-                        <TextField
-                          fullWidth
-                          label="Profession"
-                          value={parentEntry.parent_info?.profession || ''}
-                          disabled={!editingParent}
-                          onChange={(e) => handleParentFieldChange(`${parentIndex}.parent_info.profession`, e.target.value)}
-                        />
-                        
-                        <TextField
-                          fullWidth
-                          label="Relation"
-                          value={parentEntry.parent_info?.relation || ''}
-                          disabled={!editingParent}
-                          onChange={(e) => handleParentFieldChange(`${parentIndex}.parent_info.relation`, e.target.value)}
-                        />
-                        
-                        <TextField
-                          fullWidth
-                          label="Contact"
-                          value={parentEntry.parent_info?.parent_contact || ''}
-                          disabled={!editingParent}
-                          onChange={(e) => handleParentFieldChange(`${parentIndex}.parent_info.parent_contact`, e.target.value)}
-                        />
-                      </>
-                    ) : (
-                      // View mode - display as text
-                      <>
-                        <Typography><strong>Profession:</strong> {parentEntry.parent_info?.profession || '-'}</Typography>
-                        <Typography><strong>Relation:</strong> {parentEntry.parent_info?.relation || '-'}</Typography>
-                        <Typography><strong>Contact:</strong> {parentEntry.parent_info?.parent_contact || '-'}</Typography>
-                      </>
-                    )}
-                  </Box>
+                  {editingParent ? (
+                    <>
+                      <TextField
+                        fullWidth
+                        label="Profession"
+                        value={parentEntry.parent_info?.profession || ''}
+                        onChange={(e) => handleParentFieldChange(`${parentIndex}.parent_info.profession`, e.target.value)}
+                        size={isMobile ? "small" : "medium"}
+                      />
+                      
+                      <TextField
+                        fullWidth
+                        label="Relation"
+                        value={parentEntry.parent_info?.relation || ''}
+                        onChange={(e) => handleParentFieldChange(`${parentIndex}.parent_info.relation`, e.target.value)}
+                        size={isMobile ? "small" : "medium"}
+                      />
+                      
+                      <TextField
+                        fullWidth
+                        label="Contact"
+                        value={parentEntry.parent_info?.parent_contact || ''}
+                        onChange={(e) => handleParentFieldChange(`${parentIndex}.parent_info.parent_contact`, e.target.value)}
+                        size={isMobile ? "small" : "medium"}
+                      />
+                    </>
+                  ) : (
+                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                      <Typography variant="body2"><strong>Profession:</strong> {parentEntry.parent_info?.profession || '-'}</Typography>
+                      <Typography variant="body2"><strong>Relation:</strong> {parentEntry.parent_info?.relation || '-'}</Typography>
+                      <Typography variant="body2"><strong>Contact:</strong> {parentEntry.parent_info?.parent_contact || '-'}</Typography>
+                    </Box>
+                  )}
                 </Stack>
               </Stack>
             </Paper>
 
-            {/* Students Information Card */}
-            <Paper variant="outlined" sx={{ p: 2 }}>
+            <Paper variant="outlined" sx={{ p: { xs: 1.5, sm: 2 } }}>
               <Stack spacing={2}>
-                <Typography variant="h6" gutterBottom>
+                <Typography variant="h6" fontSize={{ xs: "1rem", sm: "1.25rem" }} gutterBottom>
                   Associated Students
                 </Typography>
                 
@@ -712,70 +714,68 @@ const UserProfile: React.FC = () => {
                     key={student.studentAdmissionNo || studentIndex} 
                     spacing={2}
                     sx={{ 
-                      p: 2, 
+                      p: { xs: 1.5, sm: 2 }, 
                       border: '1px solid',
                       borderColor: 'divider',
                       borderRadius: 1
                     }}
                   >
-                    <Typography variant="subtitle1">
+                    <Typography variant="subtitle1" fontSize={{ xs: "0.875rem", sm: "1rem" }}>
                       Student #{studentIndex + 1}
                     </Typography>
                     
                     {editingParent ? (
-                      // Edit mode - show text fields
                       <>
                         <TextField
                           fullWidth
                           label="Name"
                           value={student.name || ''}
-                          disabled={!editingParent}
                           onChange={(e) => handleParentFieldChange(
                             `${parentIndex}.students_info.${studentIndex}.name`,
                             e.target.value
                           )}
+                          size={isMobile ? "small" : "medium"}
                         />
                         
                         <TextField
                           fullWidth
                           label="Admission No"
                           value={student.studentAdmissionNo || ''}
-                          disabled={!editingParent}
                           onChange={(e) => handleParentFieldChange(
                             `${parentIndex}.students_info.${studentIndex}.studentAdmissionNo`,
                             e.target.value
                           )}
+                          size={isMobile ? "small" : "medium"}
                         />
                         
                         <TextField
                           fullWidth
                           label="Grade"
                           value={student.grade || ''}
-                          disabled={!editingParent}
                           onChange={(e) => handleParentFieldChange(
                             `${parentIndex}.students_info.${studentIndex}.grade`,
                             e.target.value
                           )}
+                          size={isMobile ? "small" : "medium"}
                         />
                         
                         <TextField
                           fullWidth
                           label="Class"
                           value={student.class || ''}
-                          disabled={!editingParent}
                           onChange={(e) => handleParentFieldChange(
                             `${parentIndex}.students_info.${studentIndex}.class`,
                             e.target.value
                           )}
+                          size={isMobile ? "small" : "medium"}
                         />
                       </>
                     ) : (
-                      // View mode - display as text
                       <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-                        <Typography><strong>Name:</strong> {student.name || '-'}</Typography>
-                        <Typography><strong>Admission No:</strong> {student.studentAdmissionNo || '-'}</Typography>
-                        <Typography><strong>Grade:</strong> {student.grade || '-'}</Typography>
-                        <Typography><strong>Class:</strong> {student.class || '-'}</Typography>
+                        <Typography variant="body2"><strong>Name:</strong> {student.name || '-'}</Typography>
+                        <Typography variant="body2"><strong>Admission No:</strong> {student.studentAdmissionNo || '-'}</Typography>
+                        <Typography variant="body2"><strong>Grade:</strong> {student.grade || '-'}</Typography>
+                        <Typography variant="body2"><strong>Class:</strong> {student.class || '-'}</Typography>
                       </Box>
                     )}
                   </Stack>
@@ -795,29 +795,48 @@ const UserProfile: React.FC = () => {
     }
 
     return (
-      <Paper variant="outlined" sx={{ p: 2 }}>
-        <Stack spacing={1}>
+      <Paper variant="outlined" sx={{ p: { xs: 1.5, sm: 2 } }}>
+        <Stack spacing={2}>
           <Typography variant="subtitle1" fontWeight={600}>Student Details</Typography>
           {editingStudent ? (
             <Stack spacing={2}>
-              <TextField label="Admission No" value={s.studentAdmissionNo || ""} onChange={(e) => handleStudentFieldChange("studentAdmissionNo", e.target.value)} fullWidth />
-              <TextField label="Grade" value={s.studentGrade || ""} onChange={(e) => handleStudentFieldChange("studentGrade", e.target.value)} fullWidth />
-              <TextField label="Class" value={s.studentClass || ""} onChange={(e) => handleStudentFieldChange("studentClass", e.target.value)} fullWidth />
-              <TextField label="Medium" value={s.medium || ""} onChange={(e) => handleStudentFieldChange("medium", e.target.value)} fullWidth />
-              <TextField label="Year" value={s.year || ""} onChange={(e) => handleStudentFieldChange("year", e.target.value)} fullWidth />
+              <TextField 
+                label="Grade" 
+                value={s.studentGrade || ""} 
+                onChange={(e) => handleStudentFieldChange("studentGrade", e.target.value)} 
+                fullWidth 
+                size={isMobile ? "small" : "medium"}
+              />
+              <TextField 
+                label="Class" 
+                value={s.studentClass || ""} 
+                onChange={(e) => handleStudentFieldChange("studentClass", e.target.value)} 
+                fullWidth 
+                size={isMobile ? "small" : "medium"}
+              />
+              <TextField 
+                label="Medium" 
+                value={s.medium || ""} 
+                onChange={(e) => handleStudentFieldChange("medium", e.target.value)} 
+                fullWidth 
+                size={isMobile ? "small" : "medium"}
+              />
+              <TextField 
+                label="Year" 
+                value={s.year || ""} 
+                onChange={(e) => handleStudentFieldChange("year", e.target.value)} 
+                fullWidth 
+                size={isMobile ? "small" : "medium"}
+              />
             </Stack>
           ) : (
-            <Stack direction={{ xs: "column", sm: "row" }} spacing={2} justifyContent="space-between">
-              <Stack spacing={0.5}>
-                <Typography variant="body2"><strong>Admission No:</strong> {s.studentAdmissionNo || "-"}</Typography>
-                <Typography variant="body2"><strong>Grade:</strong> {s.studentGrade || "-"}</Typography>
-                <Typography variant="body2"><strong>Class:</strong> {s.studentClass || "-"}</Typography>
-                <Typography variant="body2"><strong>Medium:</strong> {s.medium || "-"}</Typography>
-              </Stack>
-              <Stack spacing={0.5} alignItems="flex-end">
-                <Typography variant="body2"><strong>Year:</strong> {s.year || "-"}</Typography>
-                <Typography variant="body2"><strong>Updated By:</strong> {s.modifiedBy || "-"}</Typography>
-              </Stack>
+            <Stack spacing={1}>
+              <Typography variant="body2"><strong>Admission No:</strong> {s.studentAdmissionNo || "-"}</Typography>
+              <Typography variant="body2"><strong>Grade:</strong> {s.studentGrade || "-"}</Typography>
+              <Typography variant="body2"><strong>Class:</strong> {s.studentClass || "-"}</Typography>
+              <Typography variant="body2"><strong>Medium:</strong> {s.medium || "-"}</Typography>
+              <Typography variant="body2"><strong>Year:</strong> {s.year || "-"}</Typography>
+              <Typography variant="body2"><strong>Updated By:</strong> {s.modifiedBy || "-"}</Typography>
             </Stack>
           )}
         </Stack>
@@ -829,7 +848,7 @@ const UserProfile: React.FC = () => {
     <Box sx={{ display: "flex", width: "100vw", height: "100vh", minHeight: "100vh" }}>
       <CssBaseline />
       <Sidebar open={sidebarOpen || hovered} setOpen={setSidebarOpen} />
-      <Box sx={{ flexGrow: 1, display: "flex", flexDirection: "column" }}>
+      <Box sx={{ flexGrow: 1, display: "flex", flexDirection: "column", overflow: "auto" }}>
         <AppBar
           position="static"
           sx={{
@@ -842,37 +861,79 @@ const UserProfile: React.FC = () => {
           <Navbar title="User Profile" sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} />
         </AppBar>
 
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}>
+        <motion.div 
+          initial={{ opacity: 0, y: 20 }} 
+          animate={{ opacity: 1, y: 0 }} 
+          transition={{ duration: 0.5 }}
+          style={{ flex: 1 }}
+        >
           <Paper
-            elevation={3}
+            elevation={isMobile ? 0 : 3}
             sx={{
               bgcolor: theme.palette.background.paper,
-              p: 4,
-              borderRadius: 3,
+              p: { xs: 2, sm: 3, md: 4 },
+              borderRadius: { xs: 0, sm: 3 },
               maxWidth: 900,
               mx: "auto",
-              mt: 4,
-              mb: 4,
+              mt: { xs: 0, sm: 2, md: 4 },
+              mb: { xs: 0, sm: 2, md: 4 },
+              minHeight: { xs: '100%', sm: 'auto' },
             }}
           >
-            {/* Profile Header */}
-            <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", mb: 4 }}>
-              <Box sx={{ display: "flex", alignItems: "center", gap: 3 }}>
-                <Avatar src={user?.photo || "/default-avatar.png"} sx={{ width: 100, height: 100, border: `3px solid ${theme.palette.primary.main}` }} />
-                <Box>
-                  <Typography variant="h5" fontWeight="bold" gutterBottom>
+            {/* Profile Header - Mobile Responsive */}
+            <Box sx={{ 
+              display: "flex", 
+              flexDirection: { xs: "column", sm: "row" },
+              justifyContent: "space-between", 
+              alignItems: { xs: "center", sm: "flex-start" },
+              gap: { xs: 2, sm: 3 },
+              mb: 4 
+            }}>
+              <Box sx={{ 
+                display: "flex", 
+                flexDirection: { xs: "column", sm: "row" },
+                alignItems: "center", 
+                gap: { xs: 2, sm: 3 },
+                width: { xs: '100%', sm: 'auto' }
+              }}>
+                <Avatar 
+                  src={user?.photo || "/default-avatar.png"} 
+                  sx={{ 
+                    width: { xs: 80, sm: 100 }, 
+                    height: { xs: 80, sm: 100 }, 
+                    border: `3px solid ${theme.palette.primary.main}` 
+                  }} 
+                />
+                <Box sx={{ textAlign: { xs: 'center', sm: 'left' } }}>
+                  <Typography variant="h5" fontSize={{ xs: "1.25rem", sm: "1.5rem" }} fontWeight="bold" gutterBottom>
                     {isDataLoading ? <Skeleton width={200} /> : user?.name || "Unknown User"}
                   </Typography>
-                  <Typography variant="body1" color="text.secondary">
+                  <Typography variant="body1" color="text.secondary" fontSize={{ xs: "0.875rem", sm: "1rem" }}>
                     {isDataLoading ? <Skeleton width={150} /> : user?.userRole || "No Role"}
                   </Typography>
-                  <Button variant="outlined" startIcon={<PhotoCamera />} onClick={() => setOpenPhoto(true)} disabled={isMutating} sx={{ mt: 1 }}>
+                  <Button 
+                    variant="outlined" 
+                    startIcon={<PhotoCamera />} 
+                    onClick={() => setOpenPhoto(true)} 
+                    disabled={isMutating} 
+                    sx={{ mt: 1 }}
+                    size={isMobile ? "small" : "medium"}
+                    fullWidth={isMobile}
+                  >
                     Change Photo
                   </Button>
                 </Box>
               </Box>
 
-              <Button variant="outlined" onClick={handleRefresh} disabled={isDataLoading || isMutating} startIcon={<Refresh />}>
+              <Button 
+                variant="outlined" 
+                onClick={handleRefresh} 
+                disabled={isDataLoading || isMutating} 
+                startIcon={<Refresh />}
+                size={isMobile ? "small" : "medium"}
+                fullWidth={isMobile}
+                sx={{ minWidth: { xs: '100%', sm: 'auto' } }}
+              >
                 Refresh
               </Button>
             </Box>
@@ -884,104 +945,265 @@ const UserProfile: React.FC = () => {
               </Alert>
             )}
 
-            {/* User Information */}
-            <Typography variant="h6" sx={{ mb: 3, fontWeight: 600 }}>
-              Personal Information
-            </Typography>
-
-            {isDataLoading ? (
-              <LoadingSkeleton />
-            ) : (
-              <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", md: "1fr 1fr" }, gap: 2 }}>
-                <Typography><strong>Name:</strong> {user?.name || "-"}</Typography>
-                <Typography><strong>Username:</strong> {user?.username || "-"}</Typography>
-                <Typography><strong>Email:</strong> {user?.email || "-"}</Typography>
-                <Typography><strong>Contact:</strong> {user?.contact || "-"}</Typography>
-                <Typography><strong>Address:</strong> {user?.address || "-"}</Typography>
-                <Typography><strong>Birthday:</strong> {user?.birthDay || "-"}</Typography>
-                <Typography><strong>User Type:</strong> {user?.userType || "-"}</Typography>
-                <Typography><strong>Gender:</strong> {user?.gender || "-"}</Typography>
-                <Typography><strong>User Role:</strong> {user?.userRole || "-"}</Typography>
-                <Typography><strong>Location:</strong> {user?.location || "-"}</Typography>
-                {user?.status !== undefined && <Typography><strong>Status:</strong> {user.status ? "Active" : "Inactive"}</Typography>}
+            {/* User Information - Collapsible on Mobile */}
+            <Box sx={{ mb: 3 }}>
+              <Box 
+                sx={{ 
+                  display: 'flex', 
+                  justifyContent: 'space-between', 
+                  alignItems: 'center',
+                  mb: 2,
+                  cursor: isMobile ? 'pointer' : 'default'
+                }}
+                onClick={isMobile ? () => toggleSection('personal') : undefined}
+              >
+                <Typography variant="h6" sx={{ fontWeight: 600, fontSize: { xs: "1rem", sm: "1.25rem" } }}>
+                  Personal Information
+                </Typography>
+                {isMobile && (
+                  <IconButton 
+                    size="small"
+                    sx={{
+                      transform: expandedSections.personal ? 'rotate(180deg)' : 'rotate(0deg)',
+                      transition: 'transform 0.3s'
+                    }}
+                  >
+                    <ExpandMoreIcon />
+                  </IconButton>
+                )}
               </Box>
-            )}
 
-            {/* Action Buttons */}
-            <Box sx={{ display: "flex", gap: 2, mt: 4, justifyContent: "flex-end" }}>
-              <Button variant="outlined" onClick={() => setOpenOther(true)} disabled={isMutating || isDataLoading || !user} sx={{ minWidth: 160 }}>
+              <Collapse in={!isMobile || expandedSections.personal}>
+                {isDataLoading ? (
+                  <LoadingSkeleton />
+                ) : (
+                  <Box sx={{ 
+                    display: "grid", 
+                    gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr" }, 
+                    gap: { xs: 1.5, sm: 2 },
+                    fontSize: { xs: "0.875rem", sm: "1rem" }
+                  }}>
+                    <Typography variant="body2"><strong>Name:</strong> {user?.name || "-"}</Typography>
+                    <Typography variant="body2"><strong>Username:</strong> {user?.username || "-"}</Typography>
+                    <Typography variant="body2"><strong>Email:</strong> {user?.email || "-"}</Typography>
+                    <Typography variant="body2"><strong>Contact:</strong> {user?.contact || "-"}</Typography>
+                    <Typography variant="body2" sx={{ gridColumn: { xs: "1", sm: "1 / -1" } }}>
+                      <strong>Address:</strong> {user?.address || "-"}
+                    </Typography>
+                    <Typography variant="body2"><strong>Birthday:</strong> {user?.birthDay || "-"}</Typography>
+                    <Typography variant="body2"><strong>User Type:</strong> {user?.userType || "-"}</Typography>
+                    <Typography variant="body2"><strong>Gender:</strong> {user?.gender || "-"}</Typography>
+                    <Typography variant="body2"><strong>User Role:</strong> {user?.userRole || "-"}</Typography>
+                    <Typography variant="body2"><strong>Location:</strong> {user?.location || "-"}</Typography>
+                    {user?.status !== undefined && (
+                      <Typography variant="body2">
+                        <strong>Status:</strong> {user.status ? "Active" : "Inactive"}
+                      </Typography>
+                    )}
+                  </Box>
+                )}
+              </Collapse>
+            </Box>
+
+            {/* Action Buttons - Stacked on Mobile */}
+            <Box sx={{ 
+              display: "flex", 
+              flexDirection: { xs: "column", sm: "row" },
+              gap: 2, 
+              mt: 4, 
+              justifyContent: "flex-end" 
+            }}>
+              <Button 
+                variant="outlined" 
+                onClick={() => setOpenOther(true)} 
+                disabled={isMutating || isDataLoading || !user} 
+                sx={{ minWidth: { xs: '100%', sm: 160 } }}
+                size={isMobile ? "medium" : "large"}
+              >
                 Other Profile Data
               </Button>
 
-              <Button variant="contained" startIcon={<EditIcon />} onClick={() => setOpenEdit(true)} disabled={isMutating || isDataLoading || !user} sx={{ minWidth: 120 }}>
+              <Button 
+                variant="contained" 
+                startIcon={<EditIcon />} 
+                onClick={() => setOpenEdit(true)} 
+                disabled={isMutating || isDataLoading || !user} 
+                sx={{ minWidth: { xs: '100%', sm: 120 } }}
+                size={isMobile ? "medium" : "large"}
+              >
                 Edit Profile
               </Button>
             </Box>
           </Paper>
         </motion.div>
 
-        {/* Edit Dialog - Using custom Dialog component */}
-        <Dialog open={openEdit} onClose={() => setOpenEdit(false)} maxWidth="md" fullWidth aria-labelledby="edit-profile-title" sx={{ "& .MuiDialog-paper": { borderRadius: 2 } }}>
+        {/* Edit Dialog - Mobile Responsive */}
+        <Dialog 
+          open={openEdit} 
+          onClose={() => setOpenEdit(false)} 
+          maxWidth="md" 
+          fullWidth
+          fullScreen={isMobile}
+          aria-labelledby="edit-profile-title" 
+          sx={{ "& .MuiDialog-paper": { borderRadius: { xs: 0, sm: 2 } } }}
+        >
           <DialogTitle id="edit-profile-title" sx={{ pb: 1 }}>
-            <Typography variant="h6" fontWeight="bold">Edit Profile Information</Typography>
+            <Typography variant="h6" fontSize={{ xs: "1.125rem", sm: "1.25rem" }} fontWeight="bold">
+              Edit Profile Information
+            </Typography>
           </DialogTitle>
           <DialogContent sx={{ pt: 2 }}>
-            <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", md: "1fr 1fr" }, gap: 2 }}>
-              <TextField fullWidth label="Name" name="name" value={editUser.name} onChange={handleEditChange} error={!!validationErrors.name} helperText={validationErrors.name} required />
-              <TextField fullWidth label="Username" name="username" value={editUser.username} onChange={handleEditChange} error={!!validationErrors.username} helperText={validationErrors.username} required />
-              <TextField fullWidth label="Email" name="email" type="email" value={editUser.email} onChange={handleEditChange} error={!!validationErrors.email} helperText={validationErrors.email} required />
-              <TextField fullWidth label="Contact" name="contact" value={editUser.contact} onChange={handleEditChange} error={!!validationErrors.contact} helperText={validationErrors.contact} required />
-              <TextField fullWidth label="Address" name="address" multiline rows={2} value={editUser.address} onChange={handleEditChange} error={!!validationErrors.address} helperText={validationErrors.address} required sx={{ gridColumn: { md: "1 / -1" } }} />
-              <TextField fullWidth label="Birthday" name="birthDay" type="date" value={editUser.birthDay} onChange={handleEditChange} error={!!validationErrors.birthDay} helperText={validationErrors.birthDay} InputLabelProps={{ shrink: true }} required />
-              <TextField fullWidth label="Location" name="location" value={editUser.location} onChange={handleEditChange} error={!!validationErrors.location} helperText={validationErrors.location} required />
+            <Box sx={{ 
+              display: "grid", 
+              gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr" }, 
+              gap: 2 
+            }}>
+              <TextField 
+                fullWidth 
+                label="Name" 
+                name="name" 
+                value={editUser.name} 
+                onChange={handleEditChange} 
+                error={!!validationErrors.name} 
+                helperText={validationErrors.name} 
+                required 
+                size={isMobile ? "small" : "medium"}
+              />
+              <TextField 
+                fullWidth 
+                label="Username" 
+                name="username" 
+                value={editUser.username} 
+                onChange={handleEditChange} 
+                error={!!validationErrors.username} 
+                helperText={validationErrors.username} 
+                required 
+                size={isMobile ? "small" : "medium"}
+              />
+              <TextField 
+                fullWidth 
+                label="Email" 
+                name="email" 
+                type="email" 
+                value={editUser.email} 
+                onChange={handleEditChange} 
+                error={!!validationErrors.email} 
+                helperText={validationErrors.email} 
+                required 
+                size={isMobile ? "small" : "medium"}
+              />
+              <TextField 
+                fullWidth 
+                label="Contact" 
+                name="contact" 
+                value={editUser.contact} 
+                onChange={handleEditChange} 
+                error={!!validationErrors.contact} 
+                helperText={validationErrors.contact} 
+                required 
+                size={isMobile ? "small" : "medium"}
+              />
+              <TextField 
+                fullWidth 
+                label="Address" 
+                name="address" 
+                multiline 
+                rows={2} 
+                value={editUser.address} 
+                onChange={handleEditChange} 
+                error={!!validationErrors.address} 
+                helperText={validationErrors.address} 
+                required 
+                sx={{ gridColumn: { xs: "1", sm: "1 / -1" } }}
+                size={isMobile ? "small" : "medium"}
+              />
+              <TextField 
+                fullWidth 
+                label="Birthday" 
+                name="birthDay" 
+                type="date" 
+                value={editUser.birthDay} 
+                onChange={handleEditChange} 
+                error={!!validationErrors.birthDay} 
+                helperText={validationErrors.birthDay} 
+                InputLabelProps={{ shrink: true }} 
+                required 
+                size={isMobile ? "small" : "medium"}
+              />
+              <TextField 
+                fullWidth 
+                label="Location" 
+                name="location" 
+                value={editUser.location} 
+                onChange={handleEditChange} 
+                error={!!validationErrors.location} 
+                helperText={validationErrors.location} 
+                required 
+                size={isMobile ? "small" : "medium"}
+              />
             </Box>
           </DialogContent>
-          <DialogActions sx={{ px: 3, pb: 2 }}>
-            <Button onClick={() => setOpenEdit(false)} disabled={isMutating}>Cancel</Button>
-            <Button onClick={handleSaveEdit} variant="contained" disabled={isMutating} startIcon={isMutating ? <CircularProgress size={20} color="inherit" /> : null}>
+          <DialogActions sx={{ px: { xs: 2, sm: 3 }, pb: 2, flexDirection: { xs: 'column', sm: 'row' }, gap: { xs: 1, sm: 0 } }}>
+            <Button 
+              onClick={() => setOpenEdit(false)} 
+              disabled={isMutating}
+              fullWidth={isMobile}
+            >
+              Cancel
+            </Button>
+            <Button 
+              onClick={handleSaveEdit} 
+              variant="contained" 
+              disabled={isMutating} 
+              startIcon={isMutating ? <CircularProgress size={20} color="inherit" /> : null}
+              fullWidth={isMobile}
+            >
               {isMutating ? "Saving..." : "Save Changes"}
             </Button>
           </DialogActions>
         </Dialog>
 
-        {/* Photo Dialog */}
-        <Dialog open={openPhoto} onClose={() => setOpenPhoto(false)} aria-labelledby="photo-upload-title">
+        {/* Photo Dialog - Mobile Responsive */}
+        <Dialog 
+          open={openPhoto} 
+          onClose={() => setOpenPhoto(false)} 
+          aria-labelledby="photo-upload-title"
+          fullWidth
+          maxWidth="xs"
+        >
           <DialogTitle id="photo-upload-title">Upload New Photo</DialogTitle>
           <DialogContent>
-            <input type="file" accept="image/*" onChange={handlePhotoUpload} disabled={isMutating} />
+            <Box sx={{ py: 2 }}>
+              <input 
+                type="file" 
+                accept="image/*" 
+                onChange={handlePhotoUpload} 
+                disabled={isMutating}
+                style={{ width: '100%' }}
+              />
+            </Box>
           </DialogContent>
-          <DialogActions>
-            <Button onClick={() => setOpenPhoto(false)}>Cancel</Button>
+          <DialogActions sx={{ flexDirection: { xs: 'column', sm: 'row' }, gap: { xs: 1, sm: 0 }, px: 2 }}>
+            <Button onClick={() => setOpenPhoto(false)} fullWidth={isMobile}>
+              Cancel
+            </Button>
           </DialogActions>
         </Dialog>
 
-        {/* Other Profile Data Dialog */}
-        <Dialog open={openOther} onClose={() => setOpenOther(false)} maxWidth="md" fullWidth aria-labelledby="other-profile-title">
+        {/* Other Profile Data Dialog - Mobile Responsive */}
+        <Dialog 
+          open={openOther} 
+          onClose={() => setOpenOther(false)} 
+          maxWidth="md" 
+          fullWidth 
+          fullScreen={isMobile}
+          aria-labelledby="other-profile-title"
+        >
           <DialogTitle id="other-profile-title">
             <Stack direction="row" alignItems="center" justifyContent="space-between">
-              <Typography>Other Profile Data</Typography>
-              {/* <Stack direction="row" spacing={1}>
-                {!editingTeacher && !editingParent && !editingStudent ? (
-                  // Show a single Edit button that toggles editing for sections that exist
-                  // <Button
-                  //   onClick={() => {
-                  //     // enable editing only for sections that exist in data
-                  //     if (localTeacherData) setEditingTeacher(true);
-                  //     if (localParentData) setEditingParent(true);
-                  //     if (localStudentData) setEditingStudent(true);
-                  //     // if none exist, allow user to add teacher row (useful in some flows)
-                  //     if (!localTeacherData && !localParentData && !localStudentData) {
-                  //       setEditingTeacher(true);
-                  //       setLocalTeacherData({ teacher_info: [] });
-                  //     }
-                  //   }}
-                  //   startIcon={<EditIcon />}
-                  //   disabled={isMutating}
-                  // >
-                  //   Edit
-                  // </Button>
-                ) : null}
-              </Stack> */}
+              <Typography variant="h6" fontSize={{ xs: "1.125rem", sm: "1.25rem" }}>
+                Other Profile Data
+              </Typography>
             </Stack>
           </DialogTitle>
           <DialogContent dividers>
@@ -995,32 +1217,27 @@ const UserProfile: React.FC = () => {
                 <>
                   {(user?.userType === "Teacher" || user?.teacher_data) && (
                     <Stack spacing={1}>
-                      <Stack direction="row" justifyContent="space-between" alignItems="center">
-                        <Typography variant="h6">Teacher Profile</Typography>
-                        {/* {localTeacherData && !editingTeacher && (
-                          // <Button onClick={() => setEditingTeacher(true)} disabled={isMutating}>Edit Teacher</Button>
-                        )} */}
-                      </Stack>
+                      <Typography variant="h6" fontSize={{ xs: "1rem", sm: "1.25rem" }}>
+                        Teacher Profile
+                      </Typography>
                       {renderTeacherEditable(user?.teacher_data)}
                     </Stack>
                   )}
 
                   {(user?.userType === "Parent" || user?.parent_data) && (
                     <Stack spacing={1}>
-                      <Stack direction="row" justifyContent="space-between" alignItems="center">
-                        <Typography variant="h6">Parent Profile</Typography>
-                        {/* {localParentData && !editingParent && <Button onClick={() => setEditingParent(true)} disabled={isMutating}>Edit Parent</Button>} */}
-                      </Stack>
+                      <Typography variant="h6" fontSize={{ xs: "1rem", sm: "1.25rem" }}>
+                        Parent Profile
+                      </Typography>
                       {renderParentEditable(user?.parent_data ? (Array.isArray(user.parent_data) ? user.parent_data : [user.parent_data]) : null)}
                     </Stack>
                   )}
 
                   {(user?.userType === "Student" || user?.student_data) && (
                     <Stack spacing={1}>
-                      <Stack direction="row" justifyContent="space-between" alignItems="center">
-                        <Typography variant="h6">Student Profile</Typography>
-                        {/* {localStudentData && !editingStudent && <Button onClick={() => setEditingStudent(true)} disabled={isMutating}>Edit Student</Button>} */}
-                      </Stack>
+                      <Typography variant="h6" fontSize={{ xs: "1rem", sm: "1.25rem" }}>
+                        Student Profile
+                      </Typography>
                       {renderStudentEditable(user?.student_data)}
                     </Stack>
                   )}
@@ -1035,13 +1252,28 @@ const UserProfile: React.FC = () => {
               )}
             </Stack>
           </DialogContent>
-          <DialogActions>
+          <DialogActions sx={{ 
+            flexDirection: { xs: 'column', sm: 'row' }, 
+            gap: { xs: 1, sm: 0 }, 
+            px: 2,
+            pb: 2
+          }}>
             {!editingTeacher && !editingParent && !editingStudent ? (
-              <Button onClick={() => setOpenOther(false)}>Close</Button>
+              <Button onClick={() => setOpenOther(false)} fullWidth={isMobile}>
+                Close
+              </Button>
             ) : (
               <>
-                <Button onClick={handleCancelOtherEdit} disabled={isMutating}>Cancel</Button>
-                <Button onClick={handleSaveOther} variant="contained" disabled={isMutating} startIcon={otherProfileMutation.isPending ? <CircularProgress size={20} color="inherit" /> : null}>
+                <Button onClick={handleCancelOtherEdit} disabled={isMutating} fullWidth={isMobile}>
+                  Cancel
+                </Button>
+                <Button 
+                  onClick={handleSaveOther} 
+                  variant="contained" 
+                  disabled={isMutating} 
+                  startIcon={otherProfileMutation.isPending ? <CircularProgress size={20} color="inherit" /> : null}
+                  fullWidth={isMobile}
+                >
                   {otherProfileMutation.isPending ? "Saving..." : "Save Changes"}
                 </Button>
               </>
@@ -1050,8 +1282,22 @@ const UserProfile: React.FC = () => {
         </Dialog>
       </Box>
 
-      <Snackbar open={snackbar.open} autoHideDuration={6000} onClose={() => setSnackbar((prev) => ({ ...prev, open: false }))} anchorOrigin={{ vertical: "bottom", horizontal: "right" }}>
-        <Alert onClose={() => setSnackbar((prev) => ({ ...prev, open: false }))} severity={snackbar.severity} sx={{ width: "100%" }}>
+      {/* Snackbar - Positioned for Mobile */}
+      <Snackbar 
+        open={snackbar.open} 
+        autoHideDuration={6000} 
+        onClose={() => setSnackbar((prev) => ({ ...prev, open: false }))} 
+        anchorOrigin={{ 
+          vertical: isMobile ? "top" : "bottom", 
+          horizontal: isMobile ? "center" : "right" 
+        }}
+        sx={{ mt: isMobile ? 8 : 0 }}
+      >
+        <Alert 
+          onClose={() => setSnackbar((prev) => ({ ...prev, open: false }))} 
+          severity={snackbar.severity} 
+          sx={{ width: "100%" }}
+        >
           {snackbar.message}
         </Alert>
       </Snackbar>
@@ -1060,3 +1306,4 @@ const UserProfile: React.FC = () => {
 };
 
 export default UserProfile;
+     

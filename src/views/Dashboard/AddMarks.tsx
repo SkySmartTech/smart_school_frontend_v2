@@ -26,6 +26,7 @@ import {
     DialogContent,
     DialogActions,
     AlertTitle,
+    useMediaQuery,
 } from '@mui/material';
 import UploadFileIcon from '@mui/icons-material/UploadFile';
 import { DataGrid } from '@mui/x-data-grid';
@@ -99,10 +100,9 @@ interface AdmissionData {
     student_name: string;
 }
 
-// Extended StudentMark interface to include attendance
 interface ExtendedStudentMark extends StudentMark {
     attendance?: 'present' | 'absent';
-    status?: boolean; // true = present, false = absent
+    status?: boolean;
 }
 
 interface ExcelRow {
@@ -134,12 +134,12 @@ const TeacherDashboard: React.FC = () => {
     const [excelError, setExcelError] = useState<string>('');
     const [showExcelPreview, setShowExcelPreview] = useState(false);
     const [excelData, setExcelData] = useState<ExtendedStudentMark[]>([]);
-    
-    // Refs to prevent unnecessary re-renders and manage timeouts
+
     const admissionDataTimeoutRef = useRef<NodeJS.Timeout | null>(null);
     const lastFetchParamsRef = useRef<string>('');
-    
+
     const theme = useTheme();
+    const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
 
     const { control, watch, reset } = useForm<FilterFormData>({
         defaultValues: {
@@ -148,7 +148,7 @@ const TeacherDashboard: React.FC = () => {
             selectedSubject: '',
             selectedExam: '',
             selectedMonth: '',
-            selectedYear: '', 
+            selectedYear: '',
             searchQuery: ''
         }
     });
@@ -157,13 +157,11 @@ const TeacherDashboard: React.FC = () => {
     const { selectedGrade, selectedClass, selectedSubject, selectedExam, selectedMonth, selectedYear, searchQuery } = formValues;
     const isMonthFilterEnabled = selectedExam === 'Monthly';
 
-    // Helper function to format subject names to proper case
     const formatSubjectName = useCallback((subject: string): string => {
         if (!subject) return subject;
         return subject.charAt(0).toUpperCase() + subject.slice(1).toLowerCase();
     }, []);
 
-    // Helper function to format exam names for submission (keeping the formatted version for API)
     const formatExamName = useCallback((exam: string): string => {
         const examMap: Record<string, string> = {
             'First Term': 'First',
@@ -174,53 +172,47 @@ const TeacherDashboard: React.FC = () => {
         return examMap[exam] || exam;
     }, []);
 
-    // Memoize subject options calculation - keep original casing as value
     const subjectOptions = useMemo(() => {
         if (!teacherProfile?.teacher_data || !Array.isArray(teacherProfile.teacher_data) || !selectedGrade || !selectedClass) {
             return [];
         }
 
         const subjects = teacherProfile.teacher_data
-            .filter(teacher => 
-                teacher.teacherGrade === selectedGrade && 
+            .filter(teacher =>
+                teacher.teacherGrade === selectedGrade &&
                 teacher.teacherClass === selectedClass
             )
             .map(teacher => ({
-                label: formatSubjectName(teacher.subject), 
-                value: teacher.subject 
+                label: formatSubjectName(teacher.subject),
+                value: teacher.subject
             }));
 
-        // Remove duplicates based on original subject names
-        return subjects.filter((subject, index, self) => 
+        return subjects.filter((subject, index, self) =>
             index === self.findIndex(s => s.value.toLowerCase() === subject.value.toLowerCase())
         );
     }, [teacherProfile?.teacher_data, selectedGrade, selectedClass, formatSubjectName]);
 
-    // Memoize filtered students for search
     const filteredStudents = useMemo(() => {
         if (!searchQuery.trim()) return students;
-        
+
         const query = searchQuery.toLowerCase();
-        return students.filter(student => 
+        return students.filter(student =>
             student.student_name.toLowerCase().includes(query) ||
             student.student_admission.toLowerCase().includes(query)
         );
     }, [students, searchQuery]);
 
-    // Check if form is valid for submission
     const isFormValid = useMemo(() => {
         return selectedGrade && selectedClass && selectedSubject && selectedExam && selectedYear &&
-               (selectedExam !== 'Monthly' || selectedMonth);
+            (selectedExam !== 'Monthly' || selectedMonth);
     }, [selectedGrade, selectedClass, selectedSubject, selectedExam, selectedYear, selectedMonth]);
 
-    // Count modified marks
     const modifiedCount = useMemo(() => {
-        return Object.values(modifiedMarks).filter(mark => 
+        return Object.values(modifiedMarks).filter(mark =>
             (mark.marks !== undefined && mark.marks !== '') || mark.attendance !== undefined
         ).length;
     }, [modifiedMarks]);
 
-    // Stable utility functions
     const showSnackbar = useCallback((message: string, severity: 'success' | 'error' | 'info' | 'warning') => {
         setSnackbarMessage(message);
         setSnackbarSeverity(severity);
@@ -236,10 +228,9 @@ const TeacherDashboard: React.FC = () => {
         return "A";
     }, []);
 
-    // Fetch grades only - called once on mount
     const fetchGrades = useCallback(async () => {
         if (profileLoading) return;
-        
+
         setLoading(true);
         try {
             const grades = await fetchGradesFromApi();
@@ -255,7 +246,6 @@ const TeacherDashboard: React.FC = () => {
         }
     }, [profileLoading, showSnackbar]);
 
-    // Fetch classes when grade changes
     const fetchClasses = useCallback(async (grade: string) => {
         if (!grade) {
             setClassOptions([]);
@@ -274,7 +264,6 @@ const TeacherDashboard: React.FC = () => {
         }
     }, [showSnackbar]);
 
-    // Fetch admission data with caching check
     const fetchAdmissionDataHandler = useCallback(async (grade: string, classValue: string, year: string) => {
         if (!grade || !classValue || !year) {
             setAdmissionData([]);
@@ -282,10 +271,9 @@ const TeacherDashboard: React.FC = () => {
             return;
         }
 
-        // Create a cache key to prevent unnecessary API calls
         const cacheKey = `${grade}-${classValue}-${year}`;
         if (lastFetchParamsRef.current === cacheKey) {
-            return; // Don't refetch if parameters haven't changed
+            return;
         }
 
         try {
@@ -294,21 +282,20 @@ const TeacherDashboard: React.FC = () => {
             setAdmissionData(data);
             lastFetchParamsRef.current = cacheKey;
 
-            // Initialize students with admission data - use formatted subject name
             const initialStudents: ExtendedStudentMark[] = data.map((item, index) => ({
                 id: index + 1,
                 student_admission: item.student_admission,
                 student_name: item.student_name,
                 student_grade: grade,
                 student_class: classValue,
-                subject: selectedSubject ? formatSubjectName(selectedSubject) : '', // Use formatted subject
+                subject: selectedSubject ? formatSubjectName(selectedSubject) : '',
                 term: selectedExam || '',
                 marks: '',
                 student_grade_value: '',
                 month: isMonthFilterEnabled ? selectedMonth : undefined,
                 year: year,
                 attendance: 'present',
-                status: true 
+                status: true
             }));
 
             setStudents(initialStudents);
@@ -356,16 +343,14 @@ const TeacherDashboard: React.FC = () => {
         return updatedRow;
     }, [students, calculateGrade, showSnackbar]);
 
-    // Handle attendance change
     const handleAttendanceChange = useCallback((studentId: GridRowId, attendance: 'present' | 'absent') => {
         const status = attendance === 'present' ? true : false;
-        
+
         setStudents((prev) =>
-            prev.map((s) => (s.id === studentId ? { 
-                ...s, 
-                attendance, 
+            prev.map((s) => (s.id === studentId ? {
+                ...s,
+                attendance,
                 status,
-                // Clear marks when marked as absent
                 marks: attendance === 'absent' ? '' : s.marks,
                 student_grade_value: attendance === 'absent' ? '' : s.student_grade_value
             } : s))
@@ -377,7 +362,6 @@ const TeacherDashboard: React.FC = () => {
                 ...prevModified[studentId],
                 attendance,
                 status,
-                // Clear marks when marked as absent
                 marks: attendance === 'absent' ? '' : prevModified[studentId]?.marks,
                 student_grade_value: attendance === 'absent' ? '' : prevModified[studentId]?.student_grade_value
             },
@@ -406,9 +390,9 @@ const TeacherDashboard: React.FC = () => {
                     student_name: student.student_name,
                     student_grade: selectedGrade,
                     student_class: selectedClass,
-                    subject: formatSubjectName(selectedSubject), 
-                    term: formatExamName(selectedExam), 
-                    month: isMonthFilterEnabled ? selectedMonth : "0", 
+                    subject: formatSubjectName(selectedSubject),
+                    term: formatExamName(selectedExam),
+                    month: isMonthFilterEnabled ? selectedMonth : "0",
                     marks: mark.marks || '0',
                     student_grade_value: mark.student_grade_value || 'N/A',
                     year: selectedYear,
@@ -467,33 +451,28 @@ const TeacherDashboard: React.FC = () => {
         showSnackbar('All unsaved marks cleared', 'info');
     }, [showSnackbar]);
 
-    // Add this function to validate Excel data
     const validateExcelData = (data: ExcelRow[]): string | null => {
         if (!data || data.length === 0) return "Excel file is empty";
-        
+
         const requiredColumns = [
-            'Admission No', 'Student Name', 'Grade', 'Class', 
+            'Admission No', 'Student Name', 'Grade', 'Class',
             'Subject', 'Term', 'Year', 'Marks', 'Attendance'
         ];
-        
-        // Check headers
+
         const headers = Object.keys(data[0]);
         const missingColumns = requiredColumns.filter(col => !headers.includes(col));
         if (missingColumns.length > 0) {
             return `Missing columns: ${missingColumns.join(', ')}`;
         }
 
-        // Validate each row
         for (let i = 0; i < data.length; i++) {
             const row = data[i];
-            
-            // Check required fields
-            if (!row['Admission No'] || !row['Student Name'] || !row['Grade'] || 
+
+            if (!row['Admission No'] || !row['Student Name'] || !row['Grade'] ||
                 !row['Class'] || !row['Subject'] || !row['Term'] || !row['Year']) {
                 return `Row ${i + 1}: Missing required fields`;
             }
 
-            // Validate marks
             if (row['Marks']) {
                 const marks = Number(row['Marks']);
                 if (isNaN(marks) || marks < 0 || marks > 100) {
@@ -501,7 +480,6 @@ const TeacherDashboard: React.FC = () => {
                 }
             }
 
-            // Validate attendance
             if (row['Attendance'] && !['present', 'absent'].includes(row['Attendance'].toLowerCase())) {
                 return `Row ${i + 1}: Invalid attendance value (should be present/absent)`;
             }
@@ -510,7 +488,6 @@ const TeacherDashboard: React.FC = () => {
         return null;
     };
 
-    // Add this function to handle Excel file upload
     const handleExcelUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
         const file = event.target.files?.[0];
         if (!file) return;
@@ -527,14 +504,12 @@ const TeacherDashboard: React.FC = () => {
                 const worksheet = workbook.Sheets[sheetName];
                 const jsonData = XLSX.utils.sheet_to_json<ExcelRow>(worksheet);
 
-                // Validate the Excel data
                 const validationError = validateExcelData(jsonData);
                 if (validationError) {
                     setExcelError(validationError);
                     return;
                 }
 
-                // Transform Excel data to match our format
                 const transformedData: ExtendedStudentMark[] = jsonData.map((row, index) => ({
                     id: index + 1,
                     student_admission: row['Admission No'],
@@ -562,7 +537,6 @@ const TeacherDashboard: React.FC = () => {
         reader.readAsArrayBuffer(file);
     };
 
-    // Add this function to handle Excel data submission
     const handleExcelSubmit = async () => {
         if (excelData.length === 0) {
             showSnackbar('No data to submit', 'error');
@@ -586,7 +560,6 @@ const TeacherDashboard: React.FC = () => {
         }
     };
 
-    // Add this function to your component to generate a template
     const downloadTemplate = () => {
         const template: ExcelRow[] = [{
             'Admission No': 'STU001',
@@ -607,19 +580,16 @@ const TeacherDashboard: React.FC = () => {
         XLSX.writeFile(wb, 'marks_template.xlsx');
     };
 
-    // Effect 1: Fetch grades only once when component mounts and profile loads
     useEffect(() => {
         if (!profileLoading && gradeOptions.length === 0) {
             fetchGrades();
         }
-    }, [profileLoading]); // Only depend on profileLoading
+    }, [profileLoading]);
 
-    // Effect 2: Fetch classes when grade changes
     useEffect(() => {
         fetchClasses(selectedGrade);
-    }, [selectedGrade]); // Only depend on selectedGrade
+    }, [selectedGrade]);
 
-    // Effect 3: Reset subject if it's not available for the new grade/class combination
     useEffect(() => {
         if (selectedGrade && selectedClass && selectedSubject && subjectOptions.length > 0) {
             const availableSubjects = subjectOptions.map(s => s.value);
@@ -630,16 +600,13 @@ const TeacherDashboard: React.FC = () => {
                 });
             }
         }
-    }, [subjectOptions]); // Only depend on subjectOptions
+    }, [subjectOptions]);
 
-    // Effect 4: Debounced admission data fetching
     useEffect(() => {
-        // Clear any existing timeout
         if (admissionDataTimeoutRef.current) {
             clearTimeout(admissionDataTimeoutRef.current);
         }
 
-        // Only fetch if we have the required core fields
         if (selectedGrade && selectedClass && selectedYear) {
             admissionDataTimeoutRef.current = setTimeout(() => {
                 fetchAdmissionDataHandler(selectedGrade, selectedClass, selectedYear);
@@ -655,52 +622,70 @@ const TeacherDashboard: React.FC = () => {
                 clearTimeout(admissionDataTimeoutRef.current);
             }
         };
-    }, [selectedGrade, selectedClass, selectedYear]); // Fixed dependencies
+    }, [selectedGrade, selectedClass, selectedYear]);
 
-    // Effect 5: Update existing student fields when subject/exam/month changes
     useEffect(() => {
         if (admissionData.length > 0) {
-            setStudents(prevStudents => 
+            setStudents(prevStudents =>
                 prevStudents.map(student => ({
                     ...student,
-                    subject: selectedSubject ? formatSubjectName(selectedSubject) : '', // Use formatted subject
+                    subject: selectedSubject ? formatSubjectName(selectedSubject) : '',
                     term: selectedExam || '',
                     month: isMonthFilterEnabled ? selectedMonth : undefined,
                     year: selectedYear || '',
-                    status: student.attendance === 'present' ? true : false // Keep status in sync with attendance
+                    status: student.attendance === 'present' ? true : false
                 }))
             );
         }
     }, [selectedSubject, selectedExam, selectedMonth, isMonthFilterEnabled, selectedYear, admissionData.length, formatSubjectName]);
 
-    // Memoized columns to prevent DataGrid re-renders
     const columns: GridColDef<ExtendedStudentMark>[] = useMemo(() => [
-        { field: 'student_admission', headerName: 'Admission No', width: 200, editable: false },
-        { field: 'student_name', headerName: 'Student Name', width: 400, editable: false },
-        { field: 'student_class', headerName: 'Class', width: 150, editable: false },
-        { 
-            field: 'subject', 
-            headerName: 'Subject', 
-            width: 150, 
+        {
+            field: 'student_admission',
+            headerName: 'Admission No',
+            width: isMobile ? 120 : 200,
+            editable: false
+        },
+        {
+            field: 'student_name',
+            headerName: 'Student Name',
+            width: isMobile ? 150 : 400,
+            editable: false
+        },
+        {
+            field: 'student_class',
+            headerName: 'Class',
+            width: isMobile ? 100 : 150,
+            editable: false
+        },
+        {
+            field: 'subject',
+            headerName: 'Subject',
+            width: isMobile ? 120 : 150,
             editable: false,
             renderCell: (params: GridRenderCellParams<ExtendedStudentMark, string>) => (
                 <span>{formatSubjectName(params.row.subject)}</span>
             )
         },
-        { 
-            field: 'term', 
-            headerName: 'Term', 
-            width: 130, 
+        {
+            field: 'term',
+            headerName: 'Term',
+            width: isMobile ? 100 : 130,
             editable: false,
             renderCell: (params: GridRenderCellParams<ExtendedStudentMark, string>) => (
                 <span>{params.row.term}</span>
             )
         },
-        { field: 'year', headerName: 'Year', width: 100, editable: false },
+        {
+            field: 'year',
+            headerName: 'Year',
+            width: isMobile ? 80 : 100,
+            editable: false
+        },
         {
             field: 'marks',
             headerName: 'Marks (0-100)',
-            width: 140,
+            width: isMobile ? 120 : 140,
             editable: true,
             type: 'number',
             renderCell: (params: GridRenderCellParams<ExtendedStudentMark, string>) => (
@@ -708,11 +693,10 @@ const TeacherDashboard: React.FC = () => {
                     variant="outlined"
                     size="small"
                     value={params.row.marks || ''}
-                    placeholder={params.row.student_admission ?? ''} 
+                    placeholder={params.row.student_admission ?? ''}
                     disabled={params.row.attendance === 'absent'}
                     onChange={(e) => {
                         const value = e.target.value;
-                        // Only process if attendance is present
                         if (params.row.attendance === 'present') {
                             if (value === '' || (Number(value) >= 0 && Number(value) <= 100)) {
                                 const updatedRow = {
@@ -724,9 +708,9 @@ const TeacherDashboard: React.FC = () => {
                         }
                     }}
                     inputProps={{
-                        style: { 
-                            textAlign: 'center', 
-                            padding: '8px 10px',
+                        style: {
+                            textAlign: 'center',
+                            padding: isMobile ? '6px 8px' : '8px 10px',
                             backgroundColor: params.row.attendance === 'absent' ? theme.palette.action.disabledBackground : 'inherit'
                         },
                         min: 0,
@@ -737,15 +721,15 @@ const TeacherDashboard: React.FC = () => {
                         width: '100%',
                         '& .MuiOutlinedInput-root': {
                             borderRadius: '4px',
-                            '&:hover fieldset': { 
-                                borderColor: params.row.attendance === 'absent' ? 
-                                    theme.palette.action.disabled : 
-                                    theme.palette.info.main 
+                            '&:hover fieldset': {
+                                borderColor: params.row.attendance === 'absent' ?
+                                    theme.palette.action.disabled :
+                                    theme.palette.info.main
                             },
-                            '&.Mui-focused fieldset': { 
-                                borderColor: params.row.attendance === 'absent' ? 
-                                    theme.palette.action.disabled : 
-                                    theme.palette.info.main 
+                            '&.Mui-focused fieldset': {
+                                borderColor: params.row.attendance === 'absent' ?
+                                    theme.palette.action.disabled :
+                                    theme.palette.info.main
                             },
                             '&.Mui-disabled': {
                                 backgroundColor: theme.palette.action.disabledBackground
@@ -755,15 +739,15 @@ const TeacherDashboard: React.FC = () => {
                 />
             ),
         },
-        { 
-            field: 'student_grade_value', 
-            headerName: 'Grade', 
+        {
+            field: 'student_grade_value',
+            headerName: 'Grade',
             editable: false,
-            width: 100,
+            width: isMobile ? 80 : 100,
             renderCell: (params: GridRenderCellParams<ExtendedStudentMark, string>) => {
                 const grade = params.row.student_grade_value;
                 if (!grade) return null;
-                
+
                 const getGradeColor = (grade: string) => {
                     switch (grade) {
                         case 'A': return 'success';
@@ -774,10 +758,10 @@ const TeacherDashboard: React.FC = () => {
                         default: return 'default';
                     }
                 };
-                
+
                 return (
-                    <Chip 
-                        label={grade} 
+                    <Chip
+                        label={grade}
                         color={getGradeColor(grade) as any}
                         size="small"
                         variant="filled"
@@ -788,7 +772,7 @@ const TeacherDashboard: React.FC = () => {
         {
             field: 'attendance',
             headerName: 'Attendance',
-            width: 150,
+            width: isMobile ? 130 : 150,
             editable: false,
             renderCell: (params: GridRenderCellParams<ExtendedStudentMark, string>) => (
                 <FormControl component="fieldset" sx={{ minWidth: '100%' }}>
@@ -796,54 +780,56 @@ const TeacherDashboard: React.FC = () => {
                         row
                         value={params.row.attendance || 'present'}
                         onChange={(e) => handleAttendanceChange(params.row.id, e.target.value as 'present' | 'absent')}
-                        sx={{ 
+                        sx={{
                             justifyContent: 'center',
                             '& .MuiFormControlLabel-root': {
                                 margin: '0 2px',
                                 '& .MuiFormControlLabel-label': {
-                                    fontSize: '0.75rem',
+                                    fontSize: isMobile ? '0.7rem' : '0.75rem',
                                     fontWeight: 500,
                                 }
                             }
                         }}
                     >
-                        <FormControlLabel 
-                            value="present" 
+                        <FormControlLabel
+                            value="present"
                             control={
-                                <Radio 
-                                    size="small" 
-                                    sx={{ 
-                                        color: theme.palette.success.main,
-                                        '&.Mui-checked': { color: theme.palette.success.main }
-                                    }} 
-                                />
-                            } 
-                            label="P"
-                        />
-                        <FormControlLabel 
-                            value="absent" 
-                            control={
-                                <Radio 
+                                <Radio
                                     size="small"
-                                    sx={{ 
-                                        color: theme.palette.error.main,
-                                        '&.Mui-checked': { color: theme.palette.error.main }
+                                    sx={{
+                                        color: theme.palette.success.main,
+                                        '&.Mui-checked': { color: theme.palette.success.main },
+                                        padding: isMobile ? '4px' : '9px'
                                     }}
                                 />
-                            } 
+                            }
+                            label="P"
+                        />
+                        <FormControlLabel
+                            value="absent"
+                            control={
+                                <Radio
+                                    size="small"
+                                    sx={{
+                                        color: theme.palette.error.main,
+                                        '&.Mui-checked': { color: theme.palette.error.main },
+                                        padding: isMobile ? '4px' : '9px'
+                                    }}
+                                />
+                            }
                             label="A"
                         />
                     </RadioGroup>
                 </FormControl>
             ),
         },
-    ], [theme.palette.info.main, theme.palette.success.main, theme.palette.error.main, formatSubjectName, handleAttendanceChange]);
+    ], [theme.palette.info.main, theme.palette.success.main, theme.palette.error.main, theme.palette.action.disabled, theme.palette.action.disabledBackground, formatSubjectName, handleAttendanceChange, processRowUpdate, isMobile]);
 
     return (
-        <Box sx={{ display: "flex", width: "99vw", minHeight: "100vh" }}>
+        <Box sx={{ display: "flex", width: "100%", minHeight: "100vh" }}>
             <CssBaseline />
             <Sidebar open={sidebarOpen} setOpen={setSidebarOpen} />
-            <Box sx={{ flexGrow: 1, overflowX: 'hidden' }}>
+            <Box sx={{ flexGrow: 1, overflowX: 'hidden', width: '100%' }}>
                 <AppBar position="static" sx={{
                     boxShadow: "none",
                     bgcolor: theme.palette.background.paper,
@@ -853,397 +839,417 @@ const TeacherDashboard: React.FC = () => {
                     <Navbar title="Add Marks" sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} />
                 </AppBar>
 
-                <Stack spacing={3} sx={{ px: 2, py: 3, maxWidth: '100%' }}>
-                    <Paper elevation={2} sx={{ p: 2, borderRadius: '10px' }}>
-                        
-            <Paper elevation={2} sx={{ p: 2, mb: 2, borderRadius: '10px' }}>
-                <Stack direction="row" spacing={2} alignItems="center">
-                    <Button
-                        variant="contained"
-                        component="label"
-                        startIcon={<UploadFileIcon />}
-                        sx={{ height: 45 }}
-                    >
-                        Upload Excel
-                        <input
-                            type="file"
-                            hidden
-                            accept=".xlsx,.xls"
-                            onChange={handleExcelUpload}
-                        />
-                    </Button>
-                    <Button
-                        variant="outlined"
-                        onClick={downloadTemplate}
-                        sx={{ height: 45 }}
-                    >
-                        Download Template
-                    </Button>
-                    <Typography variant="body2" color="textSecondary">
-                        Upload marks from Excel file (.xlsx, .xls)
-                    </Typography>
-                </Stack>
-                {excelError && (
-                    <Alert severity="error" sx={{ mt: 2 }}>
-                        <AlertTitle>Error</AlertTitle>
-                        {excelError}
-                    </Alert>
-                )}
-            </Paper>
+                <Stack spacing={{ xs: 2, md: 3 }} sx={{ px: { xs: 1, sm: 2 }, py: { xs: 2, md: 3 }, maxWidth: '100%' }}>
+                    <Paper elevation={2} sx={{ p: { xs: 1.5, sm: 2 }, borderRadius: '10px' }}>
 
-            {/* Add Excel Preview Dialog */}
-            <Dialog 
-                open={showExcelPreview} 
-                onClose={() => setShowExcelPreview(false)}
-                maxWidth="lg"
-                fullWidth
-            >
-                <DialogTitle>Preview Excel Data</DialogTitle>
-                <DialogContent>
-                    <DataGrid
-                        rows={excelData}
-                        columns={columns}
-                        autoHeight
-                        initialState={{
-                            pagination: { paginationModel: { pageSize: 10, page: 0 } },
-                        }}
-                        pageSizeOptions={[10]}
-                        disableRowSelectionOnClick
-                        sx={{ mt: 2 }}
-                    />
-                </DialogContent>
-                <DialogActions>
-                    <Button onClick={() => setShowExcelPreview(false)}>Cancel</Button>
-                    <Button 
-                        onClick={handleExcelSubmit}
-                        variant="contained"
-                        disabled={loading}
-                        startIcon={loading ? <CircularProgress size={20} /> : null}
-                    >
-                        Upload Marks
-                    </Button>
-                </DialogActions>
-            </Dialog>
-                        <Typography variant="h6" sx={{ mb: 2, color: theme.palette.text.primary }}>
+                        <Paper elevation={2} sx={{ p: { xs: 1.5, sm: 2 }, mb: 2, borderRadius: '10px' }}>
+                            <Stack
+                                direction={{ xs: 'column', sm: 'row' }}
+                                spacing={2}
+                                alignItems={{ xs: 'stretch', sm: 'center' }}
+                            >
+                                <Button
+                                    variant="contained"
+                                    component="label"
+                                    startIcon={<UploadFileIcon />}
+                                    sx={{ height: 45, width: { xs: '100%', sm: 'auto' } }}
+                                    fullWidth={isMobile}
+                                >
+                                    Upload Excel
+                                    <input
+                                        type="file"
+                                        hidden
+                                        accept=".xlsx,.xls"
+                                        onChange={handleExcelUpload}
+                                    />
+                                </Button>
+                                <Button
+                                    variant="outlined"
+                                    onClick={downloadTemplate}
+                                    sx={{ height: 45, width: { xs: '100%', sm: 'auto' } }}
+                                    fullWidth={isMobile}
+                                >
+                                    Download Template
+                                </Button>
+                                {!isMobile && (
+                                    <Typography variant="body2" color="textSecondary">
+                                        Upload marks from Excel file (.xlsx, .xls)
+                                    </Typography>
+                                )}
+                            </Stack>
+                            {isMobile && (
+                                <Typography variant="caption" color="textSecondary" sx={{ mt: 1, display: 'block' }}>
+                                    Upload marks from Excel file (.xlsx, .xls)
+                                </Typography>
+                            )}
+                            {excelError && (
+                                <Alert severity="error" sx={{ mt: 2 }}>
+                                    <AlertTitle>Error</AlertTitle>
+                                    {excelError}
+                                </Alert>
+                            )}
+                        </Paper>
+
+                        <Dialog
+                            open={showExcelPreview}
+                            onClose={() => setShowExcelPreview(false)}
+                            maxWidth="lg"
+                            fullWidth
+                            fullScreen={isMobile}
+                        >
+                            <DialogTitle>Preview Excel Data</DialogTitle>
+                            <DialogContent>
+                                <Box sx={{ height: isMobile ? 'calc(100vh - 200px)' : 400, width: '100%' }}>
+                                    <DataGrid
+                                        rows={excelData}
+                                        columns={columns}
+                                        autoHeight={!isMobile}
+                                        initialState={{
+                                            pagination: { paginationModel: { pageSize: 10, page: 0 } },
+                                        }}
+                                        pageSizeOptions={[10]}
+                                        disableRowSelectionOnClick
+                                        sx={{ mt: 2 }}
+                                    />
+                                </Box>
+                            </DialogContent>
+                            <DialogActions>
+                                <Button onClick={() => setShowExcelPreview(false)}>Cancel</Button>
+                                <Button
+                                    onClick={handleExcelSubmit}
+                                    variant="contained"
+                                    disabled={loading}
+                                    startIcon={loading ? <CircularProgress size={20} /> : null}
+                                >
+                                    Upload Marks
+                                </Button>
+                            </DialogActions>
+                        </Dialog>
+
+                        <Typography variant={isMobile ? "subtitle1" : "h6"} sx={{ mb: 2, color: theme.palette.text.primary }}>
                             Filter Student Data
                         </Typography>
 
-                        <Stack
-                            direction={{ xs: 'column', md: 'row' }}
-                            spacing={{ xs: 1, md: 2 }}
-                            flexWrap="wrap"
-                            alignItems="center"
-                            justifyContent="space-between"
-                            sx={{ mb: 2 }}
-                        >
-                            <Controller
-                                control={control}
-                                name="selectedGrade"
-                                render={({ field }) => (
-                                    <TextField
-                                        {...field}
-                                        select
-                                        label="Student Grade"
-                                        variant="outlined"
-                                        sx={{
-                                            minWidth: 150,
-                                            maxWidth: 250,
-                                            flex: '1 1 50px',
-                                            '& .MuiOutlinedInput-root': {
-                                                borderRadius: "10px",
-                                                height: "45px",
-                                                bgcolor: theme.palette.background.paper,
-                                                '& .MuiOutlinedInput-notchedOutline': { borderColor: theme.palette.divider },
-                                                '&.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: theme.palette.primary.main },
-                                                '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: theme.palette.primary.main }
-                                            }
-                                        }}
-                                        InputProps={{
-                                            startAdornment: (
-                                                <InputAdornment position="start">
-                                                    <ClassIcon fontSize="small" />
-                                                </InputAdornment>
-                                            ),
-                                        }}
-                                    >
-                                        {gradeOptions.map((option) => (
-                                            <MenuItem key={option.value} value={option.value}>
-                                                {option.label}
-                                            </MenuItem>
-                                        ))}
-                                    </TextField>
-                                )}
-                            />
-                            <Controller
-                                control={control}
-                                name="selectedClass"
-                                render={({ field }) => (
-                                    <TextField
-                                        {...field}
-                                        select
-                                        label="Class"
-                                        variant="outlined"
-                                        sx={{
-                                            minWidth: 150,
-                                            maxWidth: 250,
-                                            flex: '1 1 50px',
-                                            '& .MuiOutlinedInput-root': {
-                                                borderRadius: "10px",
-                                                height: "45px",
-                                                bgcolor: theme.palette.background.paper,
-                                                '& .MuiOutlinedInput-notchedOutline': { borderColor: theme.palette.divider },
-                                                '&.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: theme.palette.primary.main },
-                                                '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: theme.palette.primary.main }
-                                            }
-                                        }}
-                                        InputProps={{
-                                            startAdornment: (
-                                                <InputAdornment position="start">
-                                                    <ClassIcon fontSize="small" />
-                                                </InputAdornment>
-                                            ),
-                                        }}
-                                    >
-                                        {classOptions.map((option) => (
-                                            <MenuItem key={option.value} value={option.value}>
-                                                {option.label}
-                                            </MenuItem>
-                                        ))}
-                                    </TextField>
-                                )}
-                            />
-                            <Controller
-                                control={control}
-                                name="selectedSubject"
-                                render={({ field }) => (
-                                    <TextField
-                                        {...field}
-                                        select
-                                        label="Subject"
-                                        variant="outlined"
-                                        disabled={!selectedGrade || !selectedClass || subjectOptions.length === 0}
-                                        sx={{
-                                            flex: '1 1 50px',
-                                            minWidth: 150,
-                                            maxWidth: 250,
-                                            '& .MuiOutlinedInput-root': {
-                                                height: "45px",
-                                                borderRadius: '10px',
-                                                bgcolor: theme.palette.background.paper,
-                                                '& .MuiOutlinedInput-notchedOutline': { borderColor: theme.palette.divider },
-                                                '&.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: theme.palette.primary.main },
-                                                '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: theme.palette.primary.main }
-                                            }
-                                        }}
-                                        InputProps={{
-                                            startAdornment: (
-                                                <InputAdornment position="start">
-                                                    <SubjectIcon fontSize="small" />
-                                                </InputAdornment>
-                                            ),
-                                        }}
-                                    >
-                                        {subjectOptions.length === 0 ? (
-                                            <MenuItem value="" disabled>
-                                                {selectedGrade && selectedClass ? 'No subjects found' : 'Select grade and class first'}
-                                            </MenuItem>
-                                        ) : (
-                                            subjectOptions.map((option) => (
+                        <Stack spacing={{ xs: 1.5, sm: 2 }}>
+                            <Stack
+                                direction={{ xs: 'column', sm: 'row' }}
+                                spacing={{ xs: 1.5, sm: 2 }}
+                                flexWrap="wrap"
+                            >
+                                <Controller
+                                    control={control}
+                                    name="selectedGrade"
+                                    render={({ field }) => (
+                                        <TextField
+                                            {...field}
+                                            select
+                                            label="Student Grade"
+                                            variant="outlined"
+                                            sx={{
+                                                flex: { xs: '1 1 100%', sm: '1 1 calc(50% - 8px)', md: '1 1 auto' },
+                                                minWidth: { xs: '100%', sm: 150 },
+                                                maxWidth: { md: 250 },
+                                                '& .MuiOutlinedInput-root': {
+                                                    borderRadius: "10px",
+                                                    height: "45px",
+                                                    bgcolor: theme.palette.background.paper,
+                                                    '& .MuiOutlinedInput-notchedOutline': { borderColor: theme.palette.divider },
+                                                    '&.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: theme.palette.primary.main },
+                                                    '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: theme.palette.primary.main }
+                                                }
+                                            }}
+                                            InputProps={{
+                                                startAdornment: (
+                                                    <InputAdornment position="start">
+                                                        <ClassIcon fontSize="small" />
+                                                    </InputAdornment>
+                                                ),
+                                            }}
+                                        >
+                                            {gradeOptions.map((option) => (
                                                 <MenuItem key={option.value} value={option.value}>
                                                     {option.label}
                                                 </MenuItem>
-                                            ))
-                                        )}
-                                    </TextField>
-                                )}
-                            />
-                            <Controller
-                                control={control}
-                                name="selectedYear"
-                                render={({ field }) => (
-                                    <TextField
-                                        {...field}
-                                        select
-                                        label="Academic Year"
-                                        variant="outlined"
-                                        sx={{
-                                            minWidth: 150,
-                                            maxWidth: 250,
-                                            flex: '1 1 50px',
-                                            '& .MuiOutlinedInput-root': {
-                                                borderRadius: "10px",
-                                                height: "45px",
-                                                bgcolor: theme.palette.background.paper,
-                                                '& .MuiOutlinedInput-notchedOutline': { borderColor: theme.palette.divider },
-                                                '&.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: theme.palette.primary.main },
-                                                '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: theme.palette.primary.main }
-                                            }
-                                        }}
-                                    >
-                                        {yearOptions.map((option) => (
-                                            <MenuItem key={option.value} value={option.value}>
-                                                {option.label}
-                                            </MenuItem>
-                                        ))}
-                                    </TextField>
-                                )}
-                            />
+                                            ))}
+                                        </TextField>
+                                    )}
+                                />
+                                <Controller
+                                    control={control}
+                                    name="selectedClass"
+                                    render={({ field }) => (
+                                        <TextField
+                                            {...field}
+                                            select
+                                            label="Class"
+                                            variant="outlined"
+                                            sx={{
+                                                flex: { xs: '1 1 100%', sm: '1 1 calc(50% - 8px)', md: '1 1 auto' },
+                                                minWidth: { xs: '100%', sm: 150 },
+                                                maxWidth: { md: 250 },
+                                                '& .MuiOutlinedInput-root': {
+                                                    borderRadius: "10px",
+                                                    height: "45px",
+                                                    bgcolor: theme.palette.background.paper,
+                                                    '& .MuiOutlinedInput-notchedOutline': { borderColor: theme.palette.divider },
+                                                    '&.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: theme.palette.primary.main },
+                                                    '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: theme.palette.primary.main }
+                                                }
+                                            }}
+                                            InputProps={{
+                                                startAdornment: (
+                                                    <InputAdornment position="start">
+                                                        <ClassIcon fontSize="small" />
+                                                    </InputAdornment>
+                                                ),
+                                            }}
+                                        >
+                                            {classOptions.map((option) => (
+                                                <MenuItem key={option.value} value={option.value}>
+                                                    {option.label}
+                                                </MenuItem>
+                                            ))}
+                                        </TextField>
+                                    )}
+                                />
+                                <Controller
+                                    control={control}
+                                    name="selectedSubject"
+                                    render={({ field }) => (
+                                        <TextField
+                                            {...field}
+                                            select
+                                            label="Subject"
+                                            variant="outlined"
+                                            disabled={!selectedGrade || !selectedClass || subjectOptions.length === 0}
+                                            sx={{
+                                                flex: { xs: '1 1 100%', sm: '1 1 calc(50% - 8px)', md: '1 1 auto' },
+                                                minWidth: { xs: '100%', sm: 150 },
+                                                maxWidth: { md: 250 },
+                                                '& .MuiOutlinedInput-root': {
+                                                    height: "45px",
+                                                    borderRadius: '10px',
+                                                    bgcolor: theme.palette.background.paper,
+                                                    '& .MuiOutlinedInput-notchedOutline': { borderColor: theme.palette.divider },
+                                                    '&.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: theme.palette.primary.main },
+                                                    '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: theme.palette.primary.main }
+                                                }
+                                            }}
+                                            InputProps={{
+                                                startAdornment: (
+                                                    <InputAdornment position="start">
+                                                        <SubjectIcon fontSize="small" />
+                                                    </InputAdornment>
+                                                ),
+                                            }}
+                                        >
+                                            {subjectOptions.length === 0 ? (
+                                                <MenuItem value="" disabled>
+                                                    {selectedGrade && selectedClass ? 'No subjects found' : 'Select grade and class first'}
+                                                </MenuItem>
+                                            ) : (
+                                                subjectOptions.map((option) => (
+                                                    <MenuItem key={option.value} value={option.value}>
+                                                        {option.label}
+                                                    </MenuItem>
+                                                ))
+                                            )}
+                                        </TextField>
+                                    )}
+                                />
+                                <Controller
+                                    control={control}
+                                    name="selectedYear"
+                                    render={({ field }) => (
+                                        <TextField
+                                            {...field}
+                                            select
+                                            label="Academic Year"
+                                            variant="outlined"
+                                            sx={{
+                                                flex: { xs: '1 1 100%', sm: '1 1 calc(50% - 8px)', md: '1 1 auto' },
+                                                minWidth: { xs: '100%', sm: 150 },
+                                                maxWidth: { md: 250 },
+                                                '& .MuiOutlinedInput-root': {
+                                                    borderRadius: "10px",
+                                                    height: "45px",
+                                                    bgcolor: theme.palette.background.paper,
+                                                    '& .MuiOutlinedInput-notchedOutline': { borderColor: theme.palette.divider },
+                                                    '&.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: theme.palette.primary.main },
+                                                    '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: theme.palette.primary.main }
+                                                }
+                                            }}
+                                        >
+                                            {yearOptions.map((option) => (
+                                                <MenuItem key={option.value} value={option.value}>
+                                                    {option.label}
+                                                </MenuItem>
+                                            ))}
+                                        </TextField>
+                                    )}
+                                />
+                            </Stack>
 
-                            <Controller
-                                control={control}
-                                name="selectedExam"
-                                render={({ field }) => (
-                                    <TextField
-                                        {...field}
-                                        select
-                                        label="Exam"
-                                        variant="outlined"
-                                        sx={{
-                                            minWidth: 150,
-                                            maxWidth: 250,
-                                            flex: '1 1 50px',
-                                            '& .MuiOutlinedInput-root': {
-                                                height: "45px",
-                                                borderRadius: "10px",
-                                                bgcolor: theme.palette.background.paper,
-                                                '& .MuiOutlinedInput-notchedOutline': { borderColor: theme.palette.divider },
-                                                '&.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: theme.palette.primary.main },
-                                                '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: theme.palette.primary.main }
-                                            }
-                                        }}
-                                        InputProps={{
-                                            startAdornment: (
-                                                <InputAdornment position="start">
-                                                    <EventIcon fontSize="small" />
-                                                </InputAdornment>
-                                            ),
-                                        }}
-                                    >
-                                        {examOptions.map((option) => (
-                                            <MenuItem key={option.value} value={option.value}>
-                                                {option.label}
-                                            </MenuItem>
-                                        ))}
-                                    </TextField>
-                                )}
-                            />
-
-                            <Controller
-                                control={control}
-                                name="selectedMonth"
-                                render={({ field }) => (
-                                    <TextField
-                                        {...field}
-                                        select
-                                        label="Month"
-                                        variant="outlined"
-                                        disabled={!isMonthFilterEnabled}
-                                        sx={{
-                                            minWidth: 150,
-                                            maxWidth: 250,
-                                            flex: '1 1 50px',
-                                            '& .MuiOutlinedInput-root': {
-                                                height: "45px",
-                                                borderRadius: '10px',
-                                                bgcolor: theme.palette.background.paper,
-                                                '& .MuiOutlinedInput-notchedOutline': { borderColor: theme.palette.divider },
-                                                '&.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: theme.palette.primary.main },
-                                                '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: theme.palette.primary.main }
-                                            }
-                                        }}
-                                        InputProps={{
-                                            startAdornment: (
-                                                <InputAdornment position="start">
-                                                    <CalendarMonthIcon fontSize="small" />
-                                                </InputAdornment>
-                                            ),
-                                        }}
-                                    >
-                                        {monthOptions.map((option) => (
-                                            <MenuItem key={option.value} value={option.value}>
-                                                {option.label}
-                                            </MenuItem>
-                                        ))}
-                                    </TextField>
-                                )}
-                            />
-                        </Stack>
-
-                        <Stack
-                            direction={{ xs: 'column', md: 'row' }}
-                            spacing={{ xs: 1, md: 2 }}
-                            alignItems="center"
-                            justifyContent="space-between"
-                        >
-                            <Controller
-                                control={control}
-                                name="searchQuery"
-                                render={({ field }) => (
-                                    <TextField
-                                        {...field}
-                                        label="Search Students"
-                                        placeholder="Search by name or admission number"
-                                        variant="outlined"
-                                        size="small"
-                                        sx={{
-                                            minWidth: 150,
-                                            maxWidth: 460,
-                                            flexGrow: 1,
-                                            width: { xs: '100%', md: 'auto' },
-                                            '& .MuiOutlinedInput-root': {
-                                                borderRadius: '10px',
-                                                height: '45px',
-                                                bgcolor: theme.palette.background.paper,
-                                                '& .MuiOutlinedInput-notchedOutline': { borderColor: theme.palette.divider },
-                                                '&.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: theme.palette.primary.main },
-                                                '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: theme.palette.primary.main },
-                                            }
-                                        }}
-                                        InputProps={{
-                                            startAdornment: (
-                                                <InputAdornment position="start" sx={{ mr: 1 }}>
-                                                    <SearchIcon fontSize="small" />
-                                                </InputAdornment>
-                                            ),
-                                        }}
-                                    />
-                                )}
-                            />
-                            <Button
-                                variant="outlined"
-                                onClick={handleClearFilters}
-                                sx={{
-                                    px: 3, py: 1,
-                                    borderRadius: '10px',
-                                    borderColor: theme.palette.primary.main,
-                                    color: theme.palette.primary.main,
-                                    '&:hover': {
-                                        borderColor: theme.palette.primary.dark,
-                                        color: theme.palette.primary.dark,
-                                    },
-                                    width: { xs: '100%', md: 'auto' }
-                                }}
+                            <Stack
+                                direction={{ xs: 'column', sm: 'row' }}
+                                spacing={{ xs: 1.5, sm: 2 }}
+                                flexWrap="wrap"
                             >
-                                Clear Filters
-                            </Button>
+                                <Controller
+                                    control={control}
+                                    name="selectedExam"
+                                    render={({ field }) => (
+                                        <TextField
+                                            {...field}
+                                            select
+                                            label="Exam"
+                                            variant="outlined"
+                                            sx={{
+                                                flex: { xs: '1 1 100%', sm: '1 1 calc(50% - 8px)', md: '1 1 auto' },
+                                                minWidth: { xs: '100%', sm: 150 },
+                                                maxWidth: { md: 250 },
+                                                '& .MuiOutlinedInput-root': {
+                                                    height: "45px",
+                                                    borderRadius: "10px",
+                                                    bgcolor: theme.palette.background.paper,
+                                                    '& .MuiOutlinedInput-notchedOutline': { borderColor: theme.palette.divider },
+                                                    '&.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: theme.palette.primary.main },
+                                                    '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: theme.palette.primary.main }
+                                                }
+                                            }}
+                                            InputProps={{
+                                                startAdornment: (
+                                                    <InputAdornment position="start">
+                                                        <EventIcon fontSize="small" />
+                                                    </InputAdornment>
+                                                ),
+                                            }}
+                                        >
+                                            {examOptions.map((option) => (
+                                                <MenuItem key={option.value} value={option.value}>
+                                                    {option.label}
+                                                </MenuItem>
+                                            ))}
+                                        </TextField>
+                                    )}
+                                />
+
+                                <Controller
+                                    control={control}
+                                    name="selectedMonth"
+                                    render={({ field }) => (
+                                        <TextField
+                                            {...field}
+                                            select
+                                            label="Month"
+                                            variant="outlined"
+                                            disabled={!isMonthFilterEnabled}
+                                            sx={{
+                                                flex: { xs: '1 1 100%', sm: '1 1 calc(50% - 8px)', md: '1 1 auto' },
+                                                minWidth: { xs: '100%', sm: 150 },
+                                                maxWidth: { md: 250 },
+                                                '& .MuiOutlinedInput-root': {
+                                                    height: "45px",
+                                                    borderRadius: '10px',
+                                                    bgcolor: theme.palette.background.paper,
+                                                    '& .MuiOutlinedInput-notchedOutline': { borderColor: theme.palette.divider },
+                                                    '&.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: theme.palette.primary.main },
+                                                    '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: theme.palette.primary.main }
+                                                }
+                                            }}
+                                            InputProps={{
+                                                startAdornment: (
+                                                    <InputAdornment position="start">
+                                                        <CalendarMonthIcon fontSize="small" />
+                                                    </InputAdornment>
+                                                ),
+                                            }}
+                                        >
+                                            {monthOptions.map((option) => (
+                                                <MenuItem key={option.value} value={option.value}>
+                                                    {option.label}
+                                                </MenuItem>
+                                            ))}
+                                        </TextField>
+                                    )}
+                                />
+                            </Stack>
+
+                            <Stack
+                                direction={{ xs: 'column', sm: 'row' }}
+                                spacing={{ xs: 1.5, sm: 2 }}
+                                alignItems={{ xs: 'stretch', sm: 'center' }}
+                            >
+                                <Controller
+                                    control={control}
+                                    name="searchQuery"
+                                    render={({ field }) => (
+                                        <TextField
+                                            {...field}
+                                            label="Search Students"
+                                            placeholder="Search by name or admission number"
+                                            variant="outlined"
+                                            size="small"
+                                            sx={{
+                                                flexGrow: 1,
+                                                width: '100%',
+                                                maxWidth: { sm: 460 },
+                                                '& .MuiOutlinedInput-root': {
+                                                    borderRadius: '10px',
+                                                    height: '45px',
+                                                    bgcolor: theme.palette.background.paper,
+                                                    '& .MuiOutlinedInput-notchedOutline': { borderColor: theme.palette.divider },
+                                                    '&.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: theme.palette.primary.main },
+                                                    '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: theme.palette.primary.main },
+                                                }
+                                            }}
+                                            InputProps={{
+                                                startAdornment: (
+                                                    <InputAdornment position="start" sx={{ mr: 1 }}>
+                                                        <SearchIcon fontSize="small" />
+                                                    </InputAdornment>
+                                                ),
+                                            }}
+                                        />
+                                    )}
+                                />
+                                <Button
+                                    variant="outlined"
+                                    onClick={handleClearFilters}
+                                    fullWidth={isMobile}
+                                    sx={{
+                                        px: 3,
+                                        py: 1,
+                                        borderRadius: '10px',
+                                        borderColor: theme.palette.primary.main,
+                                        color: theme.palette.primary.main,
+                                        '&:hover': {
+                                            borderColor: theme.palette.primary.dark,
+                                            color: theme.palette.primary.dark,
+                                        },
+                                        minWidth: { sm: 'auto' }
+                                    }}
+                                >
+                                    Clear Filters
+                                </Button>
+                            </Stack>
                         </Stack>
 
-                        {/* Status indicators */}
                         {(modifiedCount > 0 || !isFormValid) && (
-                            <Box sx={{ display: 'flex', gap: 1, mt: 1 }}>
+                            <Box sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, gap: 1, mt: 2 }}>
                                 {modifiedCount > 0 && (
-                                    <Chip 
-                                        label={`${modifiedCount} marks modified`} 
-                                        color="info" 
-                                        size="small" 
+                                    <Chip
+                                        label={`${modifiedCount} marks modified`}
+                                        color="info"
+                                        size="small"
                                         variant="outlined"
                                     />
                                 )}
                                 {!isFormValid && (
-                                    <Chip 
-                                        label="Complete required fields to enable submission" 
-                                        color="warning" 
-                                        size="small" 
+                                    <Chip
+                                        label={isMobile ? "Complete fields" : "Complete required fields to enable submission"}
+                                        color="warning"
+                                        size="small"
                                         variant="outlined"
                                     />
                                 )}
@@ -1257,17 +1263,21 @@ const TeacherDashboard: React.FC = () => {
                         </Box>
                     ) : (
                         <Paper elevation={2} sx={{
-                            mt: 3, p: 2, borderRadius: theme.shape.borderRadius, boxShadow: theme.shadows[3], bgcolor: theme.palette.background.paper,
+                            mt: { xs: 2, md: 3 },
+                            p: { xs: 1, sm: 2 },
+                            borderRadius: theme.shape.borderRadius,
+                            boxShadow: theme.shadows[3],
+                            bgcolor: theme.palette.background.paper,
                             overflowX: 'auto'
                         }}>
-                            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-                                <Typography variant="h6" sx={{ color: theme.palette.text.primary }}>
-                                    Student Marks {filteredStudents.length > 0 && `(${filteredStudents.length} students)`}
+                            <Box sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, justifyContent: 'space-between', alignItems: { xs: 'flex-start', sm: 'center' }, mb: 2, gap: 1 }}>
+                                <Typography variant={isMobile ? "subtitle1" : "h6"} sx={{ color: theme.palette.text.primary }}>
+                                    Student Marks {filteredStudents.length > 0 && `(${filteredStudents.length})`}
                                 </Typography>
                                 {modifiedCount > 0 && (
                                     <Tooltip title="Number of students with modified marks or attendance">
-                                        <Chip 
-                                            label={`${modifiedCount} unsaved changes`}
+                                        <Chip
+                                            label={`${modifiedCount} unsaved`}
                                             color="warning"
                                             size="small"
                                             variant="filled"
@@ -1275,19 +1285,19 @@ const TeacherDashboard: React.FC = () => {
                                     </Tooltip>
                                 )}
                             </Box>
-                            
+
                             {filteredStudents.length === 0 ? (
                                 <Box sx={{ textAlign: 'center', py: 4 }}>
-                                    <Typography variant="body1" color="text.secondary">
-                                        {!selectedGrade || !selectedClass || !selectedYear ? 
-                                            'Please select grade, class, and year to view students' : 
-                                            searchQuery ? 'No students found matching your search criteria' :
-                                            'No students found for the selected criteria'
+                                    <Typography variant="body2" color="text.secondary" sx={{ px: 2 }}>
+                                        {!selectedGrade || !selectedClass || !selectedYear ?
+                                            'Please select grade, class, and year to view students' :
+                                            searchQuery ? 'No students found matching your search' :
+                                                'No students found for the selected criteria'
                                         }
                                     </Typography>
                                 </Box>
                             ) : (
-                                <Box sx={{ height: 400, width: '100%' }}>
+                                <Box sx={{ height: { xs: 500, md: 400 }, width: '100%' }}>
                                     <DataGrid
                                         rows={filteredStudents}
                                         columns={columns}
@@ -1298,28 +1308,32 @@ const TeacherDashboard: React.FC = () => {
                                             showSnackbar('Error updating student marks', 'error');
                                         }}
                                         initialState={{
-                                            pagination: { paginationModel: { page: 0, pageSize: 10 } },
+                                            pagination: { paginationModel: { page: 0, pageSize: isMobile ? 5 : 10 } },
                                         }}
-                                        pageSizeOptions={[5, 10, 25, 50]}
+                                        pageSizeOptions={isMobile ? [5, 10] : [5, 10, 25, 50]}
                                         disableRowSelectionOnClick
                                         loading={loading}
                                         sx={{
-                                            '.MuiDataGrid-footerContainer': { 
-                                                backgroundColor: theme.palette.background.paper, 
+                                            '.MuiDataGrid-footerContainer': {
+                                                backgroundColor: theme.palette.background.paper,
                                                 color: theme.palette.text.secondary,
                                             },
-                                            '.MuiDataGrid-row:nth-of-type(odd)': { 
+                                            '.MuiDataGrid-row:nth-of-type(odd)': {
                                                 backgroundColor: theme.palette.background.paper,
                                             },
-                                            '.MuiDataGrid-row:nth-of-type(even)': { 
+                                            '.MuiDataGrid-row:nth-of-type(even)': {
                                                 backgroundColor: theme.palette.background.paper,
                                             },
-                                            '.MuiDataGrid-cell': { 
+                                            '.MuiDataGrid-cell': {
                                                 borderColor: theme.palette.divider,
+                                                fontSize: isMobile ? '0.75rem' : '0.875rem',
                                             },
-                                            '.MuiDataGrid-virtualScrollerContent': { 
-                                                '& .MuiDataGrid-row': { 
-                                                    '&:hover': { 
+                                            '.MuiDataGrid-columnHeaders': {
+                                                fontSize: isMobile ? '0.75rem' : '0.875rem',
+                                            },
+                                            '.MuiDataGrid-virtualScrollerContent': {
+                                                '& .MuiDataGrid-row': {
+                                                    '&:hover': {
                                                         backgroundColor: theme.palette.action.hover,
                                                     },
                                                 },
@@ -1330,14 +1344,20 @@ const TeacherDashboard: React.FC = () => {
                                     />
                                 </Box>
                             )}
-                            
+
                             {filteredStudents.length > 0 && (
-                                <Box sx={{ display: 'flex', justifyContent: 'center', mt: 3, gap: 2 }}>
+                                <Stack
+                                    direction={{ xs: 'column', sm: 'row' }}
+                                    justifyContent="center"
+                                    spacing={2}
+                                    sx={{ mt: 3 }}
+                                >
                                     <Button
                                         variant="contained"
                                         onClick={handleSubmitMarks}
                                         disabled={loading || !isFormValid || modifiedCount === 0}
                                         startIcon={<SaveIcon />}
+                                        fullWidth={isMobile}
                                         sx={{
                                             bgcolor: theme.palette.primary.main,
                                             '&:hover': { bgcolor: theme.palette.primary.dark },
@@ -1345,17 +1365,18 @@ const TeacherDashboard: React.FC = () => {
                                             px: 4,
                                             py: 1.2,
                                             borderRadius: theme.shape.borderRadius,
-                                            minWidth: 180,
+                                            minWidth: { sm: 180 },
                                         }}
                                     >
-                                        {loading ? 'Submitting...' : `Submit ${modifiedCount} Records`}
+                                        {loading ? 'Submitting...' : `Submit ${modifiedCount} ${isMobile ? '' : 'Records'}`}
                                     </Button>
-                                    
+
                                     {modifiedCount > 0 && (
                                         <Button
                                             variant="outlined"
                                             onClick={handleClearChanges}
                                             startIcon={<ClearIcon />}
+                                            fullWidth={isMobile}
                                             sx={{
                                                 borderColor: theme.palette.warning.main,
                                                 color: theme.palette.warning.main,
@@ -1371,7 +1392,7 @@ const TeacherDashboard: React.FC = () => {
                                             Clear Changes
                                         </Button>
                                     )}
-                                </Box>
+                                </Stack>
                             )}
                         </Paper>
                     )}
@@ -1379,28 +1400,27 @@ const TeacherDashboard: React.FC = () => {
                 <Footer />
             </Box>
 
-            <Snackbar 
-                open={snackbarOpen} 
-                autoHideDuration={6000} 
+            <Snackbar
+                open={snackbarOpen}
+                autoHideDuration={6000}
                 onClose={handleCloseSnackbar}
-                anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+                anchorOrigin={{
+                    vertical: isMobile ? 'top' : 'bottom',
+                    horizontal: isMobile ? 'center' : 'right'
+                }}
             >
-                <Alert 
-                    onClose={handleCloseSnackbar} 
-                    severity={snackbarSeverity} 
+                <Alert
+                    onClose={handleCloseSnackbar}
+                    severity={snackbarSeverity}
                     sx={{ width: '100%' }}
                     elevation={6}
                     variant="filled"
                 >
                     {snackbarMessage}
                 </Alert>
-                
             </Snackbar>
-           
-    </Box>
- 
-);
+        </Box>
+    );
+};
 
-}
-   <Footer />
 export default TeacherDashboard;

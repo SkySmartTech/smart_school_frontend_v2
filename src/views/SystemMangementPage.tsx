@@ -22,7 +22,12 @@ import {
   Alert,
   Tabs,
   Tab,
-  useTheme
+  useTheme,
+  useMediaQuery,
+  Card,
+  CardContent,
+  Typography,
+  Divider
 } from '@mui/material';
 import {
   Edit as EditIcon,
@@ -65,7 +70,10 @@ const SystemManagement = () => {
     options: false
   });
   const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
+  const isTablet = useMediaQuery(theme.breakpoints.down('md'));
   useCustomTheme();
+  
   const [snackbar, setSnackbar] = useState({
     open: false,
     message: '',
@@ -320,33 +328,170 @@ const SystemManagement = () => {
     }
   };
 
+  // Mobile Card View Component
+  const renderMobileCard = (item: any, type: string) => {
+    return (
+      <Card 
+        key={item.id} 
+        sx={{ 
+          mb: 2,
+          boxShadow: 1,
+          '&:hover': {
+            boxShadow: 3
+          }
+        }}
+      >
+        <CardContent>
+          {type === 'grade' && (
+            <>
+              <Typography variant="h6" gutterBottom>
+                {item.grade}
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                Updated: {item.updated_at}
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                Created: {item.created_at}
+              </Typography>
+            </>
+          )}
+          {type === 'subject' && (
+            <>
+              <Typography variant="h6" gutterBottom>
+                {item.mainSubject || item.subjectName || ''}
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                Medium: {item.medium}
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                Updated: {item.updated_at}
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                Created: {item.created_at}
+              </Typography>
+            </>
+          )}
+          {type === 'class' && (
+            <>
+              <Typography variant="h6" gutterBottom>
+                {item.class}
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                Updated: {item.updated_at}
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                Created: {item.created_at}
+              </Typography>
+            </>
+          )}
+          {type === 'setting' && (
+            <>
+              <Typography variant="h6" gutterBottom>
+                {item.settingName}
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                Value: {item.value}
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                Updated: {item.updated_at}
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                Created: {item.created_at}
+              </Typography>
+            </>
+          )}
+          <Divider sx={{ my: 1.5 }} />
+          <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1 }}>
+            <IconButton 
+              onClick={() => handleEditClick(item)}
+              size="small"
+              sx={{ 
+                bgcolor: 'primary.main',
+                color: 'white',
+                '&:hover': { bgcolor: 'primary.dark' }
+              }}
+            >
+              <EditIcon fontSize="small" />
+            </IconButton>
+            <IconButton 
+              onClick={() => handleDeleteClick(item.id)}
+              size="small"
+              sx={{ 
+                bgcolor: 'error.main',
+                color: 'white',
+                '&:hover': { bgcolor: 'error.dark' }
+              }}
+            >
+              <DeleteIcon fontSize="small" />
+            </IconButton>
+          </Box>
+        </CardContent>
+      </Card>
+    );
+  };
+
   const renderTable = () => {
+    // Mobile view with cards
+    if (isMobile) {
+      switch (activeTab) {
+        case 0: // Grades
+          return (
+            <Box>
+              {grades.map((grade) => renderMobileCard(grade, 'grade'))}
+            </Box>
+          );
+        case 1: // Subjects
+          return (
+            <Box>
+              {subjects.map((subject) => renderMobileCard(subject, 'subject'))}
+            </Box>
+          );
+        case 2: // Classes
+          return (
+            <Box>
+              {classes.map((cls) => renderMobileCard(cls, 'class'))}
+            </Box>
+          );
+        case 3: // Common Settings
+          return (
+            <Box>
+              {commonSettings.map((setting) => renderMobileCard(setting, 'setting'))}
+            </Box>
+          );
+        default:
+          return null;
+      }
+    }
+
+    // Desktop/Tablet view with tables
     switch (activeTab) {
       case 0: // Grades
         return (
-          <TableContainer component={Paper}>
-            <Table>
+          <TableContainer component={Paper} sx={{ overflowX: 'auto' }}>
+            <Table size={isTablet ? 'small' : 'medium'}>
               <TableHead>
                 <TableRow>
                   <TableCell>Grade Name</TableCell>
-                  <TableCell>Updated At</TableCell>
-                  <TableCell>Created At</TableCell>
+                  {!isTablet && <TableCell>Updated At</TableCell>}
+                  {!isTablet && <TableCell>Created At</TableCell>}
                   <TableCell>Actions</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
                 {grades.map((grade) => (
                   <TableRow key={grade.id}>
-                    <TableCell>{grade.grade}</TableCell> 
-                    <TableCell>{grade.updated_at}</TableCell>
-                    <TableCell>{grade.created_at}</TableCell>
+                    <TableCell>{grade.grade}</TableCell>
+                    {!isTablet && <TableCell>{grade.updated_at}</TableCell>}
+                    {!isTablet && <TableCell>{grade.created_at}</TableCell>}
                     <TableCell>
-                      <IconButton onClick={() => handleEditClick(grade)}>
-                        <EditIcon color="primary" />
-                      </IconButton>
-                      <IconButton onClick={() => handleDeleteClick(grade.id)}>
-                        <DeleteIcon color="error" />
-                      </IconButton>
+                      <Box sx={{ display: 'flex', gap: 0.5 }}>
+                        <IconButton onClick={() => handleEditClick(grade)} size="small">
+                          <EditIcon color="primary" fontSize="small" />
+                        </IconButton>
+                        <IconButton onClick={() => handleDeleteClick(grade.id)} size="small">
+                          <DeleteIcon color="error" fontSize="small" />
+                        </IconButton>
+                      </Box>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -356,14 +501,14 @@ const SystemManagement = () => {
         );
       case 1: // Subjects
         return (
-          <TableContainer component={Paper}>
-            <Table>
+          <TableContainer component={Paper} sx={{ overflowX: 'auto' }}>
+            <Table size={isTablet ? 'small' : 'medium'}>
               <TableHead>
                 <TableRow>
                   <TableCell>Subject Name</TableCell>
                   <TableCell>Medium</TableCell>
-                  <TableCell>Updated At</TableCell>
-                  <TableCell>Created At</TableCell>
+                  {!isTablet && <TableCell>Updated At</TableCell>}
+                  {!isTablet && <TableCell>Created At</TableCell>}
                   <TableCell>Actions</TableCell>
                 </TableRow>
               </TableHead>
@@ -372,15 +517,17 @@ const SystemManagement = () => {
                   <TableRow key={subject.id}>
                     <TableCell>{subject.mainSubject || subject.subjectName || ''}</TableCell>
                     <TableCell>{subject.medium}</TableCell>
-                    <TableCell>{subject.updated_at}</TableCell>
-                    <TableCell>{subject.created_at}</TableCell>
+                    {!isTablet && <TableCell>{subject.updated_at}</TableCell>}
+                    {!isTablet && <TableCell>{subject.created_at}</TableCell>}
                     <TableCell>
-                      <IconButton onClick={() => handleEditClick(subject)}>
-                        <EditIcon color="primary" />
-                      </IconButton>
-                      <IconButton onClick={() => handleDeleteClick(subject.id)}>
-                        <DeleteIcon color="error" />
-                      </IconButton>
+                      <Box sx={{ display: 'flex', gap: 0.5 }}>
+                        <IconButton onClick={() => handleEditClick(subject)} size="small">
+                          <EditIcon color="primary" fontSize="small" />
+                        </IconButton>
+                        <IconButton onClick={() => handleDeleteClick(subject.id)} size="small">
+                          <DeleteIcon color="error" fontSize="small" />
+                        </IconButton>
+                      </Box>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -390,13 +537,13 @@ const SystemManagement = () => {
         );
       case 2: // Classes
         return (
-          <TableContainer component={Paper}>
-            <Table>
+          <TableContainer component={Paper} sx={{ overflowX: 'auto' }}>
+            <Table size={isTablet ? 'small' : 'medium'}>
               <TableHead>
                 <TableRow>
                   <TableCell>Class Name</TableCell>
-                  <TableCell>Updated At</TableCell>
-                  <TableCell>Created At</TableCell>
+                  {!isTablet && <TableCell>Updated At</TableCell>}
+                  {!isTablet && <TableCell>Created At</TableCell>}
                   <TableCell>Actions</TableCell>
                 </TableRow>
               </TableHead>
@@ -404,15 +551,17 @@ const SystemManagement = () => {
                 {classes.map((cls) => (
                   <TableRow key={cls.id}>
                     <TableCell>{cls.class}</TableCell>
-                    <TableCell>{cls.updated_at}</TableCell>
-                    <TableCell>{cls.created_at}</TableCell>
+                    {!isTablet && <TableCell>{cls.updated_at}</TableCell>}
+                    {!isTablet && <TableCell>{cls.created_at}</TableCell>}
                     <TableCell>
-                      <IconButton onClick={() => handleEditClick(cls)}>
-                        <EditIcon color="primary" />
-                      </IconButton>
-                      <IconButton onClick={() => handleDeleteClick(cls.id)}>
-                        <DeleteIcon color="error" />
-                      </IconButton>
+                      <Box sx={{ display: 'flex', gap: 0.5 }}>
+                        <IconButton onClick={() => handleEditClick(cls)} size="small">
+                          <EditIcon color="primary" fontSize="small" />
+                        </IconButton>
+                        <IconButton onClick={() => handleDeleteClick(cls.id)} size="small">
+                          <DeleteIcon color="error" fontSize="small" />
+                        </IconButton>
+                      </Box>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -420,16 +569,16 @@ const SystemManagement = () => {
             </Table>
           </TableContainer>
         );
-      case 3: // Common Setting
+      case 3: // Common Settings
         return (
-          <TableContainer component={Paper}>
-            <Table>
+          <TableContainer component={Paper} sx={{ overflowX: 'auto' }}>
+            <Table size={isTablet ? 'small' : 'medium'}>
               <TableHead>
                 <TableRow>
                   <TableCell>Setting Name</TableCell>
                   <TableCell>Value</TableCell>
-                  <TableCell>Updated At</TableCell>
-                  <TableCell>Created At</TableCell>
+                  {!isTablet && <TableCell>Updated At</TableCell>}
+                  {!isTablet && <TableCell>Created At</TableCell>}
                   <TableCell>Actions</TableCell>
                 </TableRow>
               </TableHead>
@@ -438,15 +587,17 @@ const SystemManagement = () => {
                   <TableRow key={setting.id}>
                     <TableCell>{setting.settingName}</TableCell>
                     <TableCell>{setting.value}</TableCell>
-                    <TableCell>{setting.updated_at}</TableCell>
-                    <TableCell>{setting.created_at}</TableCell>
+                    {!isTablet && <TableCell>{setting.updated_at}</TableCell>}
+                    {!isTablet && <TableCell>{setting.created_at}</TableCell>}
                     <TableCell>
-                      <IconButton onClick={() => handleEditClick(setting)}>
-                        <EditIcon color="primary" />
-                      </IconButton>
-                      <IconButton onClick={() => handleDeleteClick(setting.id)}>
-                        <DeleteIcon color="error" />
-                      </IconButton>
+                      <Box sx={{ display: 'flex', gap: 0.5 }}>
+                        <IconButton onClick={() => handleEditClick(setting)} size="small">
+                          <EditIcon color="primary" fontSize="small" />
+                        </IconButton>
+                        <IconButton onClick={() => handleDeleteClick(setting.id)} size="small">
+                          <DeleteIcon color="error" fontSize="small" />
+                        </IconButton>
+                      </Box>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -474,6 +625,7 @@ const SystemManagement = () => {
                 margin="normal"
                 error={!!fieldErrors.gradeId}
                 helperText={fieldErrors.gradeId}
+                size={isMobile ? 'small' : 'medium'}
               />
             )}
             
@@ -486,22 +638,13 @@ const SystemManagement = () => {
               margin="normal"
               error={!!fieldErrors.grade}
               helperText={fieldErrors.grade}
+              size={isMobile ? 'small' : 'medium'}
             />
           </>
         );
       case 1: // Subjects
         return (
           <>
-            {/* <TextField
-              fullWidth
-              label="Subject Name"
-              name="subjectName"
-              value={formData.subjectName || ''}
-              onChange={handleFormChange}
-              margin="normal"
-              error={!!fieldErrors.subjectName}
-              helperText={fieldErrors.subjectName}
-            /> */}
             <TextField
               fullWidth
               label="Medium"
@@ -511,6 +654,7 @@ const SystemManagement = () => {
               margin="normal"
               error={!!fieldErrors.medium}
               helperText={fieldErrors.medium}
+              size={isMobile ? 'small' : 'medium'}
             />
             <TextField
               fullWidth
@@ -521,20 +665,11 @@ const SystemManagement = () => {
               margin="normal"
               error={!!fieldErrors.mainSubject}
               helperText={fieldErrors.mainSubject}
+              size={isMobile ? 'small' : 'medium'}
             />
-            {/* <TextField
-              fullWidth
-              label="Grade (e.g. Grade 1)"
-              name="grade" 
-              value={formData.grade || ''}
-              onChange={handleFormChange}
-              margin="normal"
-              error={!!fieldErrors.grade}
-              helperText={fieldErrors.grade}
-            /> */}
           </>
         );
-      case 2: // Classes - GRADE FIELD REMOVED
+      case 2: // Classes
         return (
           <>
             <TextField
@@ -546,6 +681,7 @@ const SystemManagement = () => {
               margin="normal"
               error={!!fieldErrors.class}
               helperText={fieldErrors.class}
+              size={isMobile ? 'small' : 'medium'}
             />
           </>
         );
@@ -561,6 +697,7 @@ const SystemManagement = () => {
               margin="normal"
               error={!!fieldErrors.settingName}
               helperText={fieldErrors.settingName}
+              size={isMobile ? 'small' : 'medium'}
             />
             <TextField
               fullWidth
@@ -571,6 +708,7 @@ const SystemManagement = () => {
               margin="normal"
               error={!!fieldErrors.value}
               helperText={fieldErrors.value}
+              size={isMobile ? 'small' : 'medium'}
             />
           </>
         );
@@ -586,7 +724,7 @@ const SystemManagement = () => {
         open={sidebarOpen || hovered}
         setOpen={setSidebarOpen}
       />
-      <Box sx={{ flexGrow: 1, display: "flex", flexDirection: "column" }}>
+      <Box sx={{ flexGrow: 1, display: "flex", flexDirection: "column", minWidth: 0 }}>
         <AppBar
           position="static"
           sx={{
@@ -603,46 +741,104 @@ const SystemManagement = () => {
             setSidebarOpen={setSidebarOpen}
           />
         </AppBar>
-        <Box sx={{ p: 3, flexGrow: 1, overflow: "auto" }}>
-          <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 2 }}>
-            <Tabs value={activeTab} onChange={handleTabChange} aria-label="system management tabs">
+        <Box sx={{ 
+          p: { xs: 1.5, sm: 2, md: 3 }, 
+          flexGrow: 1, 
+          overflow: "auto",
+          minWidth: 0
+        }}>
+          <Box sx={{ 
+            borderBottom: 1, 
+            borderColor: 'divider', 
+            mb: 2,
+            overflowX: 'auto',
+            '&::-webkit-scrollbar': {
+              height: '4px'
+            }
+          }}>
+            <Tabs 
+              value={activeTab} 
+              onChange={handleTabChange} 
+              aria-label="system management tabs"
+              variant={isMobile ? "scrollable" : "standard"}
+              scrollButtons={isMobile ? "auto" : false}
+              sx={{
+                '& .MuiTab-root': {
+                  minWidth: { xs: 'auto', sm: 160 },
+                  fontSize: { xs: '0.875rem', sm: '1rem' },
+                  px: { xs: 2, sm: 3 }
+                }
+              }}
+            >
               <Tab label="Grades" />
               <Tab label="Subjects" />
               <Tab label="Classes" />
               <Tab label="Common Setting" />
             </Tabs>
           </Box>
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2 }}>
+          <Box sx={{ 
+            display: 'flex', 
+            justifyContent: 'space-between', 
+            mb: 2,
+            flexDirection: { xs: 'column', sm: 'row' },
+            gap: { xs: 1, sm: 0 }
+          }}>
             <Button
               variant="contained"
               startIcon={<AddIcon />}
               onClick={handleAddClick}
               disabled={loading.table}
+              fullWidth={isMobile}
+              size={isMobile ? 'medium' : 'large'}
             >
               Add Data
             </Button>
           </Box>
           {loading.table ? (
             <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '200px' }}>
-              <CircularProgress size={60} />
+              <CircularProgress size={isMobile ? 40 : 60} />
             </Box>
           ) : (
             renderTable()
           )}
         </Box>
       </Box>
-      <Dialog open={openForm} onClose={() => setOpenForm(false)} fullWidth maxWidth="sm">
-        <DialogTitle>{editId ? 'Edit Item' : 'Add New Item'}</DialogTitle>
+      <Dialog 
+        open={openForm} 
+        onClose={() => setOpenForm(false)} 
+        fullWidth 
+        maxWidth="sm"
+        fullScreen={isMobile}
+      >
+        <DialogTitle sx={{ 
+          fontSize: { xs: '1.25rem', sm: '1.5rem' },
+          pb: { xs: 1, sm: 2 }
+        }}>
+          {editId ? 'Edit Item' : 'Add New Item'}
+        </DialogTitle>
         <DialogContent>
           {renderForm()}
         </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setOpenForm(false)}>Cancel</Button>
+        <DialogActions sx={{ 
+          px: { xs: 2, sm: 3 },
+          pb: { xs: 2, sm: 2 },
+          flexDirection: { xs: 'column', sm: 'row' },
+          gap: { xs: 1, sm: 0 }
+        }}>
+          <Button 
+            onClick={() => setOpenForm(false)}
+            fullWidth={isMobile}
+            size={isMobile ? 'medium' : 'large'}
+          >
+            Cancel
+          </Button>
           <Button
             onClick={handleFormSubmit}
             variant="contained"
             disabled={loading.form}
             startIcon={loading.form ? <CircularProgress size={20} color="inherit" /> : null}
+            fullWidth={isMobile}
+            size={isMobile ? 'medium' : 'large'}
           >
             {loading.form ? 'Saving....' : 'Save'}
           </Button>
@@ -652,7 +848,10 @@ const SystemManagement = () => {
         open={snackbar.open}
         autoHideDuration={6000}
         onClose={() => setSnackbar({ ...snackbar, open: false })}
-        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+        anchorOrigin={{ 
+          vertical: 'bottom', 
+          horizontal: isMobile ? 'center' : 'right' 
+        }}
       >
         <Alert
           onClose={() => setSnackbar({ ...snackbar, open: false })}

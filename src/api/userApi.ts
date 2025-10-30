@@ -46,7 +46,10 @@ export const userSchema = z.object({
     // Student specific fields
     studentGrade: z.string().min(1, "Student grade is required"),
     studentClass: z.string().min(1, "Student class is required"),
-    studentAdmissionNo: z.string().min(1, "Admission number is required"),
+    studentAdmissionNo: z
+      .string()
+      .min(5, "Student admission number must be at least 5 digits")
+      .max(10, "Student admission number must be at most 10 digits"),
     parentContact: z
       .string()
       .min(10, "Parent phone must be at least 10 digits")
