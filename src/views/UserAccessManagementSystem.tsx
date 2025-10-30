@@ -2,8 +2,8 @@ import { useState, useEffect } from "react";
 import {
     Box, Button, Checkbox, CircularProgress, FormControlLabel,
     MenuItem, Select, Typography, type SelectChangeEvent,
-    AppBar, Snackbar, Alert, Paper, CssBaseline, TextField, Grid,
-    Dialog, DialogTitle, DialogContent, DialogActions
+    AppBar, Snackbar, Alert, Paper, CssBaseline, TextField,
+    Dialog, DialogTitle, DialogContent, DialogActions, useMediaQuery
 } from "@mui/material";
 import Sidebar from "../components/Sidebar";
 import { useCustomTheme } from "../context/ThemeContext";
@@ -20,10 +20,6 @@ import {
 import { Stack } from "@mui/system";
 
 const defaultPermissions: Record<PermissionKey, boolean> = {
-
-
-
-
     // Admin Panel
     dashboard: false,
     studentDashboard: false,
@@ -55,7 +51,6 @@ const defaultPermissions: Record<PermissionKey, boolean> = {
     userProfile: false,
     help: false,
     
-
     // Other Settings
     autoRefresh: false,
 };
@@ -71,6 +66,10 @@ const UserAccessManagementSystem = () => {
     const [sidebarOpen, setSidebarOpen] = useState(false);
     const theme = useTheme();
     useCustomTheme();
+
+    // Responsive breakpoints
+    const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
+    const isTablet = useMediaQuery(theme.breakpoints.down('md'));
 
     const [snackbar, setSnackbar] = useState({
         open: false,
@@ -229,17 +228,22 @@ const UserAccessManagementSystem = () => {
                     checked={permissions ? permissions[key] || false : false}
                     onChange={handlePermissionChange(key)}
                     disabled={loading}
+                    size={isMobile ? "small" : "medium"}
                 />
             }
             label={
-                <Typography variant="body1" sx={{ fontWeight: bold ? 'bold' : 'normal' }}>
+                <Typography 
+                    variant={isMobile ? "body2" : "body1"} 
+                    sx={{ fontWeight: bold ? 'bold' : 'normal' }}
+                >
                     {label}
                 </Typography>
             }
             sx={{
-                ml: indented ? 4 : 2,
+                ml: indented ? (isMobile ? 2 : 4) : (isMobile ? 1 : 2),
+                width: '100%',
                 '& .MuiFormControlLabel-label': {
-                    fontSize: '0.875rem',
+                    fontSize: isMobile ? '0.813rem' : '0.875rem',
                     color: theme.palette.text.secondary
                 }
             }}
@@ -252,19 +256,27 @@ const UserAccessManagementSystem = () => {
         childKeys: PermissionKey[],
         childLabels: string[]
     ) => (
-        <Box key={parentKey} sx={{ mb: 1 }}>
+        <Box key={parentKey} sx={{ mb: 1, width: '100%' }}>
             <FormControlLabel
                 control={
                     <Checkbox
                         checked={permissions ? permissions[parentKey] || false : false}
                         onChange={handleParentPermissionChange(parentKey, childKeys)}
                         disabled={loading}
+                        size={isMobile ? "small" : "medium"}
                     />
                 }
-                label={<Typography variant="subtitle1" sx={{ fontWeight: 'bold' }}>{parentLabel}</Typography>}
-                sx={{ ml: 2 }}
+                label={
+                    <Typography 
+                        variant={isMobile ? "body2" : "subtitle1"} 
+                        sx={{ fontWeight: 'bold' }}
+                    >
+                        {parentLabel}
+                    </Typography>
+                }
+                sx={{ ml: isMobile ? 1 : 2 }}
             />
-            <Box sx={{ display: 'flex', flexDirection: 'column', ml: 2 }}>
+            <Box sx={{ display: 'flex', flexDirection: 'column', ml: isMobile ? 1 : 2 }}>
                 {childKeys.map((childKey, index) =>
                     renderCheckbox(childKey, childLabels[index], false, true)
                 )}
@@ -273,13 +285,16 @@ const UserAccessManagementSystem = () => {
     );
 
     const renderPermissionSection = (title: string, content: React.ReactNode) => (
-        <Stack spacing={3} sx={{ p: 3, overflow: 'auto' }}>
-            <Typography variant="h6" sx={{
-                fontWeight: "bold",
-                mb: 2,
-                color: theme.palette.primary.main,
-                pl: 2
-            }}>
+        <Stack spacing={isMobile ? 2 : 3} sx={{ p: isMobile ? 2 : 3, overflow: 'auto' }}>
+            <Typography 
+                variant={isMobile ? "subtitle1" : "h6"} 
+                sx={{
+                    fontWeight: "bold",
+                    mb: isMobile ? 1 : 2,
+                    color: theme.palette.primary.main,
+                    pl: isMobile ? 1 : 2
+                }}
+            >
                 {title}
             </Typography>
             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
@@ -292,7 +307,7 @@ const UserAccessManagementSystem = () => {
         <Box sx={{ display: "flex", width: "100vw", minHeight: "100vh" }}>
             <CssBaseline />
             <Sidebar open={sidebarOpen} setOpen={setSidebarOpen} />
-            <Box sx={{ flexGrow: 1, display: "flex", flexDirection: "column" }}>
+            <Box sx={{ flexGrow: 1, display: "flex", flexDirection: "column", overflow: 'hidden' }}>
                 <AppBar position="static" sx={{
                     bgcolor: theme.palette.background.paper,
                     boxShadow: 'none',
@@ -303,7 +318,7 @@ const UserAccessManagementSystem = () => {
                 </AppBar>
 
                 {error && (
-                    <Alert severity="error" sx={{ m: 2 }}>
+                    <Alert severity="error" sx={{ m: isMobile ? 1 : 2 }}>
                         {error}
                     </Alert>
                 )}
@@ -313,30 +328,76 @@ const UserAccessManagementSystem = () => {
                         <CircularProgress />
                     </Box>
                 ) : (
-                    <Box sx={{ p: 3 }}>
-                        <Paper elevation={3} sx={{ p: 3, mb: 3, borderRadius: 2 }}>
-                            <Box sx={{ display: "flex", gap: 2, flexWrap: "wrap", alignItems: "center" }}>
-                                <Typography>User Role:</Typography>
-                                <Select
-                                    value={selectedRole}
-                                    onChange={handleRoleChange}
-                                    sx={{ minWidth: 200 }}
-                                    disabled={loading || roles.length === 0}
-                                >
-                                    {roles.map(role => (
-                                        <MenuItem key={role.id} value={role.userType}>{role.userType}</MenuItem>
-                                    ))}
-                                </Select>
+                    <Box sx={{ 
+                        p: isMobile ? 1.5 : isTablet ? 2 : 3,
+                        overflow: 'auto',
+                        height: '100%'
+                    }}>
+                        <Paper elevation={3} sx={{ 
+                            p: isMobile ? 2 : 3, 
+                            mb: isMobile ? 2 : 3, 
+                            borderRadius: 2 
+                        }}>
+                            <Box sx={{ 
+                                display: "flex", 
+                                flexDirection: isMobile ? "column" : "row",
+                                gap: 2, 
+                                flexWrap: "wrap", 
+                                alignItems: isMobile ? "stretch" : "center" 
+                            }}>
+                                <Box sx={{ 
+                                    display: 'flex', 
+                                    flexDirection: isMobile ? 'column' : 'row',
+                                    alignItems: isMobile ? 'stretch' : 'center',
+                                    gap: isMobile ? 1 : 2,
+                                    width: isMobile ? '100%' : 'auto'
+                                }}>
+                                    <Typography sx={{ 
+                                        fontSize: isMobile ? '0.875rem' : '1rem',
+                                        whiteSpace: 'nowrap'
+                                    }}>
+                                        User Role:
+                                    </Typography>
+                                    <Select
+                                        value={selectedRole}
+                                        onChange={handleRoleChange}
+                                        sx={{ 
+                                            minWidth: isMobile ? '100%' : 200,
+                                            fontSize: isMobile ? '0.875rem' : '1rem'
+                                        }}
+                                        disabled={loading || roles.length === 0}
+                                        size={isMobile ? "small" : "medium"}
+                                    >
+                                        {roles.map(role => (
+                                            <MenuItem key={role.id} value={role.userType}>{role.userType}</MenuItem>
+                                        ))}
+                                    </Select>
+                                </Box>
 
-                                <Box sx={{ display: "flex", gap: 2, ml: "auto" }}>
+                                <Box sx={{ 
+                                    display: "flex", 
+                                    flexDirection: isMobile ? "column" : "row",
+                                    gap: isMobile ? 1.5 : 2, 
+                                    ml: isMobile ? 0 : "auto",
+                                    width: isMobile ? '100%' : 'auto'
+                                }}>
                                     <Button
                                         variant="contained"
                                         onClick={handleUpdate}
                                         disabled={loading || !selectedRoleId}
+                                        fullWidth={isMobile}
+                                        size={isMobile ? "small" : "medium"}
                                     >
                                         {loading ? <CircularProgress size={20} /> : "Update"}
                                     </Button>
-                                    <Button variant="contained" color="secondary" onClick={handleNew} disabled={loading}>
+                                    <Button 
+                                        variant="contained" 
+                                        color="secondary" 
+                                        onClick={handleNew} 
+                                        disabled={loading}
+                                        fullWidth={isMobile}
+                                        size={isMobile ? "small" : "medium"}
+                                    >
                                         New
                                     </Button>
                                     <Button
@@ -344,6 +405,8 @@ const UserAccessManagementSystem = () => {
                                         color="error"
                                         onClick={handleDelete}
                                         disabled={loading || !selectedRoleId}
+                                        fullWidth={isMobile}
+                                        size={isMobile ? "small" : "medium"}
                                     >
                                         Delete
                                     </Button>
@@ -355,57 +418,74 @@ const UserAccessManagementSystem = () => {
                                 label="Role Description"
                                 value={roleDescription}
                                 onChange={(e) => setRoleDescription(e.target.value)}
-                                sx={{ mt: 3 }}
+                                sx={{ mt: isMobile ? 2 : 3 }}
                                 disabled={loading}
+                                size={isMobile ? "small" : "medium"}
+                                multiline={isMobile}
+                                rows={isMobile ? 2 : 1}
                             />
                         </Paper>
 
-                        <Paper elevation={3} sx={{ p: 3, borderRadius: 2 }}>
-                            <Typography variant="h5" sx={{ mb: 3 }}>Role Permissions</Typography>
-                            <Grid container spacing={3}>
-                                {renderPermissionSection("Admin Panel", (
-                                    <>
-                                        {renderParentCheckbox(
-                                            "dashboard",
-                                            "Dashboard",
-                                            ["studentDashboard", "teacherDashboard", "commonDashboard"],
-                                            ["Student Dashboard", "Teacher Dashboard", "Common Dashboard"]
-                                        )}
+                        <Paper elevation={3} sx={{ p: isMobile ? 2 : 3, borderRadius: 2 }}>
+                            <Typography 
+                                variant={isMobile ? "h6" : "h5"} 
+                                sx={{ mb: isMobile ? 2 : 3 }}
+                            >
+                                Role Permissions
+                            </Typography>
+                            
+                            <Box sx={{ 
+                                display: 'flex',
+                                flexDirection: isTablet ? 'column' : 'row',
+                                gap: isMobile ? 2 : 3
+                            }}>
+                                <Box sx={{ flex: 1 }}>
+                                    {renderPermissionSection("Admin Panel", (
+                                        <>
+                                            {renderParentCheckbox(
+                                                "dashboard",
+                                                "Dashboard",
+                                                ["studentDashboard", "teacherDashboard", "commonDashboard"],
+                                                ["Student Dashboard", "Teacher Dashboard", "Common Dashboard"]
+                                            )}
 
-                                        {renderCheckbox("addMarks", "Add Marks", true)}
+                                            {renderCheckbox("addMarks", "Add Marks", true)}
 
-                                        {renderCheckbox("addClassTeacher", "Add Class Teacher", true)}
+                                            {renderCheckbox("addClassTeacher", "Add Class Teacher", true)}
 
-                                        {renderCheckbox("addStudent", "Add Student", true)}
+                                            {renderCheckbox("addStudent", "Add Student", true)}
 
-                                        {renderCheckbox("marksChecking", "Marks Checking", true)}
+                                            {renderCheckbox("marksChecking", "Marks Checking", true)}
 
-                                        {renderParentCheckbox(
-                                            "userManagement",
-                                            "User Management",
-                                            ["userManagementSub", "userAccessManagement"],
-                                            ["User Management", "User Access Management"]
-                                        )}
+                                            {renderParentCheckbox(
+                                                "userManagement",
+                                                "User Management",
+                                                ["userManagementSub", "userAccessManagement"],
+                                                ["User Management", "User Access Management"]
+                                            )}
 
-                                        {renderParentCheckbox(
-                                            "reports",
-                                            "Reports",
-                                            ["managementStaffReport", "classTeacherReport", "parentReport", "parentPrincipalReport", "parentTeacherReport"],
-                                            ["Management Staff Report", "Class Teacher Report", "Parent Report", "Parent Principal Report", "Parent Teacher Report"],
-                                        )}
+                                            {renderParentCheckbox(
+                                                "reports",
+                                                "Reports",
+                                                ["managementStaffReport", "classTeacherReport", "parentReport", "parentPrincipalReport", "parentTeacherReport"],
+                                                ["Management Staff Report", "Class Teacher Report", "Parent Report", "Parent Principal Report", "Parent Teacher Report"],
+                                            )}
 
-                                        {renderCheckbox("systemManagement", "System Management", true)}
-                                        {renderCheckbox("userProfile", "User profile", true)}
-                                        {renderCheckbox("help", "Help", true)}
-                                    </>
-                                ))}
+                                            {renderCheckbox("systemManagement", "System Management", true)}
+                                            {renderCheckbox("userProfile", "User profile", true)}
+                                            {renderCheckbox("help", "Help", true)}
+                                        </>
+                                    ))}
+                                </Box>
 
-                                {renderPermissionSection("Other Settings", (
-                                    <>
-                                        {renderCheckbox("autoRefresh", "Auto Refresh Dashboard", true)}
-                                    </>
-                                ))}
-                            </Grid>
+                                <Box sx={{ flex: 1 }}>
+                                    {renderPermissionSection("Other Settings", (
+                                        <>
+                                            {renderCheckbox("autoRefresh", "Auto Refresh Dashboard", true)}
+                                        </>
+                                    ))}
+                                </Box>
+                            </Box>
                         </Paper>
                     </Box>
                 )}
@@ -414,7 +494,10 @@ const UserAccessManagementSystem = () => {
                     open={snackbar.open}
                     autoHideDuration={6000}
                     onClose={() => setSnackbar({ ...snackbar, open: false })}
-                    anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
+                    anchorOrigin={{ 
+                        vertical: isMobile ? 'bottom' : 'top', 
+                        horizontal: 'center' 
+                    }}
                 >
                     <Alert severity={snackbar.severity}>{snackbar.message}</Alert>
                 </Snackbar>
@@ -424,8 +507,11 @@ const UserAccessManagementSystem = () => {
                     onClose={() => setNewRoleDialog(false)}
                     maxWidth="sm"
                     fullWidth
+                    fullScreen={isMobile}
                 >
-                    <DialogTitle>Create New Role</DialogTitle>
+                    <DialogTitle sx={{ fontSize: isMobile ? '1.1rem' : '1.25rem' }}>
+                        Create New Role
+                    </DialogTitle>
                     <DialogContent>
                         <Box sx={{ pt: 2, display: 'flex', flexDirection: 'column', gap: 2 }}>
                             <TextField
@@ -434,6 +520,7 @@ const UserAccessManagementSystem = () => {
                                 value={newRoleForm.userType}
                                 onChange={(e) => setNewRoleForm(prev => ({ ...prev, userType: e.target.value }))}
                                 disabled={loading}
+                                size={isMobile ? "small" : "medium"}
                             />
                             <TextField
                                 fullWidth
@@ -442,14 +529,21 @@ const UserAccessManagementSystem = () => {
                                 onChange={(e) => setNewRoleForm(prev => ({ ...prev, description: e.target.value }))}
                                 disabled={loading}
                                 multiline
-                                minRows={2}
+                                minRows={isMobile ? 3 : 2}
+                                size={isMobile ? "small" : "medium"}
                             />
                         </Box>
                     </DialogContent>
-                    <DialogActions>
+                    <DialogActions sx={{ 
+                        flexDirection: isMobile ? 'column' : 'row',
+                        gap: isMobile ? 1 : 0,
+                        p: isMobile ? 2 : 1
+                    }}>
                         <Button
                             onClick={() => setNewRoleDialog(false)}
                             disabled={loading}
+                            fullWidth={isMobile}
+                            size={isMobile ? "small" : "medium"}
                         >
                             Cancel
                         </Button>
@@ -457,6 +551,8 @@ const UserAccessManagementSystem = () => {
                             onClick={handleCreateRole}
                             variant="contained"
                             disabled={loading}
+                            fullWidth={isMobile}
+                            size={isMobile ? "small" : "medium"}
                         >
                             {loading ? <CircularProgress size={20} /> : "Create"}
                         </Button>

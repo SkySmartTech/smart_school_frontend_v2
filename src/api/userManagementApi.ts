@@ -103,6 +103,19 @@ const deactivateEndpointForUserType = (userType: UserType, id: number) => {
   }
 };
 
+// new: delete endpoint helper
+const deleteEndpointForUserType = (userType: UserType, id: number) => {
+  switch (userType) {
+    case "Student":
+      return `/api/user-student/${id}/delete`;
+    case "Parent":
+      return `/api/user-parent/${id}/delete`;
+    case "Teacher":
+    default:
+      return `/api/user-teacher/${id}/delete`;
+  }
+};
+
 export const fetchUsers = async (userType: UserType = "Teacher"): Promise<User[]> => {
   try {
     const url = `${API_BASE_URL}${endpointForUserType(userType)}`;
@@ -492,6 +505,22 @@ export const deactivateUser = async (id: number, userType: UserType): Promise<vo
   );
 };
 
+// new: delete user
+export const deleteUser = async (id: number, userType: UserType): Promise<void> => {
+  const url = `${API_BASE_URL}${deleteEndpointForUserType(userType, id)}`;
+  try {
+    // Use HTTP DELETE (backend complains POST not supported)
+    await axios.delete(url, {
+      ...getAuthHeader(),
+      withCredentials: true,
+      timeout: 15000
+    });
+  } catch (error) {
+    console.error(`Error deleting user (${userType}, id=${id}):`, error);
+    throw error;
+  }
+};
+
 export const searchUsers = async (searchTerm: string, userType: UserType): Promise<User[]> => {
   let endpoint = '';
   
@@ -521,12 +550,40 @@ export const searchUsers = async (searchTerm: string, userType: UserType): Promi
       }
     );
 
-    // Transform the response data to match User type
-    return Array.isArray(response.data.data) 
-      ? response.data.data 
-      : Array.isArray(response.data) 
-        ? response.data 
-        : [];
+    // Normalize/unwrap response into an array of raw user objects
+    const rawArray = Array.isArray(response.data?.data)
+      ? response.data.data
+      : Array.isArray(response.data)
+        ? response.data
+        : (response.data?.data && Array.isArray(response.data?.data)) ? response.data.data : [];
+
+    if (!Array.isArray(rawArray)) return [];
+
+    // Map/normalize each raw user into the UI User shape (same as fetchUsers)
+    return rawArray.map((user: any) => ({
+      id: user.id,
+      name: user.name || '',
+      username: user.username || '',
+      email: user.email || '',
+      status: user.status ?? true,
+      userType,
+      userRole: user.userRole || getUserRole(userType),
+      address: user.address || '',
+      birthDay: user.birthDay || '',
+      contact: user.contact || '',
+      gender: user.gender || '',
+      photo: user.photo || '',
+      grade: '',
+      class: '',
+      medium: '',
+      studentAdmissionNo: '',
+      subject: '',
+      staffNo: '',
+      profession: '',
+      parentContact: '',
+      relation: user.relation || user.parent?.relation || '',
+      ...getTypeSpecificFields(user, userType)
+    }));
         
   } catch (error) {
     console.error('Search users error:', error);
