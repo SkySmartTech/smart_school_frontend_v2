@@ -24,10 +24,11 @@ import { useSnackbar } from "notistack";
 import { Link, useNavigate } from "react-router-dom";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { login, validateUser } from "../../services/authService";
+import { sendForgotPasswordOtp, verifyForgotPasswordOtp, resetForgotPassword } from "../../api/userApi";
 import { motion } from "framer-motion";
 
 interface LoginFormProps {
-  onForgotPasswordClick: () => void;
+  onForgotPasswordClick?: () => void;
 }
 
 interface LoginFormData {
@@ -277,6 +278,45 @@ const LoginForm = ({ onForgotPasswordClick }: LoginFormProps) => {
     event.preventDefault();
   };
 
+  const handleForgotPasswordFlow = async () => {
+    try {
+      const email = window.prompt("Enter your email for password reset:");
+      if (!email) {
+        enqueueSnackbar("Email is required", { variant: "warning" });
+        return;
+      }
+
+      await sendForgotPasswordOtp({ email });
+      enqueueSnackbar("OTP sent to your email", { variant: "info" });
+
+      const otp = window.prompt("Enter the OTP you received:");
+      if (!otp) {
+        enqueueSnackbar("OTP is required", { variant: "warning" });
+        return;
+      }
+
+      await verifyForgotPasswordOtp({ email, otp });
+      enqueueSnackbar("OTP verified. Please set your new password.", { variant: "success" });
+
+      const password = window.prompt("New password (min 6 chars):");
+      if (!password || password.length < 6) {
+        enqueueSnackbar("Password must be at least 6 characters", { variant: "warning" });
+        return;
+      }
+
+      const password_confirmation = window.prompt("Confirm new password:");
+      if (password_confirmation !== password) {
+        enqueueSnackbar("Passwords do not match", { variant: "error" });
+        return;
+      }
+
+      await resetForgotPassword({ email, password, password_confirmation });
+      enqueueSnackbar("Password reset successful. You may now sign in.", { variant: "success" });
+    } catch (err: any) {
+      enqueueSnackbar(err?.message || "Forgot password flow failed", { variant: "error" });
+    }
+  };
+
   return (
     <Box sx={{ width: "100%", maxWidth: 500 }}>
       <CardContent sx={{ textAlign: "center" }}>
@@ -349,7 +389,6 @@ const LoginForm = ({ onForgotPasswordClick }: LoginFormProps) => {
             },
           }}
           autoComplete="username"
-          autoFocus
           InputProps={{
             startAdornment: (
               <InputAdornment position="start">
@@ -463,7 +502,7 @@ const LoginForm = ({ onForgotPasswordClick }: LoginFormProps) => {
         >
           <Button
             startIcon={<Info />}
-            onClick={onForgotPasswordClick}
+            onClick={onForgotPasswordClick ?? handleForgotPasswordFlow}
             sx={{
               textTransform: "none",
               color: "text.secondary",

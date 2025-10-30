@@ -323,6 +323,42 @@ export async function validateUser() {
   }
 }
 
+export async function sendForgotPasswordOtp(payload: { email: string }) {
+  try {
+    const response = await API.post("/api/forgot-password/send-otp", payload);
+    return response.data;
+  } catch (error) {
+    if (axios.isAxiosError(error)) {
+      throw new Error(error.response?.data?.message || "Failed to send OTP");
+    }
+    throw new Error("Failed to send OTP");
+  }
+}
+
+export async function verifyForgotPasswordOtp(payload: { email: string; otp: string }) {
+  try {
+    const response = await API.post("/api/forgot-password/verify-otp", payload);
+    return response.data;
+  } catch (error) {
+    if (axios.isAxiosError(error)) {
+      throw new Error(error.response?.data?.message || "OTP verification failed");
+    }
+    throw new Error("OTP verification failed");
+  }
+}
+
+export async function resetForgotPassword(payload: { email: string; password: string; password_confirmation: string }) {
+  try {
+    const response = await API.post("/api/forgot-password/reset", payload);
+    return response.data;
+  } catch (error) {
+    if (axios.isAxiosError(error)) {
+      throw new Error(error.response?.data?.message || "Password reset failed");
+    }
+    throw new Error("Password reset failed");
+  }
+}
+
 export const authService = {
   register: registerUser,
   login: loginUser,
