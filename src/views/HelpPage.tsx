@@ -4,15 +4,15 @@ import {
     Typography,
     Paper,
     Divider,
-    Link as MuiLink,
     Stack,
     CssBaseline,
     useTheme,
-    AppBar
+    AppBar,
+    Button,
+    ButtonGroup
 } from '@mui/material';
 import {
     MenuBook as MenuBookIcon,
-    ArrowForwardIos as ArrowForwardIosIcon,
     HelpOutline as HelpOutlineIcon
 } from '@mui/icons-material';
 
@@ -23,51 +23,60 @@ import { useCustomTheme } from '../context/ThemeContext';
 interface ManualLinkProps {
     title: string;
     description: string;
-    pdfUrl: string; 
+    pdfUrl: {
+        english: string;
+        sinhala: string;
+    };
 }
 
 const ManualLink: React.FC<ManualLinkProps> = ({ title, description, pdfUrl }) => {
     const theme = useTheme();
 
-    const handleClick = () => {
-        // Open PDF in new tab
-        window.open(pdfUrl, '_blank');
+    const handleClick = (language: 'english' | 'sinhala') => {
+        // Open PDF in new tab based on selected language
+        window.open(pdfUrl[language], '_blank');
     };
 
     return (
-        <MuiLink
-            component="button"
-            onClick={handleClick}
+        <Box
             sx={{
                 width: '100%',
-                textAlign: 'left',
                 p: 2,
                 borderRadius: theme.shape.borderRadius,
                 '&:hover': {
                     backgroundColor: theme.palette.action.hover,
-                    textDecoration: 'none',
                 },
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                color: theme.palette.text.primary,
                 transition: 'background-color 0.2s',
             }}
-            underline="none"
         >
-            <Stack direction="row" spacing={2} alignItems="center">
-                <MenuBookIcon color="primary" />
-                <Box>
-                    <Typography variant="body1" fontWeight={600} color="text.primary">
-                        {title}
-                    </Typography>
-                    <Typography variant="caption" color="text.secondary">
-                        {description}
-                    </Typography>
-                </Box>
+            <Stack direction="row" spacing={2} alignItems="center" justifyContent="space-between">
+                <Stack direction="row" spacing={2} alignItems="center" sx={{ flex: 1 }}>
+                    <MenuBookIcon color="primary" />
+                    <Box>
+                        <Typography variant="body1" fontWeight={600} color="text.primary">
+                            {title}
+                        </Typography>
+                        <Typography variant="caption" color="text.secondary">
+                            {description}
+                        </Typography>
+                    </Box>
+                </Stack>
+                <ButtonGroup variant="outlined" size="small">
+                    <Button 
+                        onClick={() => handleClick('sinhala')}
+                        sx={{ minWidth: '80px' }}
+                    >
+                        සිංහල
+                    </Button>
+                    <Button 
+                        onClick={() => handleClick('english')}
+                        sx={{ minWidth: '80px' }}
+                    >
+                        English
+                    </Button>
+                </ButtonGroup>
             </Stack>
-            <ArrowForwardIosIcon sx={{ fontSize: 'small', color: theme.palette.text.secondary }} />
-        </MuiLink>
+        </Box>
     );
 };
 
@@ -80,17 +89,26 @@ const HelpPage: React.FC = () => {
         {
             title: "Parent's Manual",
             description: "Guide for parents on viewing reports and interacting with the system.",
-            pdfUrl: "/manuals/parent's manual.pdf"
+            pdfUrl: {
+                english: "/src/assets/usermanuals/english user manual parent.pdf",
+                sinhala: "/src/assets/usermanuals/sinhala user manual parent.pdf"
+            }
         },
         {
             title: "Student's Manual",
             description: "Instructions for students on accessing lessons and checking homework.",
-            pdfUrl: "/manuals/student's manual.pdf"
+            pdfUrl: {
+                english: "/src/assets/usermanuals/english user manual student.pdf",
+                sinhala: "/src/assets/usermanuals/sinhala user manual student.pdf"
+            }
         },
         {
             title: "Teacher's Manual",
             description: "Detailed guide for teachers on grading, attendance, and content management.",
-            pdfUrl: "/manuals/teacher's manual.pdf"
+            pdfUrl: {
+                english: "/src/assets/usermanuals/english user manual teacher.pdf",
+                sinhala: "/src/assets/usermanuals/sinhala user manual teacher.pdf"
+            }
         },
     ];
 
