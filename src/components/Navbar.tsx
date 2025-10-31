@@ -18,8 +18,8 @@ import {
   AccountCircle as AccountCircleIcon,
 } from "@mui/icons-material";
 import { useNavigate } from "react-router-dom";
-import { useCustomTheme } from "../context/ThemeContext";
-import AnimatedSwitch from "../components/AnimatedSwitch";
+// import { useCustomTheme } from "../context/ThemeContext";
+// import AnimatedSwitch from "../components/AnimatedSwitch";
 import { useTeacherProfile } from "../hooks/useTeacherProfile";
 
 interface NavbarProps {
@@ -29,7 +29,7 @@ interface NavbarProps {
 }
 
 const Navbar = ({ title, sidebarOpen, setSidebarOpen }: NavbarProps) => {
-  const { mode, toggleTheme } = useCustomTheme();
+  // const { mode, toggleTheme } = useCustomTheme();
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
   // const [notificationAnchorEl, setNotificationAnchorEl] =useState<null | HTMLElement>(null);
   // const [notificationCount] = useState(3);
@@ -106,14 +106,14 @@ const Navbar = ({ title, sidebarOpen, setSidebarOpen }: NavbarProps) => {
 
       {/* Right side icons */}
       <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
-        {/* Dark mode toggle */}
+        {/* Dark mode toggle
         <Box sx={{ display: "flex", alignItems: "center", mr: 1 }}>
           <AnimatedSwitch
             checked={mode === "dark"}
             onChange={toggleTheme}
             inputProps={{ "aria-label": "dark mode toggle" }}
           />
-        </Box>
+        </Box> */}
 
         {/* Notifications
         <IconButton onClick={handleNotificationMenuOpen}>
