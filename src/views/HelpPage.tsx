@@ -112,24 +112,24 @@ const HelpPage: React.FC = () => {
             title: "Parent's Manual",
             description: "Guide for parents on viewing reports and interacting with the system.",
             pdfUrl: {
-                english: "/src/assets/usermanuals/english_user_manual_parent.pdf",
-                sinhala: "/src/assets/usermanuals/sinhala_user_manual_parent.pdf"
+                english: "/usermanuals/english_user_manual_parent.pdf",
+                sinhala: "/usermanuals/sinhala_user_manual_parent.pdf"
             }
         },
         {
             title: "Student's Manual",
             description: "Instructions for students on accessing lessons and checking homework.",
             pdfUrl: {
-                english: "/src/assets/usermanuals/english_user_manual_student.pdf",
-                sinhala: "/src/assets/usermanuals/sinhala_user_manual_student.pdf"
+                english: "/usermanuals/english_user_manual_student.pdf",
+                sinhala: "/usermanuals/sinhala_user_manual_student.pdf"
             }
         },
         {
             title: "Teacher's Manual",
             description: "Detailed guide for teachers on grading, attendance, and content management.",
             pdfUrl: {
-                english: "/src/assets/usermanuals/english_user_manual_teacher.pdf",
-                sinhala: "/src/assets/usermanuals/sinhala_user_manual_teacher.pdf"
+                english: "/usermanuals/english_user_manual_teacher.pdf",
+                sinhala: "/usermanuals/sinhala_user_manual_teacher.pdf"
             }
         },
     ];
