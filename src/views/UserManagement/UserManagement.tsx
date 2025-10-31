@@ -64,6 +64,7 @@ import {
   type Subject,
   statusOptions,
   genderOptions,
+  relationOptions,
   userRoleOptions,
   userTypeOptions,
   gradeOptions,
@@ -275,8 +276,19 @@ const UserManagement: React.FC = () => {
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     setForm(prev => ({ ...prev, [name]: value }));
+    
+    // If editing/adding a Parent and there is at least one parent entry,
+    // keep the first parentEntries item in sync with the form inputs so updates are sent.
+    if (activeTab === 'Parent' && ['relation', 'profession', 'parentContact', 'studentAdmissionNo'].includes(name)) {
+      setParentEntries(prev => {
+        if (prev.length === 0) return prev;
+        const updated = [...prev];
+        updated[0] = { ...updated[0], [name]: value };
+        return updated;
+      });
+    }
   };
-
+  
   const handleSelectChange = (e: React.ChangeEvent<{ value: unknown }>, field: keyof User) => {
     const value = e.target.value;
     if (field === 'status') {
@@ -285,10 +297,22 @@ const UserManagement: React.FC = () => {
         [field]: value === 'true' || value === true
       }));
     } else {
+      // Keep form in sync
       setForm(prev => ({
         ...prev,
         [field]: value
       }));
+      
+      // If relation is changed in Parent tab, update the first parentEntries item as well
+      if (field === 'relation' && activeTab === 'Parent') {
+        const val = String(value);
+        setParentEntries(prev => {
+          if (prev.length === 0) return prev;
+          const updated = [...prev];
+          updated[0] = { ...updated[0], relation: val };
+          return updated;
+        });
+      }
     }
   };
 
@@ -418,32 +442,30 @@ const UserManagement: React.FC = () => {
       case 'Parent': {
         const firstParent = parentEntries.length > 0 ? parentEntries[0] : null;
 
+        // Ensure we always send parentData as an ARRAY (backend expects 'parentData' field)
+        const mappedEntries = parentEntries.length > 0
+          ? parentEntries.map(p => ({
+              relation: p.relation || '',
+              profession: p.profession || '',
+              parentContact: p.parentContact || '',
+              studentAdmissionNo: p.studentAdmissionNo || ''
+            }))
+          : [{
+              relation: form.relation || (firstParent?.relation ?? '') || '',
+              profession: form.profession || (firstParent?.profession ?? '') || '',
+              parentContact: form.parentContact || (firstParent?.parentContact ?? '') || '',
+              studentAdmissionNo: form.studentAdmissionNo || (firstParent?.studentAdmissionNo ?? '') || ''
+            }];
+
         userData = {
           ...baseUserData,
-          profession: form.profession || (firstParent?.profession ?? ''),
-          studentAdmissionNo: form.studentAdmissionNo || (firstParent?.studentAdmissionNo ?? ''),
-          relation: form.relation || (firstParent?.relation ?? ''),
-          parentContact: form.parentContact || (firstParent?.parentContact ?? ''),
-          parentEntries: parentEntries.length > 0
-            ? parentEntries.map(p => ({
-              relation: p.relation,
-              profession: p.profession,
-              parentContact: p.parentContact,
-              studentAdmissionNo: p.studentAdmissionNo
-            }))
-            : (firstParent ? [{
-              relation: firstParent.relation,
-              profession: firstParent.profession,
-              parentContact: firstParent.parentContact,
-              studentAdmissionNo: firstParent.studentAdmissionNo
-            }] : []),
-          parentData: firstParent ? {
-            studentAdmissionNo: firstParent.studentAdmissionNo || '',
-            parentContact: firstParent.parentContact || '',
-            profession: firstParent.profession || '',
-            relation: firstParent.relation || ''
-          } : undefined
-        } as User;
+          profession: mappedEntries[0].profession,
+          studentAdmissionNo: mappedEntries[0].studentAdmissionNo,
+          relation: mappedEntries[0].relation,
+          parentContact: mappedEntries[0].parentContact,
+          parentEntries: mappedEntries, 
+          parentData: mappedEntries 
+        } as unknown as User;
         break;
       }
 
@@ -587,149 +609,149 @@ const UserManagement: React.FC = () => {
   };
 
   const handleExportPDF = () => {
-  const doc = new jsPDF({
-    orientation: "landscape", // ✅ Landscape gives more space for columns
-    unit: "pt",               // ✅ Better precision
-    format: "A4"
-  });
+    const doc = new jsPDF({
+      orientation: "landscape", // ✅ Landscape gives more space for columns
+      unit: "pt",               // ✅ Better precision
+      format: "A4"
+    });
 
-  const dataToExport = searchTerm ? apiSearchResults : users;
+    const dataToExport = searchTerm ? apiSearchResults : users;
 
-  const tableData = dataToExport.map(user => {
-    if (activeTab === "Student") {
-      return [
-        user.name,
-        user.username,
-        user.email,
-        user.address || "-",
-        user.birthDay || "-",
-        user.contact || "-",
-        user.gender || "-",
-        user.studentAdmissionNo || "-",
-        user.class || user.grade || "-",
-        user.medium || "-",
-        user.status ? "Active" : "Inactive"
-      ];
-    } else if (activeTab === "Teacher") {
-      return [
-        user.name,
-        user.username,
-        user.email,
-        user.address || "-",
-        user.birthDay || "-",
-        user.contact || "-",
-        user.gender || "-",
-        user.medium || "-",
-        user.grade || user.class || "-",
-        user.subject || "-",
-        user.status ? "Active" : "Inactive"
-      ];
-    } else {
-      // Parent
-      return [
-        user.name,
-        user.username,
-        user.email,
-        user.address || "-",
-        user.birthDay || "-",
-        user.contact || "-",
-        user.gender || "-",
-        user.studentAdmissionNo || "-",
-        user.relation || "-",
-        user.profession || "-",
-        user.parentContact || "-",
-        user.status ? "Active" : "Inactive"
-      ];
-    }
-  });
+    const tableData = dataToExport.map(user => {
+      if (activeTab === "Student") {
+        return [
+          user.name,
+          user.username,
+          user.email,
+          user.address || "-",
+          user.birthDay || "-",
+          user.contact || "-",
+          user.gender || "-",
+          user.studentAdmissionNo || "-",
+          user.class || user.grade || "-",
+          user.medium || "-",
+          user.status ? "Active" : "Inactive"
+        ];
+      } else if (activeTab === "Teacher") {
+        return [
+          user.name,
+          user.username,
+          user.email,
+          user.address || "-",
+          user.birthDay || "-",
+          user.contact || "-",
+          user.gender || "-",
+          user.medium || "-",
+          user.grade || user.class || "-",
+          user.subject || "-",
+          user.status ? "Active" : "Inactive"
+        ];
+      } else {
+        // Parent
+        return [
+          user.name,
+          user.username,
+          user.email,
+          user.address || "-",
+          user.birthDay || "-",
+          user.contact || "-",
+          user.gender || "-",
+          user.studentAdmissionNo || "-",
+          user.relation || "-",
+          user.profession || "-",
+          user.parentContact || "-",
+          user.status ? "Active" : "Inactive"
+        ];
+      }
+    });
 
-  const headers = {
-    Student: [
-      "Name",
-      "Username",
-      "Email",
-      "Address",
-      "Birthday",
-      "Phone No",
-      "Gender",
-      "Admission No",
-      "Class",
-      "Medium",
-      "Status"
-    ],
-    Teacher: [
-      "Name",
-      "Username",
-      "Email",
-      "Address",
-      "Birthday",
-      "Phone No",
-      "Gender",
-      "Medium",
-      "Grade",
-      "Subject",
-      "Status"
-    ],
-    Parent: [
-      "Name",
-      "Username",
-      "Email",
-      "Address",
-      "Birthday",
-      "Phone No",
-      "Gender",
-      "Admission No",
-      "Relation",
-      "Profession",
-      "Parent No",
-      "Status"
-    ]
+    const headers = {
+      Student: [
+        "Name",
+        "Username",
+        "Email",
+        "Address",
+        "Birthday",
+        "Phone No",
+        "Gender",
+        "Admission No",
+        "Class",
+        "Medium",
+        "Status"
+      ],
+      Teacher: [
+        "Name",
+        "Username",
+        "Email",
+        "Address",
+        "Birthday",
+        "Phone No",
+        "Gender",
+        "Medium",
+        "Grade",
+        "Subject",
+        "Status"
+      ],
+      Parent: [
+        "Name",
+        "Username",
+        "Email",
+        "Address",
+        "Birthday",
+        "Phone No",
+        "Gender",
+        "Admission No",
+        "Relation",
+        "Profession",
+        "Parent No",
+        "Status"
+      ]
+    };
+
+    // ✅ Add a title with better styling
+    doc.setFontSize(16);
+    doc.text(`${activeTab} Management Report`, 40, 40);
+
+    // ✅ Build the table neatly
+    autoTable(doc, {
+      startY: 60,
+      head: [headers[activeTab]],
+      body: tableData,
+      theme: "grid",
+      styles: {
+        fontSize: 9,
+        cellPadding: 5,
+        valign: "middle",
+        halign: "center",
+        textColor: [0, 0, 0],
+        lineWidth: 0.2
+      },
+      headStyles: {
+        fillColor: [25, 118, 210],
+        textColor: 255,
+        fontStyle: "bold",
+        halign: "center",
+      },
+      alternateRowStyles: {
+        fillColor: [245, 245, 245],
+      },
+      didDrawPage: (data) => {
+        // ✅ Add footer (optional)
+        const pageCount = (doc as any).getNumberOfPages
+          ? (doc as any).getNumberOfPages()
+          : ((doc as any).internal?.pages?.length ?? 1);
+        doc.setFontSize(10);
+        doc.text(
+          `Page ${data.pageNumber} of ${pageCount}`,
+          doc.internal.pageSize.width - 100,
+          doc.internal.pageSize.height - 20
+        );
+      },
+    });
+
+    // ✅ Save PDF with meaningful filename
+    doc.save(`${activeTab.toLowerCase()}-management-report.pdf`);
   };
-
-  // ✅ Add a title with better styling
-  doc.setFontSize(16);
-  doc.text(`${activeTab} Management Report`, 40, 40);
-
-  // ✅ Build the table neatly
-  autoTable(doc, {
-    startY: 60,
-    head: [headers[activeTab]],
-    body: tableData,
-    theme: "grid",
-    styles: {
-      fontSize: 9,
-      cellPadding: 5,
-      valign: "middle",
-      halign: "center",
-      textColor: [0, 0, 0],
-      lineWidth: 0.2
-    },
-    headStyles: {
-      fillColor: [25, 118, 210],
-      textColor: 255,
-      fontStyle: "bold",
-      halign: "center",
-    },
-    alternateRowStyles: {
-      fillColor: [245, 245, 245],
-    },
-    didDrawPage: (data) => {
-      // ✅ Add footer (optional)
-      const pageCount = (doc as any).getNumberOfPages
-        ? (doc as any).getNumberOfPages()
-        : ((doc as any).internal?.pages?.length ?? 1);
-      doc.setFontSize(10);
-      doc.text(
-        `Page ${data.pageNumber} of ${pageCount}`,
-        doc.internal.pageSize.width - 100,
-        doc.internal.pageSize.height - 20
-      );
-    },
-  });
-
-  // ✅ Save PDF with meaningful filename
-  doc.save(`${activeTab.toLowerCase()}-management-report.pdf`);
-};
 
   const handleExportExcel = () => {
     const dataToExport = searchTerm ? apiSearchResults : users;
@@ -1390,13 +1412,20 @@ const UserManagement: React.FC = () => {
                 size="small"
               />
               <TextField
+                select
                 label="Relation"
                 name="relation"
                 value={form.relation || ''}
-                onChange={handleChange}
+                onChange={(e) => handleSelectChange(e, "relation")}
                 sx={{ minWidth: 120 }}
                 size="small"
-              />
+              >
+                {relationOptions.map((relation: string) => (
+                  <MenuItem key={relation} value={relation}>
+                    {relation}
+                  </MenuItem>
+                ))}
+              </TextField>
               <TextField
                 label="Parent Contact"
                 name="parentContact"

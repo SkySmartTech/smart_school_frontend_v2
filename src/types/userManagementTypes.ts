@@ -101,6 +101,12 @@ export const genderOptions: string[] = [
   'Other'
 ];
 
+export const relationOptions: string[] = [
+  'Father',
+  'Mother',
+  'Guardian'
+];
+
 export const gradeOptions: string[] = [
   'Grade 1',
   'Grade 2',
