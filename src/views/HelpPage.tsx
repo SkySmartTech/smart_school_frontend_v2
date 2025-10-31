@@ -49,28 +49,50 @@ const ManualLink: React.FC<ManualLinkProps> = ({ title, description, pdfUrl }) =
                 transition: 'background-color 0.2s',
             }}
         >
-            <Stack direction="row" spacing={2} alignItems="center" justifyContent="space-between">
-                <Stack direction="row" spacing={2} alignItems="center" sx={{ flex: 1 }}>
-                    <MenuBookIcon color="primary" />
-                    <Box>
+            <Stack 
+                direction={{ xs: "column", sm: "row" }} 
+                spacing={2} 
+                alignItems={{ xs: "flex-start", sm: "center" }} 
+                justifyContent="space-between"
+            >
+                <Stack spacing={{ xs: 1, sm: 0 }} sx={{ flex: 1, width: { xs: '100%', sm: 'auto' } }}>
+                    <Stack direction="row" spacing={2} alignItems="center">
+                        <MenuBookIcon color="primary" />
                         <Typography variant="body1" fontWeight={600} color="text.primary">
                             {title}
                         </Typography>
-                        <Typography variant="caption" color="text.secondary">
-                            {description}
-                        </Typography>
-                    </Box>
+                    </Stack>
+                    <Typography 
+                        variant="caption" 
+                        color="text.secondary"
+                        sx={{ 
+                            display: { xs: 'block', sm: 'inline' },
+                            textAlign: { xs: 'justify', sm: 'left' },
+                            pl: { xs: 0, sm: 0 }
+                        }}
+                    >
+                        {description}
+                    </Typography>
                 </Stack>
-                <ButtonGroup variant="outlined" size="small">
+                <ButtonGroup 
+                    variant="outlined" 
+                    size="small"
+                    sx={{ 
+                        width: { xs: '100%', sm: 'auto' },
+                        '& .MuiButton-root': {
+                            flex: { xs: 1, sm: 'initial' }
+                        }
+                    }}
+                >
                     <Button 
                         onClick={() => handleClick('sinhala')}
-                        sx={{ minWidth: '80px' }}
+                        sx={{ minWidth: { xs: 'auto', sm: '80px' } }}
                     >
                         සිංහල
                     </Button>
                     <Button 
                         onClick={() => handleClick('english')}
-                        sx={{ minWidth: '80px' }}
+                        sx={{ minWidth: { xs: 'auto', sm: '80px' } }}
                     >
                         English
                     </Button>
