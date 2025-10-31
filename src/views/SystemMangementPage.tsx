@@ -104,7 +104,7 @@ const SystemManagement = () => {
             break;
           case 1: // Subjects
             const subjectsData = await fetchSubjects();
-            console.log('Subjects data from API:', subjectsData);
+            console.log('Subjects data from API :', subjectsData);
             // Sort subjects alphabetically by mainSubject or subjectName
             const sortedSubjects = [...subjectsData].sort((a, b) => {
               const nameA = (a.mainSubject || a.subjectName || '').toLowerCase();
@@ -129,7 +129,7 @@ const SystemManagement = () => {
             break;
         }
       } catch (error) {
-        console.error('Error fetching data:', error);
+        console.error('Error fetching data :', error);
         showSnackbar('Failed to load data', 'error');
       } finally {
         setLoading(prev => ({ ...prev, table: false }));
