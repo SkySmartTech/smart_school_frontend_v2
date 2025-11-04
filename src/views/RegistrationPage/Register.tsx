@@ -8,7 +8,7 @@ const Register = () => {
   return (
     <Stack
       sx={{
-        height: "100vh",
+        minHeight: "100vh",
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
@@ -16,44 +16,47 @@ const Register = () => {
         backgroundSize: "cover",
         backgroundPosition: "center",
         backgroundRepeat: "no-repeat",
+        padding: { xs: 1, sm: 2 },
       }}
     >
       <Card 
         sx={{ 
-          width: "90%", 
-          maxWidth: 1000, 
-          maxHeight: "90vh", 
-          boxShadow: 4, 
-          borderRadius: "30px", 
+          width: "100%",
+          maxWidth: { xs: "100%", sm: 500, md: 1050 },
+          maxHeight: { xs: "100vh", sm: "95vh", md: "90vh" },
+          boxShadow: { xs: 2, sm: 3, md: 4 },
+          borderRadius: { xs: "20px", sm: "25px", md: "30px" },
           display: "flex",
-          overflow: "hidden", 
-          margin: "20px 0" 
+          flexDirection: { xs: "column", md: "row" },
+          overflow: "hidden",
+          margin: { xs: "10px 0", sm: "15px 0", md: "20px 0" }
         }}
       >
-        {/* Left Side with Image */}
+        {/* Left Side with Image - Hidden on mobile, visible on desktop */}
         <Box
           sx={{
-            flex: 1,
+            flex: { md: 1 },
             backgroundImage: 'url("/images/b5.jpg")',
             backgroundSize: "cover",
             backgroundPosition: "center",
-            display: { xs: "none", md: "block" }, 
-            minHeight: "400px", 
+            display: { xs: "none", md: "block" },
+            minHeight: { md: "400px" },
+            position: "relative",
           }}
         >
           {/* Logo Box */}
           <Box
             sx={{
               position: "absolute",
-              top: 20,
-              left: 20,
-              padding: "8px 16px",
+              top: { md: 20 },
+              left: { md: 20 },
+              padding: { md: "8px 16px" },
               borderRadius: "10px",
               fontWeight: "bold",
               backgroundColor: "rgba(255,255,255,0.8)",
             }}
           >
-            
+            {/* Add your logo content here if needed */}
           </Box>
         </Box>
 
@@ -64,9 +67,24 @@ const Register = () => {
             display: "flex",
             justifyContent: "center",
             alignItems: "center",
-            padding: { xs: 2, sm: 3, md: 4 }, 
-             
-            maxHeight: "90vh", 
+            padding: { xs: 2, sm: 3, md: 4 },
+            maxHeight: { xs: "100vh", sm: "95vh", md: "90vh" },
+            overflowY: "auto",
+            width: "100%",
+            // Custom scrollbar styling for better mobile experience
+            "&::-webkit-scrollbar": {
+              width: { xs: "4px", sm: "6px" },
+            },
+            "&::-webkit-scrollbar-track": {
+              background: "transparent",
+            },
+            "&::-webkit-scrollbar-thumb": {
+              background: "rgba(0,0,0,0.2)",
+              borderRadius: "10px",
+            },
+            "&::-webkit-scrollbar-thumb:hover": {
+              background: "rgba(0,0,0,0.3)",
+            },
           }}
         >
           <RegisterForm 

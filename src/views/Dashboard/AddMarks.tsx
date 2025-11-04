@@ -935,6 +935,7 @@ const TeacherDashboard: React.FC = () => {
                                 direction={{ xs: 'column', sm: 'row' }}
                                 spacing={{ xs: 1.5, sm: 2 }}
                                 flexWrap="wrap"
+
                             >
                                 <Controller
                                     control={control}
@@ -1086,15 +1087,8 @@ const TeacherDashboard: React.FC = () => {
                                                 </MenuItem>
                                             ))}
                                         </TextField>
-                                    )}
-                                />
-                            </Stack>
+                                    )} />
 
-                            <Stack
-                                direction={{ xs: 'column', sm: 'row' }}
-                                spacing={{ xs: 1.5, sm: 2 }}
-                                flexWrap="wrap"
-                            >
                                 <Controller
                                     control={control}
                                     name="selectedExam"
