@@ -6,7 +6,7 @@ const Footer = () => {
   return (
     <Box sx={{ py: 2, textAlign: 'center', bgcolor: theme.palette.background.paper }}>
       <Typography variant="body2" color="textSecondary">
-        © 2025 School Management system. All rights reserved.
+        © 2025 SkyTech SL. All rights reserved.
       </Typography>
     </Box>
   );

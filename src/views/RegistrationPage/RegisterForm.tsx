@@ -222,7 +222,7 @@ const RegisterForm = ({ onSuccess = () => { }, onError = () => { } }: RegisterFo
       showSuccess("Registration successful! Please contact the Admin to get access to Login.");
       setTimeout(() => {
         navigate("/login");
-      }, 5000);
+      }, 2000);
     },
     onError: (error: any) => {
       const errorMsg = extractErrorMessage(error);
@@ -236,7 +236,7 @@ const RegisterForm = ({ onSuccess = () => { }, onError = () => { } }: RegisterFo
       showSuccess("Registration successful! Please contact the Admin to get access to Login.");
       setTimeout(() => {
         navigate("/login");
-      }, 3000);
+      }, 2000);
     },
     onError: (error: any) => {
       const errorMsg = extractErrorMessage(error);
@@ -250,7 +250,7 @@ const RegisterForm = ({ onSuccess = () => { }, onError = () => { } }: RegisterFo
       showSuccess("Registration successful! Please contact the Admin to get access to Login.");
       setTimeout(() => {
         navigate("/login");
-      }, 3000);
+      }, 2000);
     },
     onError: (error: any) => {
       const errorMsg = extractErrorMessage(error);
@@ -334,6 +334,7 @@ const RegisterForm = ({ onSuccess = () => { }, onError = () => { } }: RegisterFo
           }
         });
 
+        // Clear local registration state without showing success snackbar
         setRegisteredUser(null);
         setActiveStep((prevActiveStep) => prevActiveStep - 1);
 
@@ -351,14 +352,13 @@ const RegisterForm = ({ onSuccess = () => { }, onError = () => { } }: RegisterFo
         setValue("profession", "");
         setValue("relation", "");
         setValue("parentContact", "");
-
-        showSuccess("User data cleared successfully");
       } catch (error: any) {
         console.error('Delete error:', error);
         const errorMessage = error?.response?.data?.message || "Failed to clear user data";
         showError(errorMessage);
 
-        setActiveStep((prevActiveStep) => prevActiveStep - 1);
+        // still attempt to move back and clear local state to keep UI consistent
+        setActiveStep((prevActiveStep) => Math.max(0, prevActiveStep - 1));
         setRegisteredUser(null);
       }
     } else {
@@ -979,12 +979,17 @@ const RegisterForm = ({ onSuccess = () => { }, onError = () => { } }: RegisterFo
                   >
                     {isLoadingSubjects ? (
                       <MenuItem disabled>Loading subjects...</MenuItem>
-                    ) : uniqueMainSubjects.map((subject) => (
-                      <MenuItem key={subject} value={subject}>
-                        {subject}
-                      </MenuItem>
-                    ))}
+                    ) : (
+                      [...uniqueMainSubjects]
+                        .sort((a, b) => a.localeCompare(b))
+                        .map((subject) => (
+                          <MenuItem key={subject} value={subject}>
+                            {subject}
+                          </MenuItem>
+                        ))
+                    )}
                   </TextField>
+
                 </Stack>
 
                 <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>

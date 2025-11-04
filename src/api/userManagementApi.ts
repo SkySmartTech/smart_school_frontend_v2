@@ -116,6 +116,18 @@ const deleteEndpointForUserType = (userType: UserType, id: number) => {
   }
 };
 
+const activateEndpointForUserType = (userType: UserType, id: number) => {
+  switch (userType) {
+    case "Student":
+      return `/api/user-student/${id}/activate`;
+    case "Parent":
+      return `/api/user-parent/${id}/activate`;
+    case "Teacher":
+    default:
+      return `/api/user-teacher/${id}/activate`;
+  }
+};
+
 export const fetchUsers = async (userType: UserType = "Teacher"): Promise<User[]> => {
   try {
     const url = `${API_BASE_URL}${endpointForUserType(userType)}`;
@@ -235,7 +247,6 @@ const getTypeSpecificFields = (user: any, userType: UserType) => {
         profession: p?.profession ?? '',
         parentContact: p?.parentContact ?? '',
         relation: p?.relation ?? '',
-        // keep userId/userType normalized to strings where present
         userId: p?.userId !== undefined ? String(p.userId) : (user?.id !== undefined ? String(user.id) : undefined),
         userType: p?.userType ?? user?.userType ?? 'Parent',
         modifiedBy: p?.modifiedBy ?? undefined,
@@ -243,15 +254,23 @@ const getTypeSpecificFields = (user: any, userType: UserType) => {
         updated_at: p?.updated_at ?? undefined
       }));
 
+      // compute joined strings for grid display so all entries show (comma separated)
+      const relations = normalizedParents.map(p => p.relation).filter(Boolean);
+      const professions = normalizedParents.map(p => p.profession).filter(Boolean);
+      const parentContacts = normalizedParents.map(p => p.parentContact).filter(Boolean);
+      const admissionNos = normalizedParents.map(p => p.studentAdmissionNo).filter(Boolean);
+
+      const joinUnique = (arr: string[]) => Array.from(new Set(arr)).join(', ');
+
       const firstParent = normalizedParents[0] ?? null;
 
       return {
-        // root-level fields for grid display (existing behavior)
-        profession: firstParent?.profession ?? user.profession ?? '',
-        parentContact: firstParent?.parentContact ?? user.parentContact ?? '',
-        studentAdmissionNo: firstParent?.studentAdmissionNo ?? user.studentAdmissionNo ?? '',
-        relation: firstParent?.relation ?? user.relation ?? '',
-        // keep a single-object parentData (matches User.parentData type)
+        // joined strings for the grid display
+        profession: joinUnique(professions) || (firstParent?.profession ?? user.profession ?? ''),
+        parentContact: joinUnique(parentContacts) || (firstParent?.parentContact ?? user.parentContact ?? ''),
+        studentAdmissionNo: joinUnique(admissionNos) || (firstParent?.studentAdmissionNo ?? user.studentAdmissionNo ?? ''),
+        relation: joinUnique(relations) || (firstParent?.relation ?? user.relation ?? ''),
+        // keep a single-object parentData (matches User.parentData type if backend expects single)
         parentData: firstParent
           ? {
               profession: firstParent.profession,
@@ -517,6 +536,16 @@ export const deleteUser = async (id: number, userType: UserType): Promise<void> 
     });
   } catch (error) {
     console.error(`Error deleting user (${userType}, id=${id}):`, error);
+    throw error;
+  }
+};
+
+export const activateUser = async (id: number, userType: UserType): Promise<void> => {
+  const url = `${API_BASE_URL}${activateEndpointForUserType(userType, id)}`;
+  try {
+    await axios.post(url, {}, getAuthHeader());
+  } catch (error) {
+    console.error(`Error activating user (${userType}, id=${id}):`, error);
     throw error;
   }
 };
