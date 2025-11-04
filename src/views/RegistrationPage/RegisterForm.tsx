@@ -161,6 +161,7 @@ const RegisterForm = ({ onSuccess = () => { }, onError = () => { } }: RegisterFo
     formState: { errors },
     setValue,
     trigger,
+    setError, 
   } = useForm<RegisterFormValues>({
     defaultValues: {
       teacherGrades: [],
@@ -222,7 +223,7 @@ const RegisterForm = ({ onSuccess = () => { }, onError = () => { } }: RegisterFo
       showSuccess("Registration successful! Please contact the Admin to get access to Login.");
       setTimeout(() => {
         navigate("/login");
-      }, 2000);
+      }, 1000);
     },
     onError: (error: any) => {
       const errorMsg = extractErrorMessage(error);
@@ -236,7 +237,7 @@ const RegisterForm = ({ onSuccess = () => { }, onError = () => { } }: RegisterFo
       showSuccess("Registration successful! Please contact the Admin to get access to Login.");
       setTimeout(() => {
         navigate("/login");
-      }, 2000);
+      }, 1000);
     },
     onError: (error: any) => {
       const errorMsg = extractErrorMessage(error);
@@ -250,7 +251,7 @@ const RegisterForm = ({ onSuccess = () => { }, onError = () => { } }: RegisterFo
       showSuccess("Registration successful! Please contact the Admin to get access to Login.");
       setTimeout(() => {
         navigate("/login");
-      }, 2000);
+      }, 1000);
     },
     onError: (error: any) => {
       const errorMsg = extractErrorMessage(error);
@@ -479,13 +480,31 @@ const RegisterForm = ({ onSuccess = () => { }, onError = () => { } }: RegisterFo
   };
 
   const handleAddParent = () => {
-    const studentAdmissionNo = watch("studentAdmissionNo") || "";
-    const profession = watch("profession") || "";
-    const relation = watch("relation") || "";
-    const parentContact = watch("parentContact") || "";
+    const studentAdmissionNo = (watch("studentAdmissionNo") || "").toString().trim();
+    const profession = (watch("profession") || "").toString().trim();
+    const relation = (watch("relation") || "").toString().trim();
+    const parentContact = (watch("parentContact") || "").toString().trim();
 
-    if (!studentAdmissionNo && !profession && !relation && !parentContact) {
-      alert("Please fill at least one parent field before adding");
+    // clear previous manual errors
+    // (react-hook-form doesn't provide clearError, so reset by setting empty value or triggering validation)
+    // We'll clear by triggering validation for these fields
+    trigger(["studentAdmissionNo", "profession", "relation", "parentContact"]);
+
+    const missingFields: { name: keyof RegisterFormValues; label: string }[] = [];
+    if (!studentAdmissionNo) missingFields.push({ name: "studentAdmissionNo", label: "Student Admission Number" });
+    if (!profession) missingFields.push({ name: "profession", label: "Profession" });
+    if (!relation) missingFields.push({ name: "relation", label: "Relation" });
+    if (!parentContact) missingFields.push({ name: "parentContact", label: "Contact Number" });
+
+    if (missingFields.length > 0) {
+      // set field-level errors so helperText / error states show
+      missingFields.forEach(f => {
+        setError(f.name as any, { type: "manual", message: `${f.label} is required` });
+      });
+
+      // optional: focus first missing field (not required)
+      // alert to inform user (keeps behavior similar to before)
+      alert("Please fill all parent fields: Admission No, Profession, Relation and Contact before adding.");
       return;
     }
 
