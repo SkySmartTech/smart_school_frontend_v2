@@ -60,10 +60,10 @@ import useTeacherProfile from '../../hooks/useTeacherProfile';
 import Footer from '../../components/Footer';
 
 const examOptions = [
-    { label: 'First Term', value: 'First' },
-    { label: 'Second Term', value: 'Mid' },
-    { label: 'Third Term', value: 'End' },
-    { label: 'Monthly Test', value: 'Monthly' },
+    { label: 'First Term', value: 'First Term' },
+    { label: 'Second Term', value: 'Second Term' },
+    { label: 'Third Term', value: 'Third Term' },
+    { label: 'Monthly Test', value: 'Monthly Test' },
 ];
 
 const monthOptions = [
@@ -82,6 +82,8 @@ const yearOptions = [
     { label: '2026', value: '2026' },
     { label: '2027', value: '2027' },
     { label: '2028', value: '2028' },
+    { label: '2029', value: '2029' },
+    { label: '2030', value: '2030' },
 ];
 
 interface FilterFormData {
@@ -562,7 +564,7 @@ const TeacherDashboard: React.FC = () => {
 
     const downloadTemplate = () => {
         const template: ExcelRow[] = [{
-            'Admission No': 'STU001',
+            'Admission No': '12345',
             'Student Name': 'John Doe',
             'Grade': 'Grade 8',
             'Class': 'Araliya',

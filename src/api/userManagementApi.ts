@@ -1,6 +1,13 @@
 import axios from "axios";
 import type { Subject, User, UserListResponse, UserResponse } from "../types/userManagementTypes";
 
+// Add this utility function
+const safeString = (value: any): string | null => {
+  if (value === undefined || value === null) return null;
+  if (typeof value === 'string') return value.trim();
+  return String(value);
+};
+
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
 
 type UserType = "Student" | "Teacher" | "Parent";
@@ -624,14 +631,52 @@ export const bulkDeactivateUsers = async (ids: number[], userType: UserType): Pr
   const promises = ids.map(id => deactivateUser(id, userType));
   await Promise.all(promises);
 };
-function safeString(value: string | string[] | undefined | null): string | null {
-  if (!value) {
-    return null;
-  }
-  if (Array.isArray(value)) {
-    return value.join(', ').trim() || null;
-  }
-  const trimmed = String(value).trim();
-  return trimmed || null;
+
+// Add these new types
+export interface Grade {
+  id: number;
+  gradeId: string;
+  grade: string;
+  description: string | null;
+  schoolId: string | null;
+  created_at: string;
+  updated_at: string;
 }
+
+export interface Class {
+  id: number;
+  classId: string | null;
+  class: string;
+  description: string;
+  gradeId: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+// Add these new functions
+export const fetchGrades = async (): Promise<Grade[]> => {
+  try {
+    const response = await axios.get<Grade[]>(
+      `${API_BASE_URL}/api/grades`,
+      getAuthHeader()
+    );
+    return response.data;
+  } catch (error) {
+    console.error('Error fetching grades:', error);
+    throw error;
+  }
+};
+
+export const fetchClasses = async (): Promise<Class[]> => {
+  try {
+    const response = await axios.get<Class[]>(
+      `${API_BASE_URL}/api/grade-classes`,
+      getAuthHeader()
+    );
+    return response.data;
+  } catch (error) {
+    console.error('Error fetching classes:', error);
+    throw error;
+  }
+};
 

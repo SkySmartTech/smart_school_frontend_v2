@@ -68,9 +68,7 @@ import {
   relationOptions,
   userRoleOptions,
   userTypeOptions,
-  gradeOptions,
   mediumOptions,
-  classOptions,
   type TeacherAssignment
 } from "../../types/userManagementTypes";
 import {
@@ -83,7 +81,11 @@ import {
   fetchSubjects,
   updateUser,
   deleteUser,
-  activateUser 
+  activateUser,
+  fetchGrades,
+  fetchClasses,
+  type Grade,
+  type Class
 } from "../../api/userManagementApi";
 import Navbar from "../../components/Navbar";
 import { debounce } from 'lodash';
@@ -182,6 +184,16 @@ const UserManagement: React.FC = () => {
   const { data: subjects = [], isLoading: isLoadingSubjects } = useQuery<Subject[]>({
     queryKey: ['subjects'],
     queryFn: fetchSubjects
+  });
+
+  const { data: grades = [], isLoading: isLoadingGrades } = useQuery<Grade[]>({
+    queryKey: ['grades'],
+    queryFn: fetchGrades
+  });
+
+  const { data: classes = [], isLoading: isLoadingClasses } = useQuery<Class[]>({
+    queryKey: ['classes'],
+    queryFn: fetchClasses
   });
 
   const createUserMutation = useMutation({
@@ -1304,10 +1316,11 @@ const UserManagement: React.FC = () => {
                 onChange={(e) => handleSelectChange(e, "grade")}
                 sx={{ minWidth: 120 }}
                 size="small"
+                disabled={isLoadingGrades}
               >
-                {gradeOptions.map((grade: string) => (
-                  <MenuItem key={grade} value={grade}>
-                    {grade}
+                {grades.map((grade) => (
+                  <MenuItem key={grade.id} value={grade.grade}>
+                    {grade.grade}
                   </MenuItem>
                 ))}
               </TextField>
@@ -1342,10 +1355,11 @@ const UserManagement: React.FC = () => {
                 onChange={(e) => handleSelectChange(e, "class")}
                 fullWidth
                 size="small"
+                disabled={isLoadingClasses}
               >
-                {classOptions.map((cls: string) => (
-                  <MenuItem key={cls} value={cls}>
-                    {cls}
+                {classes.map((cls) => (
+                  <MenuItem key={cls.id} value={cls.class}>
+                    {cls.class}
                   </MenuItem>
                 ))}
               </TextField>
@@ -1379,9 +1393,12 @@ const UserManagement: React.FC = () => {
                 onChange={(e) => handleSelectChange(e, "grade")}
                 sx={{ minWidth: 120 }}
                 size="small"
+                disabled={isLoadingGrades}
               >
-                {gradeOptions.map(grade => (
-                  <MenuItem key={grade} value={grade}>{grade}</MenuItem>
+                {grades.map((grade) => (
+                  <MenuItem key={grade.id} value={grade.grade}>
+                    {grade.grade}
+                  </MenuItem>
                 ))}
               </TextField>
 
@@ -1393,9 +1410,12 @@ const UserManagement: React.FC = () => {
                 onChange={(e) => handleSelectChange(e, "class")}
                 sx={{ minWidth: 120 }}
                 size="small"
+                disabled={isLoadingClasses}
               >
-                {classOptions.map(cls => (
-                  <MenuItem key={cls} value={cls}>{cls}</MenuItem>
+                {classes.map((cls) => (
+                  <MenuItem key={cls.id} value={cls.class}>
+                    {cls.class}
+                  </MenuItem>
                 ))}
               </TextField>
 
