@@ -53,7 +53,8 @@ import {
   Add,
   Delete as DeleteRowIcon,
   CloudUpload as CloudUploadIcon,
-  DeleteForever as DeleteForeverIcon
+  DeleteForever as DeleteForeverIcon,
+  CheckCircle as ActivateIcon // added activate icon
 } from "@mui/icons-material";
 import Sidebar from "../../components/Sidebar";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -64,11 +65,10 @@ import {
   type Subject,
   statusOptions,
   genderOptions,
+  relationOptions,
   userRoleOptions,
   userTypeOptions,
-  gradeOptions,
   mediumOptions,
-  classOptions,
   type TeacherAssignment
 } from "../../types/userManagementTypes";
 import {
@@ -80,7 +80,12 @@ import {
   searchUsers,
   fetchSubjects,
   updateUser,
-  deleteUser
+  deleteUser,
+  activateUser,
+  fetchGrades,
+  fetchClasses,
+  type Grade,
+  type Class
 } from "../../api/userManagementApi";
 import Navbar from "../../components/Navbar";
 import { debounce } from 'lodash';
@@ -106,6 +111,7 @@ type ParentEntry = {
 };
 
 const UserManagement: React.FC = () => {
+  const PASSWORD_MASK = '********';
   const [form, setForm] = useState<FormState>({
     name: "",
     username: "",
@@ -178,6 +184,16 @@ const UserManagement: React.FC = () => {
   const { data: subjects = [], isLoading: isLoadingSubjects } = useQuery<Subject[]>({
     queryKey: ['subjects'],
     queryFn: fetchSubjects
+  });
+
+  const { data: grades = [], isLoading: isLoadingGrades } = useQuery<Grade[]>({
+    queryKey: ['grades'],
+    queryFn: fetchGrades
+  });
+
+  const { data: classes = [], isLoading: isLoadingClasses } = useQuery<Class[]>({
+    queryKey: ['classes'],
+    queryFn: fetchClasses
   });
 
   const createUserMutation = useMutation({
@@ -260,11 +276,29 @@ const UserManagement: React.FC = () => {
     }
   });
 
+  const activateUserMutation = useMutation({
+    mutationFn: (params: { id: number; userType: UserCategory }) => activateUser(params.id, params.userType),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["users"] });
+      showSnackbar("User activated successfully!", "success");
+    },
+    onError: (error: any) => {
+      showSnackbar(error.response?.data?.message || "Failed to activate user", "error");
+    }
+  });
+
   // delete handler uses deleteUserMutation (must be inside component)
   const handleDelete = (id: number) => {
     if (!id) return;
     if (window.confirm("Are you sure you want to permanently delete this user? This action cannot be undone.")) {
       deleteUserMutation.mutate(id);
+    }
+  };
+
+  const handleActivate = (id: number) => {
+    if (!id) return;
+    if (window.confirm("Are you sure you want to activate this user?")) {
+      activateUserMutation.mutate({ id, userType: activeTab });
     }
   };
 
@@ -275,6 +309,13 @@ const UserManagement: React.FC = () => {
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     setForm(prev => ({ ...prev, [name]: value }));
+
+    // removed auto-sync to parentEntries[0] because it overwrote the first parent row
+    // when typing a new parent before clicking "Add to list".
+    //
+    // If you need inline editing of existing parent rows, implement a dedicated
+    // edit flow that updates a specific parentEntries[index] instead of syncing
+    // all form inputs into parentEntries[0].
   };
 
   const handleSelectChange = (e: React.ChangeEvent<{ value: unknown }>, field: keyof User) => {
@@ -285,10 +326,16 @@ const UserManagement: React.FC = () => {
         [field]: value === 'true' || value === true
       }));
     } else {
+      // Keep form in sync
       setForm(prev => ({
         ...prev,
         [field]: value
       }));
+
+      // removed automatic sync to parentEntries[0]:
+      // previously updating parentEntries[0] here caused the first added parent row
+      // to be overwritten whenever the relation dropdown changed. Inline editing
+      // should be handled via explicit edit buttons that update a specific index.
     }
   };
 
@@ -356,11 +403,18 @@ const UserManagement: React.FC = () => {
       }
     }
 
-    const baseUserData: Omit<User, 'id'> = {
+    // Determine whether to send password:
+    const passwordToSend =
+      editId === null
+        ? form.password
+        : (form.password && form.password !== PASSWORD_MASK ? form.password : undefined); 
+
+    const baseUserData: any = {
       name: form.name,
       username: form.username,
       email: form.email,
-      password: form.password,
+      // include password only when it's provided (avoid sending the mask)
+      ...(passwordToSend !== undefined ? { password: passwordToSend } : {}),
       userType: activeTab,
       userRole: form.userRole,
       status: form.status,
@@ -418,32 +472,30 @@ const UserManagement: React.FC = () => {
       case 'Parent': {
         const firstParent = parentEntries.length > 0 ? parentEntries[0] : null;
 
+        // Ensure we always send parentData as an ARRAY (backend expects 'parentData' field)
+        const mappedEntries = parentEntries.length > 0
+          ? parentEntries.map(p => ({
+            relation: p.relation || '',
+            profession: p.profession || '',
+            parentContact: p.parentContact || '',
+            studentAdmissionNo: p.studentAdmissionNo || ''
+          }))
+          : [{
+            relation: form.relation || (firstParent?.relation ?? '') || '',
+            profession: form.profession || (firstParent?.profession ?? '') || '',
+            parentContact: form.parentContact || (firstParent?.parentContact ?? '') || '',
+            studentAdmissionNo: form.studentAdmissionNo || (firstParent?.studentAdmissionNo ?? '') || ''
+          }];
+
         userData = {
           ...baseUserData,
-          profession: form.profession || (firstParent?.profession ?? ''),
-          studentAdmissionNo: form.studentAdmissionNo || (firstParent?.studentAdmissionNo ?? ''),
-          relation: form.relation || (firstParent?.relation ?? ''),
-          parentContact: form.parentContact || (firstParent?.parentContact ?? ''),
-          parentEntries: parentEntries.length > 0
-            ? parentEntries.map(p => ({
-              relation: p.relation,
-              profession: p.profession,
-              parentContact: p.parentContact,
-              studentAdmissionNo: p.studentAdmissionNo
-            }))
-            : (firstParent ? [{
-              relation: firstParent.relation,
-              profession: firstParent.profession,
-              parentContact: firstParent.parentContact,
-              studentAdmissionNo: firstParent.studentAdmissionNo
-            }] : []),
-          parentData: firstParent ? {
-            studentAdmissionNo: firstParent.studentAdmissionNo || '',
-            parentContact: firstParent.parentContact || '',
-            profession: firstParent.profession || '',
-            relation: firstParent.relation || ''
-          } : undefined
-        } as User;
+          profession: mappedEntries[0].profession,
+          studentAdmissionNo: mappedEntries[0].studentAdmissionNo,
+          relation: mappedEntries[0].relation,
+          parentContact: mappedEntries[0].parentContact,
+          parentEntries: mappedEntries,
+          parentData: mappedEntries
+        } as unknown as User;
         break;
       }
 
@@ -453,6 +505,10 @@ const UserManagement: React.FC = () => {
 
     if (editId !== null) {
       userData = { ...userData, id: editId };
+      
+      if ((userData as any).password === undefined) {
+        delete (userData as any).password;
+      }
       updateUserMutation.mutate(userData);
     } else {
       createUserMutation.mutate(userData);
@@ -499,7 +555,8 @@ const UserManagement: React.FC = () => {
       setForm({
         ...userToEdit,
         photo: userToEdit.photo || '',
-        password: "",
+        // show masked value in the password field when editing (won't be sent unless changed)
+        password: PASSWORD_MASK,
         userRole: userToEdit.userRole || getUserRole(userToEdit.userType),
         teacherClass: userToEdit.teacherData?.map(td => td.teacherClass) || [],
         teacherGrade: userToEdit.teacherData?.[0]?.teacherGrade || '',
@@ -519,48 +576,12 @@ const UserManagement: React.FC = () => {
       }
 
       if (userToEdit.userType === 'Parent') {
-        const rawParentArray =
-          (userToEdit as any).parentEntries ||
-          (userToEdit as any).parent_data ||
-          (userToEdit as any).parent ||
-          (userToEdit as any).parentData ||
-          [];
-
-        const arr = Array.isArray(rawParentArray) ? rawParentArray : rawParentArray ? [rawParentArray] : [];
-
-        if (arr.length > 0) {
-          const parentEntriesData = arr.flatMap((parentItem: any) => {
-            if (parentItem.parent_info && parentItem.students_info) {
-              return parentItem.students_info.map((student: any) => ({
-                id: Math.random().toString(36).substr(2, 9),
-                relation: parentItem.parent_info.relation || '',
-                profession: parentItem.parent_info.profession || '',
-                parentContact: parentItem.parent_info.parent_contact || '',
-                studentAdmissionNo: student.studentAdmissionNo || ''
-              }));
-            }
-            return {
-              id: Math.random().toString(36).substr(2, 9),
-              relation: parentItem.relation || '',
-              profession: parentItem.profession || '',
-              parentContact: parentItem.parentContact || parentItem.parent_contact || '',
-              studentAdmissionNo: parentItem.studentAdmissionNo || ''
-            };
-          });
-
-          setParentEntries(parentEntriesData);
+        // Use normalizer to get a consistent parentEntries array
+        const normalized = normalizeParentEntries(userToEdit);
+        if (normalized.length > 0) {
+          setParentEntries(normalized);
         } else {
-          if ((userToEdit as any).relation || (userToEdit as any).parentContact || (userToEdit as any).profession || (userToEdit as any).studentAdmissionNo) {
-            setParentEntries([{
-              id: Math.random().toString(36).substr(2, 9),
-              relation: (userToEdit as any).relation || '',
-              profession: (userToEdit as any).profession || '',
-              parentContact: (userToEdit as any).parentContact || '',
-              studentAdmissionNo: (userToEdit as any).studentAdmissionNo || ''
-            }]);
-          } else {
-            setParentEntries([]);
-          }
+          setParentEntries([]);
         }
       }
 
@@ -587,211 +608,253 @@ const UserManagement: React.FC = () => {
   };
 
   const handleExportPDF = () => {
-  const doc = new jsPDF({
-    orientation: "landscape", // ✅ Landscape gives more space for columns
-    unit: "pt",               // ✅ Better precision
-    format: "A4"
-  });
+    const doc = new jsPDF({
+      orientation: "landscape",
+      unit: "pt",
+      format: "A4"
+    });
 
-  const dataToExport = searchTerm ? apiSearchResults : users;
+    const dataToExport = searchTerm ? apiSearchResults : users;
 
-  const tableData = dataToExport.map(user => {
-    if (activeTab === "Student") {
-      return [
-        user.name,
-        user.username,
-        user.email,
-        user.address || "-",
-        user.birthDay || "-",
-        user.contact || "-",
-        user.gender || "-",
-        user.studentAdmissionNo || "-",
-        user.class || user.grade || "-",
-        user.medium || "-",
-        user.status ? "Active" : "Inactive"
-      ];
-    } else if (activeTab === "Teacher") {
-      return [
-        user.name,
-        user.username,
-        user.email,
-        user.address || "-",
-        user.birthDay || "-",
-        user.contact || "-",
-        user.gender || "-",
-        user.medium || "-",
-        user.grade || user.class || "-",
-        user.subject || "-",
-        user.status ? "Active" : "Inactive"
-      ];
-    } else {
-      // Parent
-      return [
-        user.name,
-        user.username,
-        user.email,
-        user.address || "-",
-        user.birthDay || "-",
-        user.contact || "-",
-        user.gender || "-",
-        user.studentAdmissionNo || "-",
-        user.relation || "-",
-        user.profession || "-",
-        user.parentContact || "-",
-        user.status ? "Active" : "Inactive"
-      ];
+    const tableData: any[] = [];
+
+    if (activeTab === 'Student') {
+      dataToExport.forEach(user => {
+        tableData.push([
+          user.name || "-",
+          user.username || "-",
+          user.email || "-",
+          user.address || "-",
+          user.birthDay || "-",
+          user.contact || "-",
+          user.gender || "-",
+          user.grade || "-",
+          user.studentAdmissionNo || "-",
+          user.class || user.grade || "-",
+          user.medium || "-",
+          user.status ? "Active" : "Inactive"
+        ]);
+      });
+    } else if (activeTab === 'Teacher') {
+      dataToExport.forEach(user => {
+        const assignments = getTeacherAssignmentsForExport(user);
+        if (assignments.length === 0) {
+          tableData.push([
+            user.name || "-",
+            user.username || "-",
+            user.email || "-",
+            user.address || "-",
+            user.birthDay || "-",
+            user.contact || "-",
+            user.gender || "-",
+            user.medium || "-",
+            user.grade || user.class || "-",
+            user.subject || "-",
+            user.status ? "Active" : "Inactive"
+          ]);
+        } else {
+          assignments.forEach((a: { medium: any; teacherGrade: any; teacherClass: any; subject: any; }) => {
+            tableData.push([
+              user.name || "-",
+              user.username || "-",
+              user.email || "-",
+              user.address || "-",
+              user.birthDay || "-",
+              user.contact || "-",
+              user.gender || "-",
+              a.medium || user.medium || "-",
+              a.teacherGrade || a.teacherClass || user.grade || "-",
+              a.subject || "-",
+              user.status ? "Active" : "Inactive"
+            ]);
+          });
+        }
+      });
+    } else { // Parent
+      dataToExport.forEach(user => {
+        const entries = getParentEntriesForExport(user);
+        if (entries.length === 0) {
+          tableData.push([
+            user.name || "-",
+            user.username || "-",
+            user.email || "-",
+            user.address || "-",
+            user.birthDay || "-",
+            user.contact || "-",
+            user.gender || "-",
+            user.relation || "-",
+            user.profession || "-",
+            user.parentContact || user.contact || "-",
+            user.studentAdmissionNo || "-",
+            user.status ? "Active" : "Inactive"
+          ]);
+        } else {
+          entries.forEach(ent => {
+            // Put user details + per-parent columns in desired order:
+            // Relation, Profession, Parent Contact, Student Admission No (you asked for that order)
+            tableData.push([
+              user.name || "-",
+              user.username || "-",
+              user.email || "-",
+              user.address || "-",
+              user.birthDay || "-",
+              user.contact || "-",
+              user.gender || "-",
+              ent.relation || "-",
+              ent.profession || "-",
+              ent.parentContact || "-",
+              ent.studentAdmissionNo || "-",
+              user.status ? "Active" : "Inactive"
+            ]);
+          });
+        }
+      });
     }
-  });
 
-  const headers = {
-    Student: [
-      "Name",
-      "Username",
-      "Email",
-      "Address",
-      "Birthday",
-      "Phone No",
-      "Gender",
-      "Admission No",
-      "Class",
-      "Medium",
-      "Status"
-    ],
-    Teacher: [
-      "Name",
-      "Username",
-      "Email",
-      "Address",
-      "Birthday",
-      "Phone No",
-      "Gender",
-      "Medium",
-      "Grade",
-      "Subject",
-      "Status"
-    ],
-    Parent: [
-      "Name",
-      "Username",
-      "Email",
-      "Address",
-      "Birthday",
-      "Phone No",
-      "Gender",
-      "Admission No",
-      "Relation",
-      "Profession",
-      "Parent No",
-      "Status"
-    ]
+    const headers = {
+      Student: [
+        "Name","Username","Email","Address","Birthday","Phone No","Gender","Grade","Admission No","Class","Medium","Status"
+      ],
+      Teacher: [
+        "Name","Username","Email","Address","Birthday","Phone No","Gender","Medium","Grade","Subject","Status"
+      ],
+      Parent: [
+        "Name","Username","Email","Address","Birthday","Phone No","Gender","Relation","Profession","Parent Contact","Student Admission No","Status"
+      ]
+    };
+
+    doc.setFontSize(16);
+    doc.text(`${activeTab} Management Report`, 40, 40);
+
+    const margin = { left: 40, right: 40 };
+    const pageWidth = (doc.internal.pageSize && (doc.internal.pageSize.getWidth ? doc.internal.pageSize.getWidth() : doc.internal.pageSize.width)) as number;
+    const availableWidth = pageWidth - margin.left - margin.right;
+    const colCount = headers[activeTab].length;
+    const computedColWidth = Math.floor(availableWidth / colCount);
+
+    const columnStyles: any = {};
+    for (let i = 0; i < colCount; i++) {
+      columnStyles[i] = { cellWidth: computedColWidth };
+    }
+
+    autoTable(doc, {
+      startY: 60,
+      head: [headers[activeTab]],
+      body: tableData,
+      theme: "grid",
+      margin,
+      styles: {
+        fontSize: 9,
+        cellPadding: 5,
+        valign: "middle",
+        halign: "left",
+        textColor: [0, 0, 0],
+        lineWidth: 0.2,
+        overflow: 'linebreak'
+      },
+      headStyles: {
+        fillColor: [25, 118, 210],
+        textColor: 255,
+        fontStyle: "bold",
+        halign: "center",
+      },
+      columnStyles,
+      tableWidth: 'auto',
+      alternateRowStyles: {
+        fillColor: [245, 245, 245],
+      },
+      didDrawPage: (data) => {
+        const pageCount = (doc as any).getNumberOfPages
+          ? (doc as any).getNumberOfPages()
+          : ((doc as any).internal?.pages?.length ?? 1);
+        doc.setFontSize(10);
+        doc.text(
+          `Page ${data.pageNumber} of ${pageCount}`,
+          doc.internal.pageSize.width - 100,
+          doc.internal.pageSize.height - 20
+        );
+      },
+    });
+
+    doc.save(`${activeTab.toLowerCase()}-management-report.pdf`);
   };
-
-  // ✅ Add a title with better styling
-  doc.setFontSize(16);
-  doc.text(`${activeTab} Management Report`, 40, 40);
-
-  // ✅ Build the table neatly
-  autoTable(doc, {
-    startY: 60,
-    head: [headers[activeTab]],
-    body: tableData,
-    theme: "grid",
-    styles: {
-      fontSize: 9,
-      cellPadding: 5,
-      valign: "middle",
-      halign: "center",
-      textColor: [0, 0, 0],
-      lineWidth: 0.2
-    },
-    headStyles: {
-      fillColor: [25, 118, 210],
-      textColor: 255,
-      fontStyle: "bold",
-      halign: "center",
-    },
-    alternateRowStyles: {
-      fillColor: [245, 245, 245],
-    },
-    didDrawPage: (data) => {
-      // ✅ Add footer (optional)
-      const pageCount = (doc as any).getNumberOfPages
-        ? (doc as any).getNumberOfPages()
-        : ((doc as any).internal?.pages?.length ?? 1);
-      doc.setFontSize(10);
-      doc.text(
-        `Page ${data.pageNumber} of ${pageCount}`,
-        doc.internal.pageSize.width - 100,
-        doc.internal.pageSize.height - 20
-      );
-    },
-  });
-
-  // ✅ Save PDF with meaningful filename
-  doc.save(`${activeTab.toLowerCase()}-management-report.pdf`);
-};
 
   const handleExportExcel = () => {
     const dataToExport = searchTerm ? apiSearchResults : users;
 
-    const excelData = dataToExport.map(user => {
-      // Student data
+    const excelRows: any[] = [];
+
+    dataToExport.forEach(user => {
+      const base = {
+        'Name': user.name || '',
+        'Username': user.username || '',
+        'Email': user.email || '',
+        'Address': user.address || '-',
+        'Birthday': user.birthDay || '-',
+        'Phone No': user.contact || '-',
+        'Gender': user.gender || '-',
+        'Status': user.status ? 'Active' : 'Inactive'
+      };
+
       if (activeTab === 'Student') {
-        return {
-          'Name': user.name,
-          'Username': user.username,
-          'Email': user.email,
-          'Address': user.address || '-',
-          'Birthday': user.birthDay || '-',
-          'Phone No': user.contact || '-',
-          'Gender': user.gender || '-',
+        excelRows.push({
+          ...base,
+          'Grade': user.grade || '-',
           'Admission No': user.studentAdmissionNo || '-',
           'Class': user.class || user.grade || '-',
-          'Medium': user.medium || '-',
-          'Status': user.status ? 'Active' : 'Inactive'
-        };
-      }
-      // Teacher data
-      else if (activeTab === 'Teacher') {
-        return {
-          'Name': user.name,
-          'Username': user.username,
-          'Email': user.email,
-          'Address': user.address || '-',
-          'Birthday': user.birthDay || '-',
-          'Phone No': user.contact || '-',
-          'Gender': user.gender || '-',
-          'Medium': user.medium || '-',
-          'Grade': user.grade || user.class || '-',
-          'Subject': user.subject || '-',
-          'Status': user.status ? 'Active' : 'Inactive'
-        };
-      }
-      // Parent data
-      else {
-        return {
-          'Name': user.name,
-          'Username': user.username,
-          'Email': user.email,
-          'Address': user.address || '-',
-          'Birthday': user.birthDay || '-',
-          'Phone No': user.contact || '-',
-          'Gender': user.gender || '-',
-          'Admission No': user.studentAdmissionNo || '-',
-          'Relation': user.relation || '-',
-          'Profession': user.profession || '-',
-          'Parent No': (user as any).parentContact || '-',
-          'Status': user.status ? 'Active' : 'Inactive'
-        };
+          'Medium': user.medium || '-'
+        });
+      } else if (activeTab === 'Teacher') {
+        const assignments = getTeacherAssignmentsForExport(user);
+        if (assignments.length === 0) {
+          excelRows.push({
+            ...base,
+            'Grade': user.grade || '-',
+            'Class': user.class || '-',
+            'Subject': user.subject || '-',
+            'Medium': user.medium || '-'
+          });
+        } else {
+          assignments.forEach((a: { teacherGrade: any; teacherClass: any; subject: any; medium: any; }) => {
+            excelRows.push({
+              ...base,
+              'Grade': a.teacherGrade || '-',
+              'Class': a.teacherClass || '-',
+              'Subject': a.subject || '-',
+              'Medium': a.medium || '-'
+            });
+          });
+        }
+      } else { // Parent
+        const entries = getParentEntriesForExport(user);
+        if (entries.length === 0) {
+          excelRows.push({
+            ...base,
+            'Relation': user.relation || '-',
+            'Profession': user.profession || '-',
+            'Parent Contact': user.parentContact || user.contact || '-',
+            'Student Admission No': user.studentAdmissionNo || '-'
+          });
+        } else {
+          entries.forEach(ent => {
+            excelRows.push({
+              ...base,
+              'Relation': ent.relation || '-',
+              'Profession': ent.profession || '-',
+              'Parent Contact': ent.parentContact || '-',
+              'Student Admission No': ent.studentAdmissionNo || '-'
+            });
+          });
+        }
       }
     });
 
-    const worksheet = XLSX.utils.json_to_sheet(excelData);
+    const worksheet = XLSX.utils.json_to_sheet(excelRows);
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, `${activeTab}s`);
 
-    // Set column widths
-    const maxWidth = excelData.reduce((w: any, r: any) => {
+    // set col widths based on longest cell
+    const maxWidth = excelRows.reduce((w: any, r: any) => {
       return Object.keys(r).map((k, i) =>
         Math.max(w[i] || 10, String(r[k]).length)
       );
@@ -888,6 +951,13 @@ const UserManagement: React.FC = () => {
           onClick={() => handleEdit(params.id as number)}
           showInMenu
         />,
+        // new Activate button just after Edit
+        <GridActionsCellItem
+          icon={<ActivateIcon color="success" />}
+          label="Activate"
+          onClick={() => handleActivate(params.id as number)}
+          showInMenu
+        />,
         <GridActionsCellItem
           icon={<DeleteIcon color="error" />}
           label="Deactivate"
@@ -927,10 +997,50 @@ const UserManagement: React.FC = () => {
       case 'Parent':
         return [
           ...commonColumns,
-          { field: 'profession', headerName: 'Profession', width: isMobile ? 100 : 120, flex: isMobile ? 0 : 1 },
-          { field: 'parentContact', headerName: 'Parent No', width: isMobile ? 110 : 120, flex: isMobile ? 0 : 1 },
-          { field: 'studentAdmissionNo', headerName: 'Admission No', width: isMobile ? 120 : 150, flex: isMobile ? 0 : 1 },
-          { field: 'relation', headerName: 'Relation', width: isMobile ? 100 : 120, flex: isMobile ? 0 : 1 },
+          {
+            field: 'profession',
+            headerName: 'Profession',
+            width: isMobile ? 100 : 120,
+            flex: isMobile ? 0 : 1,
+            renderCell: (params) => {
+              const entries = normalizeParentEntries(params.row);
+              const vals = entries.map(e => e.profession).filter(Boolean);
+              return vals.length ? vals.join(', ') : (params.row.profession || '-');
+            }
+          },
+          {
+            field: 'parentContact',
+            headerName: 'Parent No',
+            width: isMobile ? 110 : 120,
+            flex: isMobile ? 0 : 1,
+            renderCell: (params) => {
+              const entries = normalizeParentEntries(params.row);
+              const vals = entries.map(e => e.parentContact).filter(Boolean);
+              return vals.length ? vals.join(', ') : (params.row.parentContact || '-');
+            }
+          },
+          {
+            field: 'studentAdmissionNo',
+            headerName: 'Admission No',
+            width: isMobile ? 120 : 150,
+            flex: isMobile ? 0 : 1,
+            renderCell: (params) => {
+              const entries = normalizeParentEntries(params.row);
+              const vals = entries.map(e => e.studentAdmissionNo).filter(Boolean);
+              return vals.length ? vals.join(', ') : (params.row.studentAdmissionNo || '-');
+            }
+          },
+          {
+            field: 'relation',
+            headerName: 'Relation',
+            width: isMobile ? 100 : 120,
+            flex: isMobile ? 0 : 1,
+            renderCell: (params) => {
+              const entries = normalizeParentEntries(params.row);
+              const vals = entries.map(e => e.relation).filter(Boolean);
+              return vals.length ? vals.join(', ') : (params.row.relation || '-');
+            }
+          },
           statusColumn,
           actionColumn
         ];
@@ -1156,24 +1266,34 @@ const UserManagement: React.FC = () => {
             </TextField>
           </>
         ) : (
-          <TextField
-            select
-            label="Status"
-            name="status"
-            value={form.status.toString()}
-            onChange={(e) => handleSelectChange(e, "status")}
-            sx={{
-              minWidth: 120,
-              gridColumn: { md: 'span 2' }
-            }}
-            size="small"
-          >
-            {statusOptions.map((option) => (
-              <MenuItem key={option.label} value={option.value.toString()}>
-                {option.label}
-              </MenuItem>
-            ))}
-          </TextField>
+          <>
+            <TextField
+              label="Password"
+              name="password"
+              type="password"
+              value={form.password || ''}
+              onChange={handleChange}
+              sx={{ minWidth: 120 }}
+              size="small"
+            />
+            <TextField
+              select
+              label="Status"
+              name="status"
+              value={form.status.toString()}
+              onChange={(e) => handleSelectChange(e, "status")}
+              sx={{
+                minWidth: 120
+              }}
+              size="small"
+            >
+              {statusOptions.map((option) => (
+                <MenuItem key={option.label} value={option.value.toString()}>
+                  {option.label}
+                </MenuItem>
+              ))}
+            </TextField>
+          </>
         )}
       </Box>
     );
@@ -1196,10 +1316,11 @@ const UserManagement: React.FC = () => {
                 onChange={(e) => handleSelectChange(e, "grade")}
                 sx={{ minWidth: 120 }}
                 size="small"
+                disabled={isLoadingGrades}
               >
-                {gradeOptions.map((grade: string) => (
-                  <MenuItem key={grade} value={grade}>
-                    {grade}
+                {grades.map((grade) => (
+                  <MenuItem key={grade.id} value={grade.grade}>
+                    {grade.grade}
                   </MenuItem>
                 ))}
               </TextField>
@@ -1234,10 +1355,11 @@ const UserManagement: React.FC = () => {
                 onChange={(e) => handleSelectChange(e, "class")}
                 fullWidth
                 size="small"
+                disabled={isLoadingClasses}
               >
-                {classOptions.map((cls: string) => (
-                  <MenuItem key={cls} value={cls}>
-                    {cls}
+                {classes.map((cls) => (
+                  <MenuItem key={cls.id} value={cls.class}>
+                    {cls.class}
                   </MenuItem>
                 ))}
               </TextField>
@@ -1271,9 +1393,12 @@ const UserManagement: React.FC = () => {
                 onChange={(e) => handleSelectChange(e, "grade")}
                 sx={{ minWidth: 120 }}
                 size="small"
+                disabled={isLoadingGrades}
               >
-                {gradeOptions.map(grade => (
-                  <MenuItem key={grade} value={grade}>{grade}</MenuItem>
+                {grades.map((grade) => (
+                  <MenuItem key={grade.id} value={grade.grade}>
+                    {grade.grade}
+                  </MenuItem>
                 ))}
               </TextField>
 
@@ -1285,9 +1410,12 @@ const UserManagement: React.FC = () => {
                 onChange={(e) => handleSelectChange(e, "class")}
                 sx={{ minWidth: 120 }}
                 size="small"
+                disabled={isLoadingClasses}
               >
-                {classOptions.map(cls => (
-                  <MenuItem key={cls} value={cls}>{cls}</MenuItem>
+                {classes.map((cls) => (
+                  <MenuItem key={cls.id} value={cls.class}>
+                    {cls.class}
+                  </MenuItem>
                 ))}
               </TextField>
 
@@ -1301,7 +1429,9 @@ const UserManagement: React.FC = () => {
                 size="small"
                 disabled={isLoadingSubjects}
               >
-                {subjects.map((subject: Subject) => (
+                {(subjects || []).slice().sort((a, b) =>
+                  (a.mainSubject || '').localeCompare(b.mainSubject || '')
+                ).map((subject: Subject) => (
                   <MenuItem key={subject.id} value={subject.mainSubject}>
                     {subject.mainSubject}
                   </MenuItem>
@@ -1390,13 +1520,20 @@ const UserManagement: React.FC = () => {
                 size="small"
               />
               <TextField
+                select
                 label="Relation"
                 name="relation"
                 value={form.relation || ''}
-                onChange={handleChange}
+                onChange={(e) => handleSelectChange(e, "relation")}
                 sx={{ minWidth: 120 }}
                 size="small"
-              />
+              >
+                {relationOptions.map((relation: string) => (
+                  <MenuItem key={relation} value={relation}>
+                    {relation}
+                  </MenuItem>
+                ))}
+              </TextField>
               <TextField
                 label="Parent Contact"
                 name="parentContact"
@@ -1709,6 +1846,124 @@ const processImage = async (file: File): Promise<string | null> => {
     reader.onerror = reject;
     reader.readAsDataURL(file);
   });
+};
+
+// Normalize various backend shapes into an array of ParentEntry
+const normalizeParentEntries = (rawUser: any): ParentEntry[] => {
+  const rawParentArray =
+    rawUser?.parentEntries ??
+    rawUser?.parentData ??
+    rawUser?.parent ??
+    rawUser?.parent_data ??
+    rawUser?.parent_info ??
+    [];
+
+  const arr = Array.isArray(rawParentArray) ? rawParentArray : (rawParentArray ? [rawParentArray] : []);
+
+  const normalized: ParentEntry[] = arr.flatMap((item: any) => {
+    // shape: { parent_info: {...}, students_info: [...] }
+    if (item?.parent_info && Array.isArray(item?.students_info)) {
+      return item.students_info.map((student: any) => ({
+        id: Math.random().toString(36).substr(2, 9),
+        relation: item.parent_info.relation || '',
+        profession: item.parent_info.profession || '',
+        parentContact: item.parent_info.parent_contact || item.parent_info.parentContact || '',
+        studentAdmissionNo: student.studentAdmissionNo || student.student_admission_no || ''
+      }));
+    }
+
+    // shape: { relation, profession, parentContact, studentAdmissionNo }
+    if (item?.relation || item?.profession || item?.parentContact || item?.studentAdmissionNo) {
+      return {
+        id: item.id ? String(item.id) : Math.random().toString(36).substr(2, 9),
+        relation: item.relation || item.parent_info?.relation || '',
+        profession: item.profession || item.parent_info?.profession || '',
+        parentContact: item.parentContact || item.parent_contact || item.parent_info?.parent_contact || '',
+        studentAdmissionNo: item.studentAdmissionNo || item.student_admission_no || ''
+      };
+    }
+
+    // fallback single-level mapping (sometimes backend returns { parent_info: {...} })
+    if (item?.parent_info) {
+      const pi = item.parent_info;
+      return {
+        id: Math.random().toString(36).substr(2, 9),
+        relation: pi.relation || '',
+        profession: pi.profession || '',
+        parentContact: pi.parent_contact || pi.parentContact || '',
+        studentAdmissionNo: (item.students_info && item.students_info[0]?.studentAdmissionNo) || ''
+      };
+    }
+
+    return {
+      id: Math.random().toString(36).substr(2, 9),
+      relation: '',
+      profession: '',
+      parentContact: '',
+      studentAdmissionNo: ''
+    };
+  });
+
+  return normalized;
+};
+
+// Helper: ensure we get parent entries as an array for export (tries normalizeParentEntries first,
+// falls back to splitting comma-joined fields if needed).
+const getParentEntriesForExport = (user: any): ParentEntry[] => {
+  const normalized = normalizeParentEntries(user);
+  if (normalized && normalized.length > 0) return normalized;
+
+  // fallback: attempt to split comma-joined grid strings
+  const relations = (user.relation || '').toString().split(',').map((s: string) => s.trim()).filter(Boolean);
+  const professions = (user.profession || '').toString().split(',').map((s: string) => s.trim()).filter(Boolean);
+  const parentContacts = (user.parentContact || user.contact || '').toString().split(',').map((s: string) => s.trim()).filter(Boolean);
+  const admissionNos = (user.studentAdmissionNo || '').toString().split(',').map((s: string) => s.trim()).filter(Boolean);
+
+  const max = Math.max(relations.length, professions.length, parentContacts.length, admissionNos.length, 1);
+  const entries: ParentEntry[] = [];
+  for (let i = 0; i < max; i++) {
+    entries.push({
+      id: `${user.id || 'u'}-${i}`,
+      relation: relations[i] || '',
+      profession: professions[i] || '',
+      parentContact: parentContacts[i] || '',
+      studentAdmissionNo: admissionNos[i] || ''
+    });
+  }
+  return entries;
+};
+
+// Helper: ensure we get a list of teacher assignments (teacherData preferred, otherwise split joined strings)
+const getTeacherAssignmentsForExport = (user: any) => {
+  // if UI/fetch already returned teacherData (normalized array), use it
+  if (Array.isArray(user.teacherData) && user.teacherData.length > 0) {
+    return user.teacherData.map((t: any, i: number) => ({
+      id: `${user.id || 'u'}-t-${i}`,
+      teacherGrade: t.teacherGrade || t.grade || '',
+      teacherClass: Array.isArray(t.teacherClass) ? t.teacherClass.join(', ') : (t.teacherClass || t.class || ''),
+      subject: Array.isArray(t.subject) ? t.subject.join(', ') : (t.subject || ''),
+      medium: Array.isArray(t.medium) ? t.medium.join(', ') : (t.medium || '')
+    }));
+  }
+
+  // fallback: split comma-joined grid fields (grade/class/subject/medium)
+  const grades = (user.grade || user.class || '').toString().split(',').map((s: string) => s.trim()).filter(Boolean);
+  const classes = (user.class || '').toString().split(',').map((s: string) => s.trim()).filter(Boolean);
+  const subjects = (user.subject || '').toString().split(',').map((s: string) => s.trim()).filter(Boolean);
+  const mediums = (user.medium || '').toString().split(',').map((s: string) => s.trim()).filter(Boolean);
+
+  const max = Math.max(grades.length, classes.length, subjects.length, mediums.length, 1);
+  const assignments = [];
+  for (let i = 0; i < max; i++) {
+    assignments.push({
+      id: `${user.id || 'u'}-t-${i}`,
+      teacherGrade: grades[i] || '',
+      teacherClass: classes[i] || '',
+      subject: subjects[i] || '',
+      medium: mediums[i] || ''
+    });
+  }
+  return assignments;
 };
 
 

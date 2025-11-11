@@ -468,7 +468,7 @@ const UserAccessManagementSystem = () => {
                                                 "reports",
                                                 "Reports",
                                                 ["managementStaffReport", "classTeacherReport", "parentReport", "parentPrincipalReport", "parentTeacherReport"],
-                                                ["Management Staff Report", "Class Teacher Report", "Parent Report", "Parent Principal Report", "Parent Teacher Report"],
+                                                ["Management Staff Report", "Class Teacher Report", "Parent Report", "Student Report For Principal", "Student Report For Teacher"],
                                             )}
 
                                             {renderCheckbox("systemManagement", "System Management", true)}

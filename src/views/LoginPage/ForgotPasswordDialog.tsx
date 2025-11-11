@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   Button,
   Dialog,
@@ -28,6 +28,10 @@ const ForgotPasswordDialog = ({ open, handleClose }: ForgotPasswordDialogProps) 
   const [isPending, setIsPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // countdown state and ref
+  const [remainingSeconds, setRemainingSeconds] = useState(0);
+  const timerRef = useRef<number | null>(null);
+
   const resetState = () => {
     setEmail("");
     setOtp("");
@@ -36,6 +40,11 @@ const ForgotPasswordDialog = ({ open, handleClose }: ForgotPasswordDialogProps) 
     setStep("email");
     setError(null);
     setIsPending(false);
+    setRemainingSeconds(0);
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
   };
 
   const handleCloseInternal = () => {
@@ -43,24 +52,85 @@ const ForgotPasswordDialog = ({ open, handleClose }: ForgotPasswordDialogProps) 
     handleClose();
   };
 
-  const handleSendOtp = async () => {
-    setError(null);
-    if (!email) {
-      setError("Email is required");
+  const startCountdown = (seconds: number) => {
+    // clear any existing timer
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
+    setRemainingSeconds(seconds);
+
+    timerRef.current = window.setInterval(() => {
+      setRemainingSeconds(prev => {
+        if (prev <= 1) {
+          // timer expired
+          if (timerRef.current) {
+            clearInterval(timerRef.current);
+            timerRef.current = null;
+          }
+          setError("OTP expired. Please request a new OTP.");
+          setStep("email");
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+  };
+
+  // ensure timer is cleared when step changes or component unmounts
+  useEffect(() => {
+    if (step !== "verify") {
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+        timerRef.current = null;
+      }
       return;
     }
-
-    setIsPending(true);
-    try {
-      await sendForgotPasswordOtp({ email });
-      enqueueSnackbar("OTP sent to your email", { variant: "info" });
-      setStep("verify");
-    } catch (err: any) {
-      setError(err?.message || "Failed to send OTP");
-    } finally {
-      setIsPending(false);
+    // if entering verify step and there's no active timer, start 3 minutes
+    if (!timerRef.current && remainingSeconds === 0) {
+      startCountdown(180); 
     }
+    return () => {
+      // cleanup on unmount or step change
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+        timerRef.current = null;
+      }
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [step]);
+
+  // helper to format mm:ss
+  const formatTime = (secs: number) => {
+    const m = Math.floor(secs / 60)
+      .toString()
+      .padStart(2, "0");
+    const s = Math.floor(secs % 60)
+      .toString()
+      .padStart(2, "0");
+    return `${m}:${s}`;
   };
+
+const handleSendOtp = async () => {
+  setError(null);
+  if (!email) {
+    setError("Email is required");
+    return;
+  }
+
+  setIsPending(true);
+  try {
+    await sendForgotPasswordOtp({ email });
+    enqueueSnackbar("OTP sent to your email", { variant: "info" });
+    setStep("verify");
+    // reset and start countdown whenever OTP is (re)sent (3 minutes = 180 seconds)
+    startCountdown(180);
+  } catch (err: any) {
+    setError(err?.message || "Failed to send OTP");
+  } finally {
+    setIsPending(false);
+  }
+};
 
   const handleVerifyOtp = async () => {
     setError(null);
@@ -74,6 +144,12 @@ const ForgotPasswordDialog = ({ open, handleClose }: ForgotPasswordDialogProps) 
       await verifyForgotPasswordOtp({ email, otp });
       enqueueSnackbar("OTP verified. Please set your new password.", { variant: "success" });
       setStep("reset");
+      // clear timer after successful verification
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+        timerRef.current = null;
+      }
+      setRemainingSeconds(0);
     } catch (err: any) {
       setError(err?.message || "OTP verification failed");
     } finally {
@@ -145,10 +221,13 @@ const ForgotPasswordDialog = ({ open, handleClose }: ForgotPasswordDialogProps) 
               variant="outlined"
               value={otp}
               onChange={(e) => setOtp(e.target.value)}
-              sx={{ mb: 2 }}
+              sx={{ mb: 1 }}
             />
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+              Time remaining: {formatTime(remainingSeconds)}
+            </Typography>
             <Typography variant="body2" color="text.secondary">
-              Didn't receive OTP? You can resend by clicking "Send OTP" again.
+              
             </Typography>
           </>
         )}

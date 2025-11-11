@@ -20,10 +20,10 @@ import Footer from "../../components/Footer";
 
 const classes = ["Araliya", "Olu", "Nelum", "Rosa", "Manel", "Sooriya", "Kumudu"];
 const exams = [
-    { label: 'First Term', value: 'First' },
-    { label: 'Second Term', value: 'Mid' },
-    { label: 'Third Term', value: 'End' },
-    { label: 'Monthly Test', value: 'Monthly' }
+    { label: 'First Term', value: 'First Term' },
+    { label: 'Second Term', value: 'Second Term' },
+    { label: 'Third Term', value: 'Third Term' },
+    { label: 'Monthly Test', value: 'Monthly Test' }
 ];
 const months = [
   { label: "January", value: "01" },
@@ -494,14 +494,27 @@ const ClassTeacherReport: React.FC = () => {
                         </Stack>
 
                         <Paper elevation={2} sx={{ p: { xs: 1, sm: 2 }, overflow: "auto" }}>
-                            <Typography 
-                                variant={isMobile ? "body1" : "h6"} 
-                                fontWeight={600} 
+                            <Stack 
+                                direction={{ xs: "column", sm: "row" }}
+                                justifyContent="space-between"
+                                alignItems={{ xs: "flex-start", sm: "center" }}
                                 mb={2}
                                 px={isMobile ? 1 : 0}
+                                spacing={1}
                             >
-                                Detailed Marks Breakdown
-                            </Typography>
+                                <Typography 
+                                    variant={isMobile ? "body1" : "h6"} 
+                                    fontWeight={600}
+                                >
+                                    Detailed Marks Breakdown
+                                </Typography>
+                                <Typography 
+                                    variant={isMobile ? "body2" : "subtitle1"} 
+                                    color="text.secondary"
+                                >
+                                    Total Students: {(data?.student_marks || []).length}
+                                </Typography>
+                            </Stack>
                             <TableContainer sx={{ maxHeight: { xs: 400, sm: 600 } }}>
                                 <Table size={isMobile ? "small" : "medium"} stickyHeader>
                                     <TableHead>

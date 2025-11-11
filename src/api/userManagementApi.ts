@@ -1,6 +1,13 @@
 import axios from "axios";
 import type { Subject, User, UserListResponse, UserResponse } from "../types/userManagementTypes";
 
+// Add this utility function
+const safeString = (value: any): string | null => {
+  if (value === undefined || value === null) return null;
+  if (typeof value === 'string') return value.trim();
+  return String(value);
+};
+
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
 
 type UserType = "Student" | "Teacher" | "Parent";
@@ -113,6 +120,18 @@ const deleteEndpointForUserType = (userType: UserType, id: number) => {
     case "Teacher":
     default:
       return `/api/user-teacher/${id}/delete`;
+  }
+};
+
+const activateEndpointForUserType = (userType: UserType, id: number) => {
+  switch (userType) {
+    case "Student":
+      return `/api/user-student/${id}/activate`;
+    case "Parent":
+      return `/api/user-parent/${id}/activate`;
+    case "Teacher":
+    default:
+      return `/api/user-teacher/${id}/activate`;
   }
 };
 
@@ -235,7 +254,6 @@ const getTypeSpecificFields = (user: any, userType: UserType) => {
         profession: p?.profession ?? '',
         parentContact: p?.parentContact ?? '',
         relation: p?.relation ?? '',
-        // keep userId/userType normalized to strings where present
         userId: p?.userId !== undefined ? String(p.userId) : (user?.id !== undefined ? String(user.id) : undefined),
         userType: p?.userType ?? user?.userType ?? 'Parent',
         modifiedBy: p?.modifiedBy ?? undefined,
@@ -243,15 +261,23 @@ const getTypeSpecificFields = (user: any, userType: UserType) => {
         updated_at: p?.updated_at ?? undefined
       }));
 
+      // compute joined strings for grid display so all entries show (comma separated)
+      const relations = normalizedParents.map(p => p.relation).filter(Boolean);
+      const professions = normalizedParents.map(p => p.profession).filter(Boolean);
+      const parentContacts = normalizedParents.map(p => p.parentContact).filter(Boolean);
+      const admissionNos = normalizedParents.map(p => p.studentAdmissionNo).filter(Boolean);
+
+      const joinUnique = (arr: string[]) => Array.from(new Set(arr)).join(', ');
+
       const firstParent = normalizedParents[0] ?? null;
 
       return {
-        // root-level fields for grid display (existing behavior)
-        profession: firstParent?.profession ?? user.profession ?? '',
-        parentContact: firstParent?.parentContact ?? user.parentContact ?? '',
-        studentAdmissionNo: firstParent?.studentAdmissionNo ?? user.studentAdmissionNo ?? '',
-        relation: firstParent?.relation ?? user.relation ?? '',
-        // keep a single-object parentData (matches User.parentData type)
+        // joined strings for the grid display
+        profession: joinUnique(professions) || (firstParent?.profession ?? user.profession ?? ''),
+        parentContact: joinUnique(parentContacts) || (firstParent?.parentContact ?? user.parentContact ?? ''),
+        studentAdmissionNo: joinUnique(admissionNos) || (firstParent?.studentAdmissionNo ?? user.studentAdmissionNo ?? ''),
+        relation: joinUnique(relations) || (firstParent?.relation ?? user.relation ?? ''),
+        // keep a single-object parentData (matches User.parentData type if backend expects single)
         parentData: firstParent
           ? {
               profession: firstParent.profession,
@@ -521,6 +547,16 @@ export const deleteUser = async (id: number, userType: UserType): Promise<void> 
   }
 };
 
+export const activateUser = async (id: number, userType: UserType): Promise<void> => {
+  const url = `${API_BASE_URL}${activateEndpointForUserType(userType, id)}`;
+  try {
+    await axios.post(url, {}, getAuthHeader());
+  } catch (error) {
+    console.error(`Error activating user (${userType}, id=${id}):`, error);
+    throw error;
+  }
+};
+
 export const searchUsers = async (searchTerm: string, userType: UserType): Promise<User[]> => {
   let endpoint = '';
   
@@ -595,14 +631,52 @@ export const bulkDeactivateUsers = async (ids: number[], userType: UserType): Pr
   const promises = ids.map(id => deactivateUser(id, userType));
   await Promise.all(promises);
 };
-function safeString(value: string | string[] | undefined | null): string | null {
-  if (!value) {
-    return null;
-  }
-  if (Array.isArray(value)) {
-    return value.join(', ').trim() || null;
-  }
-  const trimmed = String(value).trim();
-  return trimmed || null;
+
+// Add these new types
+export interface Grade {
+  id: number;
+  gradeId: string;
+  grade: string;
+  description: string | null;
+  schoolId: string | null;
+  created_at: string;
+  updated_at: string;
 }
+
+export interface Class {
+  id: number;
+  classId: string | null;
+  class: string;
+  description: string;
+  gradeId: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+// Add these new functions
+export const fetchGrades = async (): Promise<Grade[]> => {
+  try {
+    const response = await axios.get<Grade[]>(
+      `${API_BASE_URL}/api/grades`,
+      getAuthHeader()
+    );
+    return response.data;
+  } catch (error) {
+    console.error('Error fetching grades:', error);
+    throw error;
+  }
+};
+
+export const fetchClasses = async (): Promise<Class[]> => {
+  try {
+    const response = await axios.get<Class[]>(
+      `${API_BASE_URL}/api/grade-classes`,
+      getAuthHeader()
+    );
+    return response.data;
+  } catch (error) {
+    console.error('Error fetching classes:', error);
+    throw error;
+  }
+};
 

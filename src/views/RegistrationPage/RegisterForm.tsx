@@ -161,6 +161,7 @@ const RegisterForm = ({ onSuccess = () => { }, onError = () => { } }: RegisterFo
     formState: { errors },
     setValue,
     trigger,
+    setError, 
   } = useForm<RegisterFormValues>({
     defaultValues: {
       teacherGrades: [],
@@ -222,7 +223,7 @@ const RegisterForm = ({ onSuccess = () => { }, onError = () => { } }: RegisterFo
       showSuccess("Registration successful! Please contact the Admin to get access to Login.");
       setTimeout(() => {
         navigate("/login");
-      }, 5000);
+      }, 1000);
     },
     onError: (error: any) => {
       const errorMsg = extractErrorMessage(error);
@@ -236,7 +237,7 @@ const RegisterForm = ({ onSuccess = () => { }, onError = () => { } }: RegisterFo
       showSuccess("Registration successful! Please contact the Admin to get access to Login.");
       setTimeout(() => {
         navigate("/login");
-      }, 3000);
+      }, 1000);
     },
     onError: (error: any) => {
       const errorMsg = extractErrorMessage(error);
@@ -250,7 +251,7 @@ const RegisterForm = ({ onSuccess = () => { }, onError = () => { } }: RegisterFo
       showSuccess("Registration successful! Please contact the Admin to get access to Login.");
       setTimeout(() => {
         navigate("/login");
-      }, 3000);
+      }, 1000);
     },
     onError: (error: any) => {
       const errorMsg = extractErrorMessage(error);
@@ -334,12 +335,13 @@ const RegisterForm = ({ onSuccess = () => { }, onError = () => { } }: RegisterFo
           }
         });
 
+        // Clear local registration state without showing success snackbar
         setRegisteredUser(null);
         setActiveStep((prevActiveStep) => prevActiveStep - 1);
-        
+
         setTeacherAssignments([]);
         setParentEntries([]);
-        
+
         setValue("teacherGrades", []);
         setValue("subjects", []);
         setValue("teacherClass", []);
@@ -351,14 +353,13 @@ const RegisterForm = ({ onSuccess = () => { }, onError = () => { } }: RegisterFo
         setValue("profession", "");
         setValue("relation", "");
         setValue("parentContact", "");
-
-        showSuccess("User data cleared successfully");
       } catch (error: any) {
         console.error('Delete error:', error);
         const errorMessage = error?.response?.data?.message || "Failed to clear user data";
         showError(errorMessage);
-        
-        setActiveStep((prevActiveStep) => prevActiveStep - 1);
+
+        // still attempt to move back and clear local state to keep UI consistent
+        setActiveStep((prevActiveStep) => Math.max(0, prevActiveStep - 1));
         setRegisteredUser(null);
       }
     } else {
@@ -479,13 +480,31 @@ const RegisterForm = ({ onSuccess = () => { }, onError = () => { } }: RegisterFo
   };
 
   const handleAddParent = () => {
-    const studentAdmissionNo = watch("studentAdmissionNo") || "";
-    const profession = watch("profession") || "";
-    const relation = watch("relation") || "";
-    const parentContact = watch("parentContact") || "";
+    const studentAdmissionNo = (watch("studentAdmissionNo") || "").toString().trim();
+    const profession = (watch("profession") || "").toString().trim();
+    const relation = (watch("relation") || "").toString().trim();
+    const parentContact = (watch("parentContact") || "").toString().trim();
 
-    if (!studentAdmissionNo && !profession && !relation && !parentContact) {
-      alert("Please fill at least one parent field before adding");
+    // clear previous manual errors
+    // (react-hook-form doesn't provide clearError, so reset by setting empty value or triggering validation)
+    // We'll clear by triggering validation for these fields
+    trigger(["studentAdmissionNo", "profession", "relation", "parentContact"]);
+
+    const missingFields: { name: keyof RegisterFormValues; label: string }[] = [];
+    if (!studentAdmissionNo) missingFields.push({ name: "studentAdmissionNo", label: "Student Admission Number" });
+    if (!profession) missingFields.push({ name: "profession", label: "Profession" });
+    if (!relation) missingFields.push({ name: "relation", label: "Relation" });
+    if (!parentContact) missingFields.push({ name: "parentContact", label: "Contact Number" });
+
+    if (missingFields.length > 0) {
+      // set field-level errors so helperText / error states show
+      missingFields.forEach(f => {
+        setError(f.name as any, { type: "manual", message: `${f.label} is required` });
+      });
+
+      // optional: focus first missing field (not required)
+      // alert to inform user (keeps behavior similar to before)
+      alert("Please fill all parent fields: Admission No, Profession, Relation and Contact before adding.");
       return;
     }
 
@@ -519,8 +538,8 @@ const RegisterForm = ({ onSuccess = () => { }, onError = () => { } }: RegisterFo
   const isPending = isRegisteringBasic || isRegisteringStudent || isRegisteringTeacher || isRegisteringParent;
 
   return (
-    <Box sx={{ 
-      width: "100%", 
+    <Box sx={{
+      width: "100%",
       maxWidth: { xs: "100%", sm: 500 },
       overflowY: "auto",
       px: { xs: 2, sm: 0 }
@@ -557,9 +576,9 @@ const RegisterForm = ({ onSuccess = () => { }, onError = () => { } }: RegisterFo
         </Alert>
       </Snackbar>
 
-      <Stepper 
-        activeStep={activeStep} 
-        sx={{ 
+      <Stepper
+        activeStep={activeStep}
+        sx={{
           mb: 3,
           flexDirection: { xs: 'column', sm: 'row' },
           '& .MuiStepLabel-label': {
@@ -979,12 +998,17 @@ const RegisterForm = ({ onSuccess = () => { }, onError = () => { } }: RegisterFo
                   >
                     {isLoadingSubjects ? (
                       <MenuItem disabled>Loading subjects...</MenuItem>
-                    ) : uniqueMainSubjects.map((subject) => (
-                      <MenuItem key={subject} value={subject}>
-                        {subject}
-                      </MenuItem>
-                    ))}
+                    ) : (
+                      [...uniqueMainSubjects]
+                        .sort((a, b) => a.localeCompare(b))
+                        .map((subject) => (
+                          <MenuItem key={subject} value={subject}>
+                            {subject}
+                          </MenuItem>
+                        ))
+                    )}
                   </TextField>
+
                 </Stack>
 
                 <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
@@ -1249,6 +1273,7 @@ const RegisterForm = ({ onSuccess = () => { }, onError = () => { } }: RegisterFo
                     sx={{ "& .MuiOutlinedInput-root": { borderRadius: "10px", height: "40px" } }}
                   />
                   <TextField
+                    select
                     label="Relation"
                     fullWidth
                     variant="outlined"
@@ -1256,7 +1281,11 @@ const RegisterForm = ({ onSuccess = () => { }, onError = () => { } }: RegisterFo
                     error={!!errors.relation}
                     helperText={errors.relation?.message}
                     sx={{ "& .MuiOutlinedInput-root": { borderRadius: "10px", height: "40px" } }}
-                  />
+                  >
+                    <MenuItem value="Mother">Mother</MenuItem>
+                    <MenuItem value="Father">Father</MenuItem>
+                    <MenuItem value="Guardian">Guardian</MenuItem>
+                  </TextField>
                 </Stack>
 
                 <Button
@@ -1274,10 +1303,10 @@ const RegisterForm = ({ onSuccess = () => { }, onError = () => { } }: RegisterFo
 
                 {parentEntries.length > 0 && (
                   <Box sx={{ mt: 2, width: '100%' }}>
-                    <TableContainer 
-                      component={Paper} 
-                      sx={{ 
-                        maxHeight: 220, 
+                    <TableContainer
+                      component={Paper}
+                      sx={{
+                        maxHeight: 220,
                         overflowY: 'auto',
                         overflowX: { xs: 'auto', sm: 'hidden' }
                       }}
@@ -1320,17 +1349,17 @@ const RegisterForm = ({ onSuccess = () => { }, onError = () => { } }: RegisterFo
           </Stack>
         )}
 
-        <Box sx={{ 
-          display: 'flex', 
-          flexDirection: { xs: 'column', sm: 'row' }, 
+        <Box sx={{
+          display: 'flex',
+          flexDirection: { xs: 'column', sm: 'row' },
           gap: { xs: 1, sm: 0 },
-          pt: 2 
+          pt: 2
         }}>
           <Button
             color="inherit"
             disabled={activeStep === 0}
             onClick={handleBack}
-            sx={{ 
+            sx={{
               mr: { sm: 1 },
               order: { xs: 2, sm: 1 }
             }}
@@ -1351,9 +1380,9 @@ const RegisterForm = ({ onSuccess = () => { }, onError = () => { } }: RegisterFo
               {isPending ? <CircularProgress size={24} /> : 'Sign Up'}
             </Button>
           ) : (
-            <Button 
-              onClick={handleNext} 
-              variant="contained" 
+            <Button
+              onClick={handleNext}
+              variant="contained"
               disabled={isPending}
               fullWidth={true}
               sx={{ order: { xs: 1, sm: 2 }, width: { sm: 'auto' } }}
