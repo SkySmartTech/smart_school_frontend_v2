@@ -71,9 +71,9 @@ import axios from "axios";
 const MONTHLY_EXAM_VALUE = 'Monthly';
 
 const examOptions = [
-    { label: 'First Term', value: 'First' },
-    { label: 'Second Term', value: 'Mid' },
-    { label: 'Third Term', value: 'End' },
+    { label: 'First Term', value: 'First Term' },
+    { label: 'Second Term', value: 'Second Term' },
+    { label: 'Third Term', value: 'Third Term' },
     { label: 'Monthly Test', value: MONTHLY_EXAM_VALUE }
 ];
 
@@ -91,7 +91,7 @@ const ParentReport: React.FC = () => {
     const [endDate, setEndDate] = useState<Dayjs | null>(null);
 
     // New states for Year / Grade / Class / Students
-    const [yearOptions] = useState<string[]>(['2023', '2024', '2025', '2026']);
+    const [yearOptions] = useState<string[]>(['2023', '2024', '2025', '2026', '2027', '2028', '2029', '2030']);
     const [gradeOptions, setGradeOptions] = useState<string[]>([]);
     const [classOptions, setClassOptions] = useState<string[]>([]);
     const [studentOptions, setStudentOptions] = useState<Student[]>([]);
@@ -128,37 +128,44 @@ const ParentReport: React.FC = () => {
     };
 
     // Initial data loading effect
-    useEffect(() => {
-        let mounted = true;
-        const loadInitialData = async () => {
-            try {
-                // Fetch grades from /api/grades endpoint
-                const gradesResponse = await axios.get(
-                    `${API_BASE_URL}/api/grades`,
-                    getAuthHeader()
-                );
-                
-                if (!mounted) return;
+   useEffect(() => {
+    let mounted = true;
+    const loadInitialData = async () => {
+        try {
+            const gradesResponse = await axios.get(
+                `${API_BASE_URL}/api/grades`,
+                getAuthHeader()
+            );
+            
+            if (!mounted) return;
 
-                if (Array.isArray(gradesResponse.data)) {
-                    const grades = gradesResponse.data.map((item: any) => item.grade);
-                    setGradeOptions(grades.sort());
-                }
+            if (Array.isArray(gradesResponse.data)) {
+                const grades = gradesResponse.data.map((item: any) => item.grade);
 
-            } catch (err: any) {
-                if (mounted) {
-                    setSnackbar({
-                        open: true,
-                        message: `Failed to load grades: ${err.message}`,
-                        severity: "error"
-                    });
-                }
+                // ✅ Sort by the number inside the "Grade X" string
+                const sortedGrades = [...grades].sort((a, b) => {
+                    const numA = parseInt(a.replace(/[^\d]/g, ""), 10);
+                    const numB = parseInt(b.replace(/[^\d]/g, ""), 10);
+                    return numA - numB;
+                });
+
+                setGradeOptions(sortedGrades);
             }
-        };
 
-        loadInitialData();
-        return () => { mounted = false; };
-    }, []);
+        } catch (err: any) {
+            if (mounted) {
+                setSnackbar({
+                    open: true,
+                    message: `Failed to load grades: ${err.message}`,
+                    severity: "error"
+                });
+            }
+        }
+    };
+
+    loadInitialData();
+    return () => { mounted = false; };
+}, []);
 
     // Effect to load classes when grade is selected
     useEffect(() => {

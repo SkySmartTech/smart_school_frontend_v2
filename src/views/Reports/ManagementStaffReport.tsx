@@ -49,11 +49,11 @@ import {
   type SubjectMark,
 } from "../../api/managementStaffApi";
 
-const years = ["2023", "2024", "2025", "2026", "2027", "2028"];
+const years = ["2023", "2024", "2025", "2026", "2027", "2028", "2029", "2030"];
 const exams = [
-  { label: 'First Term', value: 'First' },
-  { label: 'Second Term', value: 'Mid' },
-  { label: 'Third Term', value: 'End' },
+  { label: 'First Term', value: 'First Term' },
+  { label: 'Second Term', value: 'Second Term' },
+  { label: 'Third Term', value: 'Third Term' },
   { label: 'Monthly Test', value: 'Monthly' }
 ];
 const months = [
