@@ -61,6 +61,27 @@ export async function fetchGradesFromApi(): Promise<DropdownOption[]> {
   }
 }
 
+export async function fetchClassesFromApi(): Promise<DropdownOption[]> {
+  try {
+    const res = await axios.get(`${API_BASE_URL}/api/grade-classes`, getAuthHeader());
+    
+    return Array.isArray(res.data)
+      ? res.data.map((item: any) => {
+          // Extract the class value from the class property
+          const classValue = item.class || item.id || item.value || item.name || "";
+          
+          return {
+            label: classValue.toString(),
+            value: classValue.toString(), // Ensure value is a string
+          };
+        })
+      : [];
+  } catch (error) {
+    handleApiError(error, "fetchClassesFromApi");
+    return [];
+  }
+}
+
 const getAuthHeader = () => {
   const token = localStorage.getItem('authToken') || localStorage.getItem('token') || localStorage.getItem('access_token');
 

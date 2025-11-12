@@ -159,28 +159,30 @@ export async function fetchStudentMarks(filters: FetchMarksFilters): Promise<Stu
 export async function submitStudentMarks(marksToSubmit: Partial<StudentMark>[]): Promise<void> {
   try {
     const formattedMarks = marksToSubmit.map(mark => {
-      // Normalize month to either trimmed string or null
-      const monthValue = mark.month ? String(mark.month).trim() : null;
+      // Normalize month to either trimmed string or '0' when not provided
+      const monthValue = (mark.month !== undefined && mark.month !== null && String(mark.month).toString().trim() !== '')
+        ? String(mark.month).trim()
+        : '0';
 
       return {
-        studentAdmissionNo: mark.student_admission?.trim(),
-        studentName: mark.student_name?.trim() || '',
-        studentGrade: mark.student_grade?.trim() || '',
-        studentClass: mark.student_class?.trim() || '',
-        term: mark.term?.trim() || '',
-        month: monthValue, // null when not provided
-        subject: mark.subject?.trim() || '',
+        studentAdmissionNo: mark.student_admission ? String(mark.student_admission).trim() : undefined,
+        studentName: String(mark.student_name ?? '').trim(),
+        studentGrade: String(mark.student_grade ?? '').trim(),
+        studentClass: String(mark.student_class ?? '').trim(),
+        term: String(mark.term ?? '').trim(),
+        month: monthValue, // '0' when not provided
+        subject: String(mark.subject ?? '').trim(),
         medium: "English",
-        marks: parseInt(mark.marks || "0"),
-        marksGrade: mark.student_grade_value?.trim() || 'N/A',
-        year: mark.year?.trim() || '',
+        marks: Number(mark.marks ?? 0),
+        marksGrade: String(mark.student_grade_value ?? 'N/A').trim(),
+        year: mark.year !== undefined && mark.year !== null ? String(mark.year).trim() : '',
         status: mark.status !== undefined ? mark.status : true // Default to present if not specified
       };
     });
 
     // Validation:
     // - studentName, marksGrade, year must be present
-    // - month is required only when term indicates a Monthly term
+    // - month is required only when term indicates a Monthly term (treat '0' as missing for Monthly)
     const isValid = formattedMarks.every(mark => {
       if (!mark.studentName) return false;
       if (!mark.marksGrade) return false;
@@ -188,7 +190,7 @@ export async function submitStudentMarks(marksToSubmit: Partial<StudentMark>[]):
 
       const term = (mark.term || '').toString().toLowerCase();
       const requiresMonth = term.includes('monthly'); // treat any term containing 'monthly' as requiring month
-      if (requiresMonth && (mark.month === null || mark.month === undefined || String(mark.month).trim() === '')) {
+      if (requiresMonth && (mark.month === null || mark.month === undefined || String(mark.month).trim() === '' || String(mark.month).trim() === '0')) {
         return false;
       }
 

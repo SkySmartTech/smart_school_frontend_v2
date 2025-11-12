@@ -15,10 +15,9 @@ import {
     Tooltip as ReTooltip, Legend, ResponsiveContainer, CartesianGrid
 } from "recharts";
 import { useQuery } from "@tanstack/react-query";
-import { fetchClassTeacherReport, fetchGradesFromApi, type DropdownOption } from "../../api/classteacherApi";
+import { fetchClassTeacherReport, fetchGradesFromApi, fetchClassesFromApi, type DropdownOption } from "../../api/classteacherApi";
 import Footer from "../../components/Footer";
 
-const classes = ["Araliya", "Olu", "Nelum", "Rosa", "Manel", "Sooriya", "Kumudu"];
 const exams = [
     { label: 'First Term', value: 'First Term' },
     { label: 'Second Term', value: 'Second Term' },
@@ -85,6 +84,7 @@ const ClassTeacherReport: React.FC = () => {
     const [className, setClassName] = useState("Olu");
     const [exam, setExam] = useState("First");
     const [grades, setGrades] = useState<DropdownOption[]>([]);
+    const [classes, setClasses] = useState<DropdownOption[]>([]);
 
     type SnackbarState = {
         open: boolean;
@@ -105,13 +105,20 @@ const ClassTeacherReport: React.FC = () => {
             return fetchClassTeacherReport(formattedStartDate, formattedEndDate, grade, className, exam, month);
         },
         retry: 1,
-        enabled: exam !== "Monthly" || (exam === "Monthly" && !!month),
+        enabled: exam !== "Monthly Test" || (exam === "Monthly Test" && !!month),
     });
 
     // Fetch grades from API
     const { data: gradesData, isLoading: isGradesLoading } = useQuery<DropdownOption[], Error>({
         queryKey: ["grades"],
         queryFn: fetchGradesFromApi,
+        retry: 1,
+    });
+
+    // Fetch classes from API
+    const { data: classesData, isLoading: isClassesLoading } = useQuery<DropdownOption[], Error>({
+        queryKey: ["classes"],
+        queryFn: fetchClassesFromApi,
         retry: 1,
     });
 
@@ -125,9 +132,19 @@ const ClassTeacherReport: React.FC = () => {
         }
     }, [gradesData, grade]);
 
+    useEffect(() => {
+        if (classesData) {
+            setClasses(classesData);
+            // Set default class if not already set
+            if (classesData.length > 0 && !className) {
+                setClassName(classesData[0].value);
+            }
+        }
+    }, [classesData, className]);
+
     // Refetch data when month changes for Monthly exams
     useEffect(() => {
-        if (exam === "Monthly" && month) {
+        if (exam === "Monthly Test" && month) {
             refetch();
         }
     }, [month, exam, refetch]);
@@ -152,7 +169,7 @@ const ClassTeacherReport: React.FC = () => {
     const handleExamChange = (newExam: string) => {
         setExam(newExam);
         // Reset month to default when switching away from Monthly exam
-        if (newExam !== "Monthly") {
+        if (newExam !== "Monthly Test") {
             setMonth("01");
         }
     };
@@ -290,6 +307,7 @@ const ClassTeacherReport: React.FC = () => {
                                     label="Class"
                                     value={className}
                                     onChange={(e) => setClassName(e.target.value)}
+                                    disabled={isClassesLoading}
                                     InputProps={{
                                         startAdornment: (
                                             <InputAdornment position="start">
@@ -305,11 +323,18 @@ const ClassTeacherReport: React.FC = () => {
                                     }}
                                     size={isMobile ? "small" : "medium"}
                                 >
-                                    {classes.map((c) => (
-                                        <MenuItem key={c} value={c}>
-                                            {c}
+                                    {isClassesLoading ? (
+                                        <MenuItem disabled>
+                                            <CircularProgress size={16} sx={{ mr: 1 }} />
+                                            Loading classes...
                                         </MenuItem>
-                                    ))}
+                                    ) : (
+                                        classes.map((c) => (
+                                            <MenuItem key={c.value} value={c.value}>
+                                                {c.label}
+                                            </MenuItem>
+                                        ))
+                                    )}
                                 </TextField>
 
                                 {/* Exam */}
@@ -341,7 +366,7 @@ const ClassTeacherReport: React.FC = () => {
                                 </TextField>
 
                                 {/* Month - visible only if Monthly Test is selected */}
-                                {exam === "Monthly" && (
+                                {exam === "Monthly Test" && (
                                     <TextField
                                         select
                                         label="Month"
