@@ -169,7 +169,7 @@ const RegisterForm = ({ onSuccess = () => { }, onError = () => { } }: RegisterFo
     formState: { errors },
     setValue,
     trigger,
-    setError, 
+    setError,
   } = useForm<RegisterFormValues>({
     defaultValues: {
       teacherGrades: [],
@@ -242,7 +242,7 @@ const RegisterForm = ({ onSuccess = () => { }, onError = () => { } }: RegisterFo
     // Prevent going back with browser/phone back button if on step 1
     const handlePopstate = async (event: PopStateEvent) => {
       event.preventDefault();
-      
+
       if (activeStep === 1 && registeredUser) {
         // Delete the registered user data
         await deleteUserData(registeredUser.userId, registeredUser.userType);
@@ -257,10 +257,10 @@ const RegisterForm = ({ onSuccess = () => { }, onError = () => { } }: RegisterFo
       if (activeStep === 1 && registeredUser) {
         event.preventDefault();
         event.returnValue = '';
-        
+
         // Delete the registered user data in the background
         deleteUserData(registeredUser.userId, registeredUser.userType);
-        
+
         return '';
       }
     };
@@ -269,7 +269,7 @@ const RegisterForm = ({ onSuccess = () => { }, onError = () => { } }: RegisterFo
     if (activeStep === 1 && registeredUser) {
       window.addEventListener('popstate', handlePopstate);
       window.addEventListener('beforeunload', handleBeforeUnload);
-      
+
       // Push a new state to enable popstate handling
       window.history.pushState(null, '', window.location.href);
 
@@ -546,7 +546,8 @@ const RegisterForm = ({ onSuccess = () => { }, onError = () => { } }: RegisterFo
         id: crypto.randomUUID()
       };
 
-      setTeacherAssignments(prev => [...prev, newAssignment]);
+      // Add new assignment to the top of the list (prepend)
+      setTeacherAssignments(prev => [newAssignment, ...prev]);
 
       setValue("teacherGrades", []);
       setValue("subjects", []);
@@ -595,7 +596,8 @@ const RegisterForm = ({ onSuccess = () => { }, onError = () => { } }: RegisterFo
       status: true
     };
 
-    setParentEntries(prev => [...prev, newEntry]);
+    // Add new entry to the top of the list (prepend)
+    setParentEntries(prev => [newEntry, ...prev]);
 
     setValue("studentAdmissionNo", "");
     setValue("profession", "");
@@ -1117,12 +1119,16 @@ const RegisterForm = ({ onSuccess = () => { }, onError = () => { } }: RegisterFo
                       }
                     }}
                   >
-                    {classes.map((classItem: any) => (
-                      <MenuItem key={classItem.id} value={classItem.class}>
-                        {classItem.class}
-                      </MenuItem>
-                    ))}
+                    {classes
+                      .slice()
+                      .sort((a: any, b: any) => a.class.localeCompare(b.class)) 
+                      .map((classItem: any) => (
+                        <MenuItem key={classItem.id} value={classItem.class}>
+                          {classItem.class}
+                        </MenuItem>
+                      ))}
                   </TextField>
+
                   <TextField
                     select
                     label="Grades"

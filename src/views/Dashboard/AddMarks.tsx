@@ -63,7 +63,7 @@ const examOptions = [
     { label: 'First Term', value: 'First Term' },
     { label: 'Second Term', value: 'Second Term' },
     { label: 'Third Term', value: 'Third Term' },
-    { label: 'Monthly Test', value: 'Monthly Test' },
+    { label: 'Monthly Test', value: 'Monthly' },
 ];
 
 const monthOptions = [
@@ -170,7 +170,7 @@ const TeacherDashboard: React.FC = () => {
             'First Term': 'First Term',
             'Second Term': 'Second Term',
             'Third Term': 'Third Term',
-            'Monthly Term': 'Monthly Term'
+            'Monthly Term': 'Monthly'
         };
         return examMap[exam] || exam;
     }, []);

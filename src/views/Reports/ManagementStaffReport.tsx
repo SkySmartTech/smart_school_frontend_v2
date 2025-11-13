@@ -547,13 +547,13 @@ const ManagementStaff: React.FC = () => {
                 <TableHead>
                   <TableRow>
                     <TableCell sx={{ fontWeight: "bold", fontSize: isMobile ? "0.75rem" : "0.875rem", minWidth: isMobile ? 60 : 80 }}>Class</TableCell>
-                    <TableCell align="right" sx={{ fontSize: isMobile ? "0.75rem" : "0.875rem", minWidth: isMobile ? 50 : 70 }}>Eng</TableCell>
-                    <TableCell align="right" sx={{ fontSize: isMobile ? "0.75rem" : "0.875rem", minWidth: isMobile ? 50 : 70 }}>Math</TableCell>
-                    <TableCell align="right" sx={{ fontSize: isMobile ? "0.75rem" : "0.875rem", minWidth: isMobile ? 50 : 70 }}>Sci</TableCell>
-                    <TableCell align="right" sx={{ fontSize: isMobile ? "0.75rem" : "0.875rem", minWidth: isMobile ? 50 : 70 }}>Hist</TableCell>
-                    <TableCell align="right" sx={{ fontSize: isMobile ? "0.75rem" : "0.875rem", minWidth: isMobile ? 50 : 70 }}>Sin</TableCell>
-                    <TableCell align="right" sx={{ fontSize: isMobile ? "0.75rem" : "0.875rem", minWidth: isMobile ? 50 : 70 }}>Bud</TableCell>
-                    <TableCell align="right" sx={{ fontSize: isMobile ? "0.75rem" : "0.875rem", minWidth: isMobile ? 50 : 70 }}>Avg</TableCell>
+                    <TableCell align="right" sx={{ fontSize: isMobile ? "0.75rem" : "0.875rem", minWidth: isMobile ? 50 : 70 }}>English</TableCell>
+                    <TableCell align="right" sx={{ fontSize: isMobile ? "0.75rem" : "0.875rem", minWidth: isMobile ? 50 : 70 }}>Mathematics</TableCell>
+                    <TableCell align="right" sx={{ fontSize: isMobile ? "0.75rem" : "0.875rem", minWidth: isMobile ? 50 : 70 }}>Science</TableCell>
+                    <TableCell align="right" sx={{ fontSize: isMobile ? "0.75rem" : "0.875rem", minWidth: isMobile ? 50 : 70 }}>History</TableCell>
+                    <TableCell align="right" sx={{ fontSize: isMobile ? "0.75rem" : "0.875rem", minWidth: isMobile ? 50 : 70 }}>Sinhala</TableCell>
+                    <TableCell align="right" sx={{ fontSize: isMobile ? "0.75rem" : "0.875rem", minWidth: isMobile ? 50 : 70 }}>Buddhism</TableCell>
+                    <TableCell align="right" sx={{ fontSize: isMobile ? "0.75rem" : "0.875rem", minWidth: isMobile ? 50 : 70 }}>Average</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
