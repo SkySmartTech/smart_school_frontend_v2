@@ -372,14 +372,11 @@ const ParentReport: React.FC = () => {
                                         ))}
                                     </TextField>
                                 </Stack>
-                            </Paper>
 
-                            {/* Student Details Section */}
-                            <Paper elevation={2} sx={{ p: 3, flexShrink: 0, minWidth: { xs: '100%', md: 300 } }}>
                                 <Typography variant="h6" sx={{ mb: 2, fontWeight: 600 }}>
                                     Student Details
                                 </Typography>
-                                
+
                                 {/* Child Selection Dropdown - Only show if multiple children */}
                                 {!isLoadingChildren && childrenData && childrenData.length > 1 && (
                                     <TextField
