@@ -288,6 +288,24 @@ export async function fetchSubjectsFromApi(grade: string, classValue: string): P
   }
 }
 
+export async function fetchYearsFromApi(): Promise<DropdownOption[]> {
+  try {
+    const res = await axios.get(`${API_BASE_URL}/api/years`, getAuthHeader());
+    
+    if (Array.isArray(res.data)) {
+      return res.data.map((item: any) => ({
+        label: String(item.year),
+        value: String(item.year)
+      }));
+    }
+    
+    return [];
+  } catch (error) {
+    handleApiError(error, "fetchYearsFromApi");
+    return [];
+  }
+}
+
 // New function to fetch admission data
 export async function fetchAdmissionData(grade: string, classValue: string, keyword?: string): Promise<AdmissionData[]> {
   try {

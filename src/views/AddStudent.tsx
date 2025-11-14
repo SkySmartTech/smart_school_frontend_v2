@@ -44,6 +44,7 @@ import {
   promoteStudents,
   getAvailableGrades,
   getAvailableClasses,
+  getAvailableYears,
   fetchClassStudents,
   type Student,
   type PromoteStudentsRequest
@@ -66,8 +67,7 @@ const AddStudent = () => {
   const [classFilter, setClassFilter] = useState("");
 
   // Available options
-  const YEARS = ["2023", "2024", "2025", "2026", "2027", "2028", "2029", "2030"];
-  const [years] = useState<string[]>(YEARS);
+  const [years, setYears] = useState<string[]>([]);
   const [grades, setGrades] = useState<(string | GradeOption)[]>([]);
   const [classes, setClasses] = useState<string[]>([]);
 
@@ -98,9 +98,10 @@ const AddStudent = () => {
   // Notification
   const [snackbar, setSnackbar] = useState({ open: false, message: "", severity: "success" as "success" | "error" });
 
-  // Load available grade options on mount
+  // Load available grade options and years on mount
   useEffect(() => {
     void loadAvailableGrades();
+    void loadAvailableYearsData();
   }, []);
 
   // Load students when filters change (year, grade, class)
@@ -151,6 +152,19 @@ const AddStudent = () => {
       setGrades(gradesData);
     } catch (error) {
       showSnackbar("Failed to load available grades", "error");
+    }
+  };
+
+  const loadAvailableYearsData = async () => {
+    try {
+      const yearsData = await getAvailableYears();
+      // Extract year values from objects if they contain a year property
+      const extractedYears = yearsData.map((item: any) => 
+        typeof item === 'string' ? item : item.year
+      );
+      setYears(extractedYears);
+    } catch (error) {
+      showSnackbar("Failed to load available years", "error");
     }
   };
 

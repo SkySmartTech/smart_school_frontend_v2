@@ -47,7 +47,8 @@ import {
     fetchParentReport,
     type ParentReportData,
     type DetailedMarksTableRow,
-    fetchClassStudents
+    fetchClassStudents,
+    getAvailableYears
 } from "../../api/parentReportForPrincipalApi.ts";
 
 interface Student {
@@ -91,7 +92,7 @@ const ParentReport: React.FC = () => {
     const [endDate, setEndDate] = useState<Dayjs | null>(null);
 
     // New states for Year / Grade / Class / Students
-    const [yearOptions] = useState<string[]>(['2023', '2024', '2025', '2026', '2027', '2028', '2029', '2030']);
+    const [yearOptions, setYearOptions] = useState<string[]>([]);
     const [gradeOptions, setGradeOptions] = useState<string[]>([]);
     const [classOptions, setClassOptions] = useState<string[]>([]);
     const [studentOptions, setStudentOptions] = useState<Student[]>([]);
@@ -120,6 +121,32 @@ const ParentReport: React.FC = () => {
             setMonth("");
         }
     }, [exam]);
+
+    // Fetch years on component mount
+    useEffect(() => {
+        let mounted = true;
+        const loadYears = async () => {
+            try {
+                const yearsData = await getAvailableYears();
+                if (mounted) {
+                    // Filter out any non-string values and ensure we have clean strings
+                    const cleanYears = yearsData
+                        .filter((year: any) => typeof year === 'string' && year.trim() !== '')
+                        .map((year: string) => year.trim());
+                    setYearOptions(cleanYears);
+                }
+            } catch (error: any) {
+                console.error("Failed to fetch years:", error);
+                setSnackbar({
+                    open: true,
+                    message: `Failed to load year options: ${error.message}`,
+                    severity: "error"
+                });
+            }
+        };
+        loadYears();
+        return () => { mounted = false; };
+    }, []);
 
     const hasValidFilters = (): boolean => {
         const hasExamFilter = Boolean(exam);

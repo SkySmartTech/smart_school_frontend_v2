@@ -45,6 +45,7 @@ import {
     fetchGradesFromApi,
     fetchClassesFromApi,
     fetchAdmissionData,
+    fetchYearsFromApi,
     type StudentMark,
 } from '../../api/addmarksApi';
 
@@ -73,17 +74,6 @@ const monthOptions = [
     { label: 'July', value: 'July' }, { label: 'August', value: 'August' },
     { label: 'September', value: 'September' }, { label: 'October', value: 'October' },
     { label: 'November', value: 'November' }, { label: 'December', value: 'December' },
-];
-
-const yearOptions = [
-    { label: '2023', value: '2023' },
-    { label: '2024', value: '2024' },
-    { label: '2025', value: '2025' },
-    { label: '2026', value: '2026' },
-    { label: '2027', value: '2027' },
-    { label: '2028', value: '2028' },
-    { label: '2029', value: '2029' },
-    { label: '2030', value: '2030' },
 ];
 
 interface FilterFormData {
@@ -126,6 +116,7 @@ const TeacherDashboard: React.FC = () => {
     const [sidebarOpen, setSidebarOpen] = useState(false);
     const [gradeOptions, setGradeOptions] = useState<{ label: string; value: string }[]>([]);
     const [classOptions, setClassOptions] = useState<{ label: string; value: string }[]>([]);
+    const [yearOptions, setYearOptions] = useState<{ label: string; value: string }[]>([]);
     const [students, setStudents] = useState<ExtendedStudentMark[]>([]);
     const [admissionData, setAdmissionData] = useState<AdmissionData[]>([]);
     const [modifiedMarks, setModifiedMarks] = useState<Record<GridRowId, Partial<ExtendedStudentMark>>>({});
@@ -273,6 +264,19 @@ const TeacherDashboard: React.FC = () => {
             console.error("Failed to fetch classes:", error);
             showSnackbar(
                 `Failed to load classes: ${error instanceof Error ? error.message : 'An unknown error occurred'}`,
+                'error'
+            );
+        }
+    }, [showSnackbar]);
+
+    const fetchYears = useCallback(async () => {
+        try {
+            const years = await fetchYearsFromApi();
+            setYearOptions(years);
+        } catch (error) {
+            console.error("Failed to fetch years:", error);
+            showSnackbar(
+                `Failed to load years: ${error instanceof Error ? error.message : 'An unknown error occurred'}`,
                 'error'
             );
         }
@@ -593,12 +597,12 @@ const TeacherDashboard: React.FC = () => {
         XLSX.utils.book_append_sheet(wb, ws, 'Template');
         XLSX.writeFile(wb, 'marks_template.xlsx');
     };
-
     useEffect(() => {
         if (!profileLoading && gradeOptions.length === 0) {
             fetchGrades();
+            fetchYears();
         }
-    }, [profileLoading]);
+    }, [profileLoading, fetchGrades, fetchYears]);
 
     useEffect(() => {
         fetchClasses(selectedGrade);

@@ -360,8 +360,15 @@ export async function getAvailableYears(): Promise<string[]> {
     // Try the dedicated endpoint first
     const res = await axios.get(`${API_BASE_URL}/api/years`, getAuthHeader());
     if (Array.isArray(res.data) && res.data.length > 0) {
-      // Ensure strings
-      return res.data.map((y: any) => String(y));
+      // Extract year values - handle both string and object responses
+      return res.data.map((y: any) => {
+        if (typeof y === 'string') {
+          return y;
+        } else if (typeof y === 'object' && y !== null && y.year) {
+          return String(y.year);
+        }
+        return String(y);
+      });
     }
     // If empty or unexpected, fall through to fallback
   } catch (error: any) {

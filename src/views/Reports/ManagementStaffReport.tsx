@@ -42,14 +42,14 @@ import { useQuery } from "@tanstack/react-query";
 import {
   fetchManagementStaffReport,
   checkAuthStatus,
-  fetchGradesFromApi, 
+  fetchGradesFromApi,
+  fetchYearsFromApi,
   type DropdownOption,
   type ClassMarks,
   type ManagementStaffReportData,
   type SubjectMark,
 } from "../../api/managementStaffApi";
 
-const years = ["2023", "2024", "2025", "2026", "2027", "2028", "2029", "2030"];
 const exams = [
   { label: 'First Term', value: 'First Term' },
   { label: 'Second Term', value: 'Second Term' },
@@ -92,7 +92,8 @@ const ManagementStaff: React.FC = () => {
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
   const isTablet = useMediaQuery(theme.breakpoints.down('md'));
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [year, setYear] = useState<string>(years[1]);
+  const [years, setYears] = useState<string[]>([]);
+  const [year, setYear] = useState<string>("");
   const [grade, setGrade] = useState<string>("");
   const [gradeOptions, setGradeOptions] = useState<DropdownOption[]>([]);
   const [exam, setExam] = useState<string>(exams[0].value);
@@ -121,8 +122,26 @@ const ManagementStaff: React.FC = () => {
       }
     };
 
+    const fetchYears = async () => {
+      try {
+        const yearsData = await fetchYearsFromApi();
+        setYears(yearsData);
+        if (yearsData.length > 0) {
+          setYear(yearsData[0]);
+        }
+      } catch (error) {
+        console.error("Failed to fetch years:", error);
+        setSnackbar({
+          open: true,
+          message: "Failed to load year options",
+          severity: "error",
+        });
+      }
+    };
+
     if (checkAuthStatus()) {
       fetchGrades();
+      fetchYears();
     }
   }, []);
 
