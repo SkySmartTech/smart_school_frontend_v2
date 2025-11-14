@@ -71,9 +71,9 @@ import axios from "axios";
 const MONTHLY_EXAM_VALUE = 'Monthly';
 
 const examOptions = [
-    { label: 'First Term', value: 'First' },
-    { label: 'Second Term', value: 'Mid' },
-    { label: 'Third Term', value: 'End' },
+    { label: 'First Term', value: 'First Term' },
+    { label: 'Second Term', value: 'Second Term' },
+    { label: 'Third Term', value: 'Third Term' },
     { label: 'Monthly Test', value: MONTHLY_EXAM_VALUE }
 ];
 
@@ -91,7 +91,7 @@ const ParentReport: React.FC = () => {
     const [endDate, setEndDate] = useState<Dayjs | null>(null);
 
     // New states for Year / Grade / Class / Students
-    const [yearOptions] = useState<string[]>(['2023', '2024', '2025', '2026']);
+    const [yearOptions] = useState<string[]>(['2023', '2024', '2025', '2026', '2027', '2028', '2029', '2030']);
     const [gradeOptions, setGradeOptions] = useState<string[]>([]);
     const [classOptions, setClassOptions] = useState<string[]>([]);
     const [studentOptions, setStudentOptions] = useState<Student[]>([]);
@@ -132,17 +132,24 @@ const ParentReport: React.FC = () => {
         let mounted = true;
         const loadInitialData = async () => {
             try {
-                // Fetch grades from /api/grades endpoint
                 const gradesResponse = await axios.get(
                     `${API_BASE_URL}/api/grades`,
                     getAuthHeader()
                 );
-                
+
                 if (!mounted) return;
 
                 if (Array.isArray(gradesResponse.data)) {
                     const grades = gradesResponse.data.map((item: any) => item.grade);
-                    setGradeOptions(grades.sort());
+
+                    // ✅ Sort by the number inside the "Grade X" string
+                    const sortedGrades = [...grades].sort((a, b) => {
+                        const numA = parseInt(a.replace(/[^\d]/g, ""), 10);
+                        const numB = parseInt(b.replace(/[^\d]/g, ""), 10);
+                        return numA - numB;
+                    });
+
+                    setGradeOptions(sortedGrades);
                 }
 
             } catch (err: any) {
@@ -175,7 +182,7 @@ const ParentReport: React.FC = () => {
                     `${API_BASE_URL}/api/grade-classes`,
                     getAuthHeader()
                 );
-                
+
                 if (!mounted) return;
 
                 if (Array.isArray(classesResponse.data)) {
@@ -204,7 +211,7 @@ const ParentReport: React.FC = () => {
         setStudentOptions([]);
         setSelectedStudent(null);
         setStudentSearchText('');
-        
+
         if (!selectedYear || !selectedGrade || !selectedClass) {
             return;
         }
@@ -213,7 +220,7 @@ const ParentReport: React.FC = () => {
             try {
                 const students = await fetchClassStudents(selectedYear, selectedGrade, selectedClass);
                 if (!mounted) return;
-                
+
                 if (students && students.length > 0) {
                     setStudentOptions(students);
                 }
@@ -473,8 +480,12 @@ const ParentReport: React.FC = () => {
                                 </Typography>
                                 <Stack spacing={2}>
 
-                                    {/* Exam Type Selection */}
-                                    <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
+                                    {/* All dropdowns in one row */}
+                                    <Stack
+                                        direction={{ xs: 'column', md: 'row' }}
+                                        spacing={2}
+                                    >
+                                        {/* Exam Type */}
                                         <Autocomplete
                                             fullWidth
                                             options={examOptions}
@@ -489,6 +500,8 @@ const ParentReport: React.FC = () => {
                                                 />
                                             )}
                                         />
+
+                                        {/* Month (only visible if exam === MONTHLY_EXAM_VALUE) */}
                                         {exam === MONTHLY_EXAM_VALUE && (
                                             <Autocomplete
                                                 fullWidth
@@ -504,10 +517,8 @@ const ParentReport: React.FC = () => {
                                                 )}
                                             />
                                         )}
-                                    </Stack>
 
-                                    {/* Date Range Selection */}
-                                    <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
+                                        {/* Start Date */}
                                         <DatePicker
                                             label="Start Date"
                                             value={startDate}
@@ -516,6 +527,8 @@ const ParentReport: React.FC = () => {
                                                 textField: { size: 'small', fullWidth: true }
                                             }}
                                         />
+
+                                        {/* End Date */}
                                         <DatePicker
                                             label="End Date"
                                             value={endDate}
@@ -525,106 +538,122 @@ const ParentReport: React.FC = () => {
                                             }}
                                         />
                                     </Stack>
-                                </Stack>
-                            </Paper>
 
-                            {/* Student Details Section - NEW: Year / Grade / Class / Students */}
-                            <Paper elevation={2} sx={{ p: 3, flexShrink: 0, minWidth: { xs: '100%', md: 320 } }}>
-                                <Typography variant="h6" sx={{ mb: 2, fontWeight: 600 }}>
-                                    Student Details
-                                </Typography>
-
-                                <Stack spacing={2}>
-                                    <TextField
-                                        select
-                                        label="Year"
-                                        value={selectedYear}
-                                        onChange={(e) => setSelectedYear(e.target.value)}
-                                        fullWidth
-                                        size="small"
-                                    >
-                                        <MenuItem value=""><em>None</em></MenuItem>
-                                        {yearOptions.map(y => <MenuItem key={y} value={y}>{y}</MenuItem>)}
-                                    </TextField>
-
-                                    <TextField
-                                        select
-                                        label="Grade"
-                                        value={selectedGrade}
-                                        onChange={(e) => setSelectedGrade(e.target.value)}
-                                        fullWidth
-                                        size="small"
-                                        disabled={!selectedYear}
-                                    >
-                                        <MenuItem value=""><em>None</em></MenuItem>
-                                        {gradeOptions.map(g => <MenuItem key={g} value={g}>{g}</MenuItem>)}
-                                    </TextField>
-
-                                    <TextField
-                                        select
-                                        label="Class"
-                                        value={selectedClass}
-                                        onChange={(e) => setSelectedClass(e.target.value)}
-                                        fullWidth
-                                        size="small"
-                                        disabled={!selectedGrade}
-                                    >
-                                        <MenuItem value=""><em>None</em></MenuItem>
-                                        {classOptions.map(c => <MenuItem key={c} value={c}>{c}</MenuItem>)}
-                                    </TextField>
-
-                                    <Autocomplete
-                                        options={studentOptions}
-                                        value={selectedStudent}
-                                        onChange={(_, newValue) => handleStudentSelect(newValue)}
-                                        disabled={!selectedClass}
-                                        getOptionLabel={(option) => 
-                                            `${option.name} (${option.student.studentAdmissionNo})`
-                                        }
-                                        renderInput={(params) => (
+                                    <Typography variant="h6" sx={{ mb: 3, mt:5, fontWeight: 600 }}>
+                                        Student Details
+                                    </Typography>
+                                    <Stack spacing={2}>
+                                        {/* Row for Year, Grade, and Class */}
+                                        <Stack direction="row" spacing={2.5}>
                                             <TextField
-                                                {...params}
-                                                label="Student"
+                                                select
+                                                label="Year"
+                                                value={selectedYear}
+                                                onChange={(e) => setSelectedYear(e.target.value)}
+                                                fullWidth
                                                 size="small"
-                                                placeholder={selectedClass ? "Search by name or admission no." : "Select class first"}
-                                            />
-                                        )}
-                                        renderOption={(props, option) => (
-                                            <li {...props}>
-                                                {option.name} ({option.student.studentAdmissionNo})
-                                            </li>
-                                        )}
-                                    />
+                                            >
+                                                
+                                                <MenuItem value=""><em>None</em></MenuItem>
+                                                {yearOptions.map((y) => (
+                                                    <MenuItem key={y} value={y}>{y}</MenuItem>
+                                                ))}
+                                            </TextField>
 
-                                    <Box sx={{
-                                        p: 2,
-                                        border: `1px solid ${theme.palette.divider}`,
-                                        borderRadius: theme.shape.borderRadius,
-                                        textAlign: 'left'
-                                    }}>
-                                        {selectedStudent ? (
-                                            <Stack spacing={1}>
-                                                <Typography variant="body2" fontWeight="bold">
-                                                    Student: {selectedStudent.name}
+                                            <TextField
+                                                select
+                                                label="Grade"
+                                                value={selectedGrade}
+                                                onChange={(e) => setSelectedGrade(e.target.value)}
+                                                fullWidth
+                                                size="small"
+                                                disabled={!selectedYear}
+                                            >
+                                                <MenuItem value=""><em>None</em></MenuItem>
+                                                {gradeOptions.map((g) => (
+                                                    <MenuItem key={g} value={g}>{g}</MenuItem>
+                                                ))}
+                                            </TextField>
+
+                                            <TextField
+                                                select
+                                                label="Class"
+                                                value={selectedClass}
+                                                onChange={(e) => setSelectedClass(e.target.value)}
+                                                fullWidth
+                                                size="small"
+                                                disabled={!selectedGrade}
+                                            >
+                                                <MenuItem value=""><em>None</em></MenuItem>
+                                                {classOptions.map((c) => (
+                                                    <MenuItem key={c} value={c}>{c}</MenuItem>
+                                                ))}
+                                            </TextField>
+                                        </Stack>
+
+                                        {/* Student Autocomplete (remains below) */}
+                                        <Autocomplete
+                                            options={studentOptions}
+                                            value={selectedStudent}
+                                            onChange={(_, newValue) => handleStudentSelect(newValue)}
+                                            disabled={!selectedClass}
+                                            getOptionLabel={(option) =>
+                                                `${option.name} (${option.student.studentAdmissionNo})`
+                                            }
+                                            renderInput={(params) => (
+                                                <TextField
+                                                    {...params}
+                                                    label="Student"
+                                                    size="small"
+                                                    placeholder={
+                                                        selectedClass
+                                                            ? "Search by name or admission no."
+                                                            : "Select class first"
+                                                    }
+                                                />
+                                            )}
+                                            renderOption={(props, option) => (
+                                                <li {...props}>
+                                                    {option.name} ({option.student.studentAdmissionNo})
+                                                </li>
+                                            )}
+                                        />
+
+                                        {/* Student Info Box (unchanged) */}
+                                        <Box
+                                            sx={{
+                                                p: 2,
+                                                border: `1px solid ${theme.palette.divider}`,
+                                                borderRadius: theme.shape.borderRadius,
+                                                textAlign: "left",
+                                            }}
+                                        >
+                                            {selectedStudent ? (
+                                                <Stack spacing={1}>
+                                                    <Typography variant="body2" fontWeight="bold">
+                                                        Student: {selectedStudent.name}
+                                                    </Typography>
+                                                    <Typography variant="body2" fontWeight="bold">
+                                                        Grade: {selectedGrade || selectedStudent.student.studentGrade}
+                                                    </Typography>
+                                                    <Typography variant="body2" fontWeight="bold">
+                                                        Class: {selectedClass || selectedStudent.student.studentClass}
+                                                    </Typography>
+                                                    <Typography variant="body2" fontWeight="bold">
+                                                        Admission No: {selectedStudent.student.studentAdmissionNo}
+                                                    </Typography>
+                                                </Stack>
+                                            ) : (
+                                                <Typography variant="body2" color="text.secondary">
+                                                    No student selected
                                                 </Typography>
-                                                <Typography variant="body2" fontWeight="bold">
-                                                    Grade: {selectedGrade || selectedStudent.student.studentGrade}
-                                                </Typography>
-                                                <Typography variant="body2" fontWeight="bold">
-                                                    Class: {selectedClass || selectedStudent.student.studentClass}
-                                                </Typography>
-                                                <Typography variant="body2" fontWeight="bold">
-                                                    Admission No: {selectedStudent.student.studentAdmissionNo}
-                                                </Typography>
-                                            </Stack>
-                                        ) : (
-                                            <Typography variant="body2" color="text.secondary">
-                                                No student selected
-                                            </Typography>
-                                        )}
-                                    </Box>
+                                            )}
+                                        </Box>
+                                    </Stack>
+
                                 </Stack>
                             </Paper>
+
                         </Stack>
 
                         {/* Show message if no valid filters */}

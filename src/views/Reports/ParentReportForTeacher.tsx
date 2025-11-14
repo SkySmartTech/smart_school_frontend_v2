@@ -345,66 +345,69 @@ const ParentReport: React.FC = () => {
                                 <Typography variant="h6" sx={{ mb: 2, fontWeight: 600 }}>
                                     Report Filters
                                 </Typography>
-                                <Stack spacing={2}>
+                                <Stack
+                                    direction="row"
+                                    spacing={2}
+                                    flexWrap="wrap" // allows wrapping on smaller screens
+                                    alignItems="center"
+                                >
 
                                     {/* Exam Type Selection */}
-                                    <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
+                                    <Autocomplete
+                                        sx={{ minWidth: 200, flex: 1 }}
+                                        options={examOptions}
+                                        value={examOptions.find(opt => opt.value === exam) || null}
+                                        onChange={(_, newValue) => setExam(newValue?.value || '')}
+                                        getOptionLabel={(option) => option.label}
+                                        renderInput={(params) => (
+                                            <TextField
+                                                {...params}
+                                                label="Exam Type"
+                                                size="small"
+                                            />
+                                        )}
+                                    />
+
+                                    {exam === MONTHLY_EXAM_VALUE && (
                                         <Autocomplete
-                                            fullWidth
-                                            options={examOptions}
-                                            value={examOptions.find(opt => opt.value === exam) || null}
-                                            onChange={(_, newValue) => setExam(newValue?.value || '')}
-                                            getOptionLabel={(option) => option.label}
+                                            sx={{ minWidth: 200, flex: 1 }}
+                                            options={months}
+                                            value={month}
+                                            onChange={(_, newValue) => setMonth(newValue || '')}
                                             renderInput={(params) => (
                                                 <TextField
                                                     {...params}
-                                                    label="Exam Type"
+                                                    label="Month"
                                                     size="small"
                                                 />
                                             )}
                                         />
-                                        {exam === MONTHLY_EXAM_VALUE && (
-                                            <Autocomplete
-                                                fullWidth
-                                                options={months}
-                                                value={month}
-                                                onChange={(_, newValue) => setMonth(newValue || '')}
-                                                renderInput={(params) => (
-                                                    <TextField
-                                                        {...params}
-                                                        label="Month"
-                                                        size="small"
-                                                    />
-                                                )}
-                                            />
-                                        )}
-                                    </Stack>
+                                    )}
 
-                                    {/* Date Range Selection */}
-                                    <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
-                                        <DatePicker
-                                            label="Start Date"
-                                            value={startDate}
-                                            onChange={(newValue) => setStartDate(dayjs(newValue))}
-                                            slotProps={{
-                                                textField: { size: 'small', fullWidth: true }
-                                            }}
-                                        />
-                                        <DatePicker
-                                            label="End Date"
-                                            value={endDate}
-                                            onChange={(newValue) => setEndDate(dayjs(newValue))}
-                                            slotProps={{
-                                                textField: { size: 'small', fullWidth: true }
-                                            }}
-                                        />
-                                    </Stack>
+                                    {/* Start Date */}
+                                    <DatePicker
+                                        label="Start Date"
+                                        value={startDate}
+                                        onChange={(newValue) => setStartDate(dayjs(newValue))}
+                                        slotProps={{
+                                            textField: { size: 'small', fullWidth: true }
+                                        }}
+                                        sx={{ minWidth: 200, flex: 1 }}
+                                    />
+
+                                    {/* End Date */}
+                                    <DatePicker
+                                        label="End Date"
+                                        value={endDate}
+                                        onChange={(newValue) => setEndDate(dayjs(newValue))}
+                                        slotProps={{
+                                            textField: { size: 'small', fullWidth: true }
+                                        }}
+                                        sx={{ minWidth: 200, flex: 1 }}
+                                    />
+
                                 </Stack>
-                            </Paper>
-
-                            {/* Student Details Section (single dropdown) */}
-                            <Paper elevation={2} sx={{ p: 3, flexShrink: 0, minWidth: { xs: '100%', md: 320 } }}>
-                                <Typography variant="h6" sx={{ mb: 2, fontWeight: 600 }}>
+                                <Typography variant="h6" sx={{ mb: 2, mt:5, fontWeight: 600,  }}>
                                     Student Details
                                 </Typography>
 
@@ -449,6 +452,8 @@ const ParentReport: React.FC = () => {
                                     )}
                                 </Stack>
                             </Paper>
+
+
                         </Stack>
 
                         {/* Show message if no valid filters */}

@@ -8,6 +8,27 @@ const API = axios.create({
   },
 });
 
+// Interfaces for Grade and Class
+export interface Grade {
+  id: number;
+  gradeId: string;
+  grade: string;
+  description: string | null;
+  schoolId: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface Class {
+  id: number;
+  classId: string | null;
+  class: string;
+  description: string;
+  gradeId: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 export const userSchema = z.object({
     name: z.string().min(1, "Full name is required"),
     email: z.string().email("Invalid email address"),
@@ -66,6 +87,32 @@ export const userSchema = z.object({
 });
 
 export type User = z.infer<typeof userSchema>;
+
+// Fetch grades from backend
+export const fetchGrades = async (): Promise<Grade[]> => {
+  try {
+    const response = await axios.get<Grade[]>(
+      `${import.meta.env.VITE_API_BASE_URL}/api/grades`
+    );
+    return response.data;
+  } catch (error) {
+    console.error('Error fetching grades:', error);
+    throw error;
+  }
+};
+
+// Fetch classes from backend
+export const fetchClasses = async (): Promise<Class[]> => {
+  try {
+    const response = await axios.get<Class[]>(
+      `${import.meta.env.VITE_API_BASE_URL}/api/grade-classes`
+    );
+    return response.data;
+  } catch (error) {
+    console.error('Error fetching classes:', error);
+    throw error;
+  }
+};
 
 export async function registerUser(userData: FormData) {
   try {

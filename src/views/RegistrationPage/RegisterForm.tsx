@@ -43,7 +43,7 @@ import { motion } from "framer-motion";
 import { Link, useNavigate } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import { useMutation } from "@tanstack/react-query";
-import { registerUser, registerStudent, registerTeacher, registerParent } from "../../api/userApi";
+import { registerUser, registerStudent, registerTeacher, registerParent, fetchGrades, fetchClasses } from "../../api/userApi";
 import { useState, useEffect, useMemo } from "react";
 import { useQuery } from '@tanstack/react-query';
 import axios from 'axios';
@@ -66,23 +66,31 @@ interface RegisterFormProps {
 }
 
 const RegisterForm = ({ onSuccess = () => { }, onError = () => { } }: RegisterFormProps) => {
-  const { data: subjects = [], isLoading: isLoadingSubjects } = useQuery<Subject[]>({
+  const { data: subjects = [], isLoading: isLoadingSubjects } = useQuery({
     queryKey: ['subjects'],
     queryFn: async () => {
-      const response = await axios.get<Subject[]>(`${import.meta.env.VITE_API_BASE_URL}/api/subjects`);
+      const response = await axios.get(`${import.meta.env.VITE_API_BASE_URL}/api/subjects`);
       return response.data;
     }
   });
 
+  const { data: grades = [] } = useQuery({
+    queryKey: ['grades'],
+    queryFn: fetchGrades
+  });
+
+  const { data: classes = [] } = useQuery({
+    queryKey: ['classes'],
+    queryFn: fetchClasses
+  });
+
   const uniqueMainSubjects = useMemo(() => {
-    const mainSubjects = subjects.map(subject => subject.mainSubject);
+    const mainSubjects = subjects.map((subject: any) => subject.mainSubject);
     return [...new Set(mainSubjects)];
   }, [subjects]);
 
   const gender = ["Male", "Female"];
   const roles = ["Teacher", "Student", "Parent"];
-  const grades = ["Grade 1", "Grade 2", "Grade 3", "Grade 4", "Grade 5", "Grade 6", "Grade 7", "Grade 8", "Grade 9", "Grade 10", "Grade 11", "Grade 12"];
-  const classes = ["Araliya", "Olu", "Nelum", "Rosa", "Manel", "Sooriya", "Kumudu"];
   const mediumOptions = ["Sinhala", "English", "Tamil"];
 
   const steps: string[] = ['Basic Information', 'Role Details'];
@@ -161,7 +169,7 @@ const RegisterForm = ({ onSuccess = () => { }, onError = () => { } }: RegisterFo
     formState: { errors },
     setValue,
     trigger,
-    setError, 
+    setError,
   } = useForm<RegisterFormValues>({
     defaultValues: {
       teacherGrades: [],
@@ -179,6 +187,98 @@ const RegisterForm = ({ onSuccess = () => { }, onError = () => { } }: RegisterFo
   useEffect(() => {
     setSelectedRole(userType);
   }, [userType]);
+
+  // Delete user data function
+  const deleteUserData = async (userId: number, userType: string) => {
+    try {
+      await axios.delete(`${import.meta.env.VITE_API_BASE_URL}/api/delete-register`, {
+        data: {
+          userId: userId
+        },
+        headers: {
+          'Content-Type': 'application/json',
+          'userId': String(userId),
+          'userType': userType
+        }
+      });
+      return true;
+    } catch (error: any) {
+      console.error('Delete error:', error);
+      return false;
+    }
+  };
+
+  // Clear registration state
+  const clearRegistrationState = () => {
+    setRegisteredUser(null);
+    setActiveStep(0);
+    setTeacherAssignments([]);
+    setParentEntries([]);
+    setValue("teacherGrades", []);
+    setValue("subjects", []);
+    setValue("teacherClass", []);
+    setValue("medium", []);
+    setValue("staffNo", "");
+    setValue("studentGrade", "");
+    setValue("studentClass", "");
+    setValue("studentAdmissionNo", "");
+    setValue("profession", "");
+    setValue("relation", "");
+    setValue("parentContact", "");
+    setValue("name", "");
+    setValue("email", "");
+    setValue("address", "");
+    setValue("birthDay", "");
+    setValue("contact", "");
+    setValue("userType", "");
+    setValue("username", "");
+    setValue("password", "");
+    setValue("password_confirmation", "");
+    setValue("gender", "");
+  };
+
+  // Handle browser back button (popstate event) and page/tab close (beforeunload event)
+  useEffect(() => {
+    // Prevent going back with browser/phone back button if on step 1
+    const handlePopstate = async (event: PopStateEvent) => {
+      event.preventDefault();
+
+      if (activeStep === 1 && registeredUser) {
+        // Delete the registered user data
+        await deleteUserData(registeredUser.userId, registeredUser.userType);
+        clearRegistrationState();
+        // Push a new state to prevent browser going back
+        window.history.pushState(null, '', window.location.href);
+      }
+    };
+
+    // Show confirmation when trying to close tab/browser/page while on step 1
+    const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+      if (activeStep === 1 && registeredUser) {
+        event.preventDefault();
+        event.returnValue = '';
+
+        // Delete the registered user data in the background
+        deleteUserData(registeredUser.userId, registeredUser.userType);
+
+        return '';
+      }
+    };
+
+    // Add event listeners only when on step 1 with registered user
+    if (activeStep === 1 && registeredUser) {
+      window.addEventListener('popstate', handlePopstate);
+      window.addEventListener('beforeunload', handleBeforeUnload);
+
+      // Push a new state to enable popstate handling
+      window.history.pushState(null, '', window.location.href);
+
+      return () => {
+        window.removeEventListener('popstate', handlePopstate);
+        window.removeEventListener('beforeunload', handleBeforeUnload);
+      };
+    }
+  }, [activeStep, registeredUser]);
 
   const extractErrorMessage = (error: any): string => {
     if (error?.response?.data?.message) {
@@ -324,35 +424,11 @@ const RegisterForm = ({ onSuccess = () => { }, onError = () => { } }: RegisterFo
   const handleBack = async () => {
     if (activeStep === 1 && registeredUser && registeredUser.userId) {
       try {
-        await axios.delete(`${import.meta.env.VITE_API_BASE_URL}/api/delete-register`, {
-          data: {
-            userId: registeredUser.userId
-          },
-          headers: {
-            'Content-Type': 'application/json',
-            'userId': String(registeredUser.userId),
-            'userType': registeredUser.userType
-          }
-        });
+        // Delete the registered user
+        await deleteUserData(registeredUser.userId, registeredUser.userType);
 
         // Clear local registration state without showing success snackbar
-        setRegisteredUser(null);
-        setActiveStep((prevActiveStep) => prevActiveStep - 1);
-
-        setTeacherAssignments([]);
-        setParentEntries([]);
-
-        setValue("teacherGrades", []);
-        setValue("subjects", []);
-        setValue("teacherClass", []);
-        setValue("medium", []);
-        setValue("staffNo", "");
-        setValue("studentGrade", "");
-        setValue("studentClass", "");
-        setValue("studentAdmissionNo", "");
-        setValue("profession", "");
-        setValue("relation", "");
-        setValue("parentContact", "");
+        clearRegistrationState();
       } catch (error: any) {
         console.error('Delete error:', error);
         const errorMessage = error?.response?.data?.message || "Failed to clear user data";
@@ -470,7 +546,8 @@ const RegisterForm = ({ onSuccess = () => { }, onError = () => { } }: RegisterFo
         id: crypto.randomUUID()
       };
 
-      setTeacherAssignments(prev => [...prev, newAssignment]);
+      // Add new assignment to the top of the list (prepend)
+      setTeacherAssignments(prev => [newAssignment, ...prev]);
 
       setValue("teacherGrades", []);
       setValue("subjects", []);
@@ -519,7 +596,8 @@ const RegisterForm = ({ onSuccess = () => { }, onError = () => { } }: RegisterFo
       status: true
     };
 
-    setParentEntries(prev => [...prev, newEntry]);
+    // Add new entry to the top of the list (prepend)
+    setParentEntries(prev => [newEntry, ...prev]);
 
     setValue("studentAdmissionNo", "");
     setValue("profession", "");
@@ -1000,8 +1078,8 @@ const RegisterForm = ({ onSuccess = () => { }, onError = () => { } }: RegisterFo
                       <MenuItem disabled>Loading subjects...</MenuItem>
                     ) : (
                       [...uniqueMainSubjects]
-                        .sort((a, b) => a.localeCompare(b))
-                        .map((subject) => (
+                        .sort((a: any, b: any) => String(a).localeCompare(String(b)))
+                        .map((subject: any) => (
                           <MenuItem key={subject} value={subject}>
                             {subject}
                           </MenuItem>
@@ -1041,12 +1119,16 @@ const RegisterForm = ({ onSuccess = () => { }, onError = () => { } }: RegisterFo
                       }
                     }}
                   >
-                    {classes.map((classItem) => (
-                      <MenuItem key={classItem} value={classItem}>
-                        {classItem}
-                      </MenuItem>
-                    ))}
+                    {classes
+                      .slice()
+                      .sort((a: any, b: any) => a.class.localeCompare(b.class)) 
+                      .map((classItem: any) => (
+                        <MenuItem key={classItem.id} value={classItem.class}>
+                          {classItem.class}
+                        </MenuItem>
+                      ))}
                   </TextField>
+
                   <TextField
                     select
                     label="Grades"
@@ -1076,9 +1158,9 @@ const RegisterForm = ({ onSuccess = () => { }, onError = () => { } }: RegisterFo
                       }
                     }}
                   >
-                    {grades.map((grade) => (
-                      <MenuItem key={grade} value={grade}>
-                        {grade}
+                    {grades.map((grade: any) => (
+                      <MenuItem key={grade.id} value={grade.grade}>
+                        {grade.grade}
                       </MenuItem>
                     ))}
                   </TextField>
@@ -1195,7 +1277,7 @@ const RegisterForm = ({ onSuccess = () => { }, onError = () => { } }: RegisterFo
                     helperText={errors.studentGrade?.message}
                     sx={{ "& .MuiOutlinedInput-root": { borderRadius: "10px", height: "40px" } }}
                   >
-                    {grades.map((g) => <MenuItem key={g} value={g}>{g}</MenuItem>)}
+                    {grades.map((g: any) => <MenuItem key={g.id} value={g.grade}>{g.grade}</MenuItem>)}
                   </TextField>
 
                   <TextField
@@ -1208,7 +1290,7 @@ const RegisterForm = ({ onSuccess = () => { }, onError = () => { } }: RegisterFo
                     helperText={errors.studentClass?.message}
                     sx={{ "& .MuiOutlinedInput-root": { borderRadius: "10px", height: "40px" } }}
                   >
-                    {classes.map((c) => <MenuItem key={c} value={c}>{c}</MenuItem>)}
+                    {classes.map((c: any) => <MenuItem key={c.id} value={c.class}>{c.class}</MenuItem>)}
                   </TextField>
                 </Stack>
 

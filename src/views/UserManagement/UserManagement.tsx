@@ -54,7 +54,7 @@ import {
   Delete as DeleteRowIcon,
   CloudUpload as CloudUploadIcon,
   DeleteForever as DeleteForeverIcon,
-  CheckCircle as ActivateIcon // added activate icon
+  CheckCircle as ActivateIcon 
 } from "@mui/icons-material";
 import Sidebar from "../../components/Sidebar";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -310,12 +310,6 @@ const UserManagement: React.FC = () => {
     const { name, value } = e.target;
     setForm(prev => ({ ...prev, [name]: value }));
 
-    // removed auto-sync to parentEntries[0] because it overwrote the first parent row
-    // when typing a new parent before clicking "Add to list".
-    //
-    // If you need inline editing of existing parent rows, implement a dedicated
-    // edit flow that updates a specific parentEntries[index] instead of syncing
-    // all form inputs into parentEntries[0].
   };
 
   const handleSelectChange = (e: React.ChangeEvent<{ value: unknown }>, field: keyof User) => {
@@ -332,10 +326,6 @@ const UserManagement: React.FC = () => {
         [field]: value
       }));
 
-      // removed automatic sync to parentEntries[0]:
-      // previously updating parentEntries[0] here caused the first added parent row
-      // to be overwritten whenever the relation dropdown changed. Inline editing
-      // should be handled via explicit edit buttons that update a specific index.
     }
   };
 
@@ -902,20 +892,20 @@ const UserManagement: React.FC = () => {
 
   const getColumns = (): GridColDef<User>[] => {
     const commonColumns: GridColDef<User>[] = [
-      { field: 'name', headerName: 'Name', width: isMobile ? 120 : 150, flex: isMobile ? 0 : 1 },
-      { field: 'username', headerName: 'Username', width: isMobile ? 100 : 120, flex: isMobile ? 0 : 1 },
-      { field: 'email', headerName: 'Email', width: isMobile ? 150 : 180, flex: isMobile ? 0 : 1 },
-      { field: 'address', headerName: 'Address', width: isMobile ? 120 : 150, flex: isMobile ? 0 : 1 },
-      { field: 'birthDay', headerName: 'Birthday', width: isMobile ? 100 : 100, flex: isMobile ? 0 : 1 },
-      { field: 'contact', headerName: 'Phone No', width: isMobile ? 110 : 120, flex: isMobile ? 0 : 1 },
-      { field: 'gender', headerName: 'Gender', width: isMobile ? 80 : 100, flex: isMobile ? 0 : 1 },
+      { field: 'id', headerName: 'ID', minWidth: 80 },
+      { field: 'name', headerName: 'Name', minWidth: 150 },
+      { field: 'username', headerName: 'Username', minWidth: 140 },
+      { field: 'email', headerName: 'Email', minWidth: 180 },
+      { field: 'address', headerName: 'Address', minWidth: 160 },
+      { field: 'birthDay', headerName: 'Birthday', minWidth: 130 },
+      { field: 'contact', headerName: 'Phone No', minWidth: 130 },
+      { field: 'gender', headerName: 'Gender', minWidth: 110 },
     ];
 
     const statusColumn: GridColDef<User> = {
       field: 'status',
       headerName: 'Status',
-      width: isMobile ? 100 : 120,
-      flex: isMobile ? 0 : 1,
+      minWidth: 110,
       type: 'boolean',
       renderCell: (params) => (
         <Box
@@ -943,7 +933,7 @@ const UserManagement: React.FC = () => {
       field: 'actions',
       headerName: 'Actions',
       type: 'actions',
-      width: isMobile ? 80 : 140,
+      minWidth: 120,
       getActions: (params: GridRowParams) => [
         <GridActionsCellItem
           icon={<EditIcon />}
@@ -977,20 +967,20 @@ const UserManagement: React.FC = () => {
       case 'Student':
         return [
           ...commonColumns,
-          { field: 'grade', headerName: 'Grade', width: isMobile ? 80 : 100, flex: isMobile ? 0 : 1 },
-          { field: 'medium', headerName: 'Medium', width: isMobile ? 80 : 100, flex: isMobile ? 0 : 1 },
-          { field: 'class', headerName: 'Class', width: isMobile ? 80 : 100, flex: isMobile ? 0 : 1 },
-          { field: 'studentAdmissionNo', headerName: 'Admission No', width: isMobile ? 120 : 150, flex: isMobile ? 0 : 1 },
+          { field: 'grade', headerName: 'Grade', minWidth: 110 },
+          { field: 'medium', headerName: 'Medium', minWidth: 110 },
+          { field: 'class', headerName: 'Class', minWidth: 110 },
+          { field: 'studentAdmissionNo', headerName: 'Admission No', minWidth: 150 },
           statusColumn,
           actionColumn
         ];
       case 'Teacher':
         return [
           ...commonColumns,
-          { field: 'grade', headerName: 'Grade', width: isMobile ? 80 : 100, flex: isMobile ? 0 : 1 },
-          { field: 'class', headerName: 'Class', width: isMobile ? 80 : 100, flex: isMobile ? 0 : 1 },
-          { field: 'subject', headerName: 'Subject', width: isMobile ? 100 : 120, flex: isMobile ? 0 : 1 },
-          { field: 'medium', headerName: 'Medium', width: isMobile ? 80 : 100, flex: isMobile ? 0 : 1 },
+          { field: 'grade', headerName: 'Grade', minWidth: 110 },
+          { field: 'class', headerName: 'Class', minWidth: 110 },
+          { field: 'subject', headerName: 'Subject', minWidth: 140 },
+          { field: 'medium', headerName: 'Medium', minWidth: 110 },
           statusColumn,
           actionColumn
         ];
@@ -1000,8 +990,7 @@ const UserManagement: React.FC = () => {
           {
             field: 'profession',
             headerName: 'Profession',
-            width: isMobile ? 100 : 120,
-            flex: isMobile ? 0 : 1,
+            minWidth: 130,
             renderCell: (params) => {
               const entries = normalizeParentEntries(params.row);
               const vals = entries.map(e => e.profession).filter(Boolean);
@@ -1011,8 +1000,7 @@ const UserManagement: React.FC = () => {
           {
             field: 'parentContact',
             headerName: 'Parent No',
-            width: isMobile ? 110 : 120,
-            flex: isMobile ? 0 : 1,
+            minWidth: 130,
             renderCell: (params) => {
               const entries = normalizeParentEntries(params.row);
               const vals = entries.map(e => e.parentContact).filter(Boolean);
@@ -1022,8 +1010,7 @@ const UserManagement: React.FC = () => {
           {
             field: 'studentAdmissionNo',
             headerName: 'Admission No',
-            width: isMobile ? 120 : 150,
-            flex: isMobile ? 0 : 1,
+            minWidth: 150,
             renderCell: (params) => {
               const entries = normalizeParentEntries(params.row);
               const vals = entries.map(e => e.studentAdmissionNo).filter(Boolean);
@@ -1033,8 +1020,7 @@ const UserManagement: React.FC = () => {
           {
             field: 'relation',
             headerName: 'Relation',
-            width: isMobile ? 100 : 120,
-            flex: isMobile ? 0 : 1,
+            minWidth: 130,
             renderCell: (params) => {
               const entries = normalizeParentEntries(params.row);
               const vals = entries.map(e => e.relation).filter(Boolean);
@@ -1606,7 +1592,7 @@ const UserManagement: React.FC = () => {
       <CssBaseline />
       <Sidebar open={sidebarOpen} setOpen={setSidebarOpen} />
 
-      <Box sx={{ flexGrow: 1, display: "flex", flexDirection: "column", width: '100%' }}>
+      <Box sx={{ flexGrow: 1, display: "flex", flexDirection: "column", width: '90%' }}>
         <AppBar
           position="static"
           sx={{
@@ -1655,7 +1641,15 @@ const UserManagement: React.FC = () => {
             </Stack>
           </Paper>
 
-          <Paper sx={{ p: isMobile ? 1 : 2, borderRadius: 2, height: isMobile ? 600 : 720, display: 'flex', flexDirection: 'column' }}>
+         <Paper sx={{ 
+            p: isMobile ? 1 : 2, 
+            borderRadius: 2, 
+            height: isMobile ? 600 : 720, 
+            display: 'flex', 
+            flexDirection: 'column', 
+            overflow: 'hidden',
+            maxWidth: '100%'
+          }}>
             <Stack spacing={2}>
               <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
                 <Tabs
@@ -1704,7 +1698,15 @@ const UserManagement: React.FC = () => {
               </Stack>
             </Stack>
 
-            <Box sx={{ flexGrow: 1, mt: 2, overflow: 'hidden' }}>
+            <Box sx={{ 
+              flexGrow: 1, 
+              mt: 2, 
+              overflow: 'hidden', 
+              width: '100%', 
+              maxWidth: '100%',
+              display: 'flex', 
+              flexDirection: 'column' 
+            }}>
               <DataGrid
                 rows={displayData}
                 columns={columns}
@@ -1723,6 +1725,17 @@ const UserManagement: React.FC = () => {
                 sx={{
                   border: 'none',
                   height: '100%',
+                  width: '100%',
+                  maxWidth: '100%',
+                  boxSizing: 'border-box',
+                  '& .MuiDataGrid-root': {
+                    overflow: 'auto',
+                    maxWidth: '100%'
+                  },
+                  '& .MuiDataGrid-main': {
+                    overflow: 'auto',
+                    maxWidth: '100%'
+                  },
                   '& .MuiDataGrid-cell': {
                     borderBottom: `1px solid ${theme.palette.divider}`,
                     fontSize: isMobile ? '0.75rem' : '0.875rem',
@@ -1738,10 +1751,11 @@ const UserManagement: React.FC = () => {
                     borderBottom: `1px solid ${theme.palette.divider}`,
                   },
                   '& .MuiDataGrid-virtualScroller': {
-                    overflow: 'auto',
+                    overflow: 'auto !important',
+                    maxWidth: '100%',
                     '&::-webkit-scrollbar': {
-                      width: '8px',
-                      height: '8px',
+                      width: '10px',
+                      height: '10px',
                     },
                     '&::-webkit-scrollbar-track': {
                       background: '#f1f1f1',
@@ -1752,7 +1766,24 @@ const UserManagement: React.FC = () => {
                       borderRadius: '4px',
                     },
                     '&::-webkit-scrollbar-thumb:hover': {
-                      background: '#666',
+                      background: '#555',
+                    },
+                  },
+                  '& .MuiDataGrid-scrollbar': {
+                    '&::-webkit-scrollbar': {
+                      width: '10px',
+                      height: '10px',
+                    },
+                    '&::-webkit-scrollbar-track': {
+                      background: '#f1f1f1',
+                      borderRadius: '4px',
+                    },
+                    '&::-webkit-scrollbar-thumb': {
+                      background: '#888',
+                      borderRadius: '4px',
+                    },
+                    '&::-webkit-scrollbar-thumb:hover': {
+                      background: '#555',
                     },
                   },
                   '& .MuiDataGrid-columnHeader': {

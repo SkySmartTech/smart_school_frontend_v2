@@ -63,7 +63,7 @@ const examOptions = [
     { label: 'First Term', value: 'First Term' },
     { label: 'Second Term', value: 'Second Term' },
     { label: 'Third Term', value: 'Third Term' },
-    { label: 'Monthly Test', value: 'Monthly Test' },
+    { label: 'Monthly Test', value: 'Monthly' },
 ];
 
 const monthOptions = [
@@ -136,6 +136,7 @@ const TeacherDashboard: React.FC = () => {
     const [excelError, setExcelError] = useState<string>('');
     const [showExcelPreview, setShowExcelPreview] = useState(false);
     const [excelData, setExcelData] = useState<ExtendedStudentMark[]>([]);
+    const excelInputRef = useRef<HTMLInputElement | null>(null);
 
     const admissionDataTimeoutRef = useRef<NodeJS.Timeout | null>(null);
     const lastFetchParamsRef = useRef<string>('');
@@ -166,9 +167,9 @@ const TeacherDashboard: React.FC = () => {
 
     const formatExamName = useCallback((exam: string): string => {
         const examMap: Record<string, string> = {
-            'First Term': 'First',
-            'Second Term': 'Mid',
-            'Third Term': 'End',
+            'First Term': 'First Term',
+            'Second Term': 'Second Term',
+            'Third Term': 'Third Term',
             'Monthly Term': 'Monthly'
         };
         return examMap[exam] || exam;
@@ -220,6 +221,17 @@ const TeacherDashboard: React.FC = () => {
         setSnackbarSeverity(severity);
         setSnackbarOpen(true);
     }, []);
+
+    const handleClearExcel = useCallback(() => {
+        setExcelFile(null);
+        setExcelData([]);
+        setExcelError('');
+        setShowExcelPreview(false);
+        if (excelInputRef.current) {
+            excelInputRef.current.value = '';
+        }
+        showSnackbar('Cleared uploaded Excel data', 'info');
+    }, [showSnackbar]);
 
     const calculateGrade = useCallback((marks: number): string => {
         if (marks < 0 || marks > 100) return "Invalid";
@@ -569,7 +581,7 @@ const TeacherDashboard: React.FC = () => {
             'Grade': 'Grade 8',
             'Class': 'Araliya',
             'Subject': 'Mathematics',
-            'Term': 'First',
+            'Term': 'First Term',
             'Month': 'January',
             'Year': '2025',
             'Marks': '85',
@@ -859,6 +871,7 @@ const TeacherDashboard: React.FC = () => {
                                 >
                                     Upload Excel
                                     <input
+                                        ref={excelInputRef}
                                         type="file"
                                         hidden
                                         accept=".xlsx,.xls"
@@ -872,6 +885,15 @@ const TeacherDashboard: React.FC = () => {
                                     fullWidth={isMobile}
                                 >
                                     Download Template
+                                </Button>
+                                <Button
+                                    variant="outlined"
+                                    onClick={handleClearExcel}
+                                    sx={{ height: 45, width: { xs: '100%', sm: 'auto' } }}
+                                    startIcon={<ClearIcon />}
+                                    fullWidth={isMobile}
+                                >
+                                    Clear Upload
                                 </Button>
                                 {!isMobile && (
                                     <Typography variant="body2" color="textSecondary">

@@ -49,11 +49,11 @@ import {
   type SubjectMark,
 } from "../../api/managementStaffApi";
 
-const years = ["2023", "2024", "2025", "2026", "2027", "2028"];
+const years = ["2023", "2024", "2025", "2026", "2027", "2028", "2029", "2030"];
 const exams = [
-  { label: 'First Term', value: 'First' },
-  { label: 'Second Term', value: 'Mid' },
-  { label: 'Third Term', value: 'End' },
+  { label: 'First Term', value: 'First Term' },
+  { label: 'Second Term', value: 'Second Term' },
+  { label: 'Third Term', value: 'Third Term' },
   { label: 'Monthly Test', value: 'Monthly' }
 ];
 const months = [
@@ -547,13 +547,13 @@ const ManagementStaff: React.FC = () => {
                 <TableHead>
                   <TableRow>
                     <TableCell sx={{ fontWeight: "bold", fontSize: isMobile ? "0.75rem" : "0.875rem", minWidth: isMobile ? 60 : 80 }}>Class</TableCell>
-                    <TableCell align="right" sx={{ fontSize: isMobile ? "0.75rem" : "0.875rem", minWidth: isMobile ? 50 : 70 }}>Eng</TableCell>
-                    <TableCell align="right" sx={{ fontSize: isMobile ? "0.75rem" : "0.875rem", minWidth: isMobile ? 50 : 70 }}>Math</TableCell>
-                    <TableCell align="right" sx={{ fontSize: isMobile ? "0.75rem" : "0.875rem", minWidth: isMobile ? 50 : 70 }}>Sci</TableCell>
-                    <TableCell align="right" sx={{ fontSize: isMobile ? "0.75rem" : "0.875rem", minWidth: isMobile ? 50 : 70 }}>Hist</TableCell>
-                    <TableCell align="right" sx={{ fontSize: isMobile ? "0.75rem" : "0.875rem", minWidth: isMobile ? 50 : 70 }}>Sin</TableCell>
-                    <TableCell align="right" sx={{ fontSize: isMobile ? "0.75rem" : "0.875rem", minWidth: isMobile ? 50 : 70 }}>Bud</TableCell>
-                    <TableCell align="right" sx={{ fontSize: isMobile ? "0.75rem" : "0.875rem", minWidth: isMobile ? 50 : 70 }}>Avg</TableCell>
+                    <TableCell align="right" sx={{ fontSize: isMobile ? "0.75rem" : "0.875rem", minWidth: isMobile ? 50 : 70 }}>English</TableCell>
+                    <TableCell align="right" sx={{ fontSize: isMobile ? "0.75rem" : "0.875rem", minWidth: isMobile ? 50 : 70 }}>Mathematics</TableCell>
+                    <TableCell align="right" sx={{ fontSize: isMobile ? "0.75rem" : "0.875rem", minWidth: isMobile ? 50 : 70 }}>Science</TableCell>
+                    <TableCell align="right" sx={{ fontSize: isMobile ? "0.75rem" : "0.875rem", minWidth: isMobile ? 50 : 70 }}>History</TableCell>
+                    <TableCell align="right" sx={{ fontSize: isMobile ? "0.75rem" : "0.875rem", minWidth: isMobile ? 50 : 70 }}>Sinhala</TableCell>
+                    <TableCell align="right" sx={{ fontSize: isMobile ? "0.75rem" : "0.875rem", minWidth: isMobile ? 50 : 70 }}>Buddhism</TableCell>
+                    <TableCell align="right" sx={{ fontSize: isMobile ? "0.75rem" : "0.875rem", minWidth: isMobile ? 50 : 70 }}>Average</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
