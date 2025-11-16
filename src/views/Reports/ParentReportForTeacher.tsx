@@ -69,9 +69,9 @@ import { DatePicker } from "@mui/x-date-pickers/DatePicker";
 const MONTHLY_EXAM_VALUE = 'Monthly';
 
 const examOptions = [
-    { label: 'First Term', value: 'First' },
-    { label: 'Second Term', value: 'Mid' },
-    { label: 'Third Term', value: 'End' },
+    { label: 'First Term', value: 'First Term' },
+    { label: 'Second Term', value: 'Second Term' },
+    { label: 'Third Term', value: 'Third Term' },
     { label: 'Monthly Test', value: MONTHLY_EXAM_VALUE }
 ];
 
@@ -334,7 +334,7 @@ const ParentReport: React.FC = () => {
                         borderBottom: `1px solid ${theme.palette.divider}`,
                         color: theme.palette.text.primary
                     }}>
-                        <Navbar title="Parent Report For Teacher" sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} />
+                        <Navbar title="Student Report For Teacher" sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} />
                     </AppBar>
 
                     <Stack spacing={3} sx={{ px: { xs: 2, md: 4 }, py: 3 }}>
@@ -388,9 +388,15 @@ const ParentReport: React.FC = () => {
                                     <DatePicker
                                         label="Start Date"
                                         value={startDate}
-                                        onChange={(newValue) => setStartDate(dayjs(newValue))}
+                                        onChange={(newValue) => setStartDate(newValue ? dayjs(newValue) : null)}
+                                        views={['year', 'month', 'day']}
+                                        format="YYYY-MM-DD"
                                         slotProps={{
-                                            textField: { size: 'small', fullWidth: true }
+                                            textField: {
+                                                size: 'small',
+                                                fullWidth: true,
+                                                placeholder: 'YYYY-MM-DD'
+                                            }
                                         }}
                                         sx={{ minWidth: 200, flex: 1 }}
                                     />
@@ -399,15 +405,21 @@ const ParentReport: React.FC = () => {
                                     <DatePicker
                                         label="End Date"
                                         value={endDate}
-                                        onChange={(newValue) => setEndDate(dayjs(newValue))}
+                                        onChange={(newValue) => setEndDate(newValue ? dayjs(newValue) : null)}
+                                        views={['year', 'month', 'day']}
+                                        format="YYYY-MM-DD"
                                         slotProps={{
-                                            textField: { size: 'small', fullWidth: true }
+                                            textField: {
+                                                size: 'small',
+                                                fullWidth: true,
+                                                placeholder: 'YYYY-MM-DD'
+                                            }
                                         }}
                                         sx={{ minWidth: 200, flex: 1 }}
                                     />
 
                                 </Stack>
-                                <Typography variant="h6" sx={{ mb: 2, mt:5, fontWeight: 600,  }}>
+                                <Typography variant="h6" sx={{ mb: 2, mt: 5, fontWeight: 600, }}>
                                     Student Details
                                 </Typography>
 
@@ -477,29 +489,51 @@ const ParentReport: React.FC = () => {
                                     <Paper sx={{ p: 3, flex: 2 }}>
                                         <Typography fontWeight={600} mb={2}>Overall Subject</Typography>
                                         <ResponsiveContainer width="100%" height={250}>
-                                            <BarChart data={reportData?.overallSubjectLineGraph || []}>
-                                                <XAxis dataKey="year" />
-                                                <YAxis />
-                                                <ReTooltip />
-                                                <Legend />
-                                                <Bar dataKey="firstTerm" stackId="a" fill="#8884d8" name="First Term" />
-                                                <Bar dataKey="secondTerm" stackId="a" fill="#82ca9d" name="Second Term" />
-                                                <Bar dataKey="thirdTerm" stackId="a" fill="#ffc658" name="Third Term" />
-                                            </BarChart>
+                                            {isLoadingReport ? (
+                                                <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: 250 }}>
+                                                    <CircularProgress />
+                                                </Box>
+                                            ) : (
+                                                <BarChart data={reportData?.overallSubjectLineGraph} barSize={50}>
+                                                    <XAxis dataKey="year" />
+                                                    <YAxis domain={[0, 100]} />
+                                                    <ReTooltip />
+                                                    <Bar dataKey="firstTerm" fill="#0d1542ff" name="First Term" />
+                                                    <Bar dataKey="secondTerm" fill="#1310b6ff" name="Second Term" />
+                                                    <Bar dataKey="thirdTerm" fill=" #77aef5ff" name="Third Term" />
+                                                </BarChart>
+                                            )}
                                         </ResponsiveContainer>
                                     </Paper>
 
                                     {/* Subject Wise Marks (Pie Chart) */}
                                     <Paper sx={{ p: 3, flex: 1 }}>
-                                        <Typography fontWeight={600} mb={2}>Subject Wise Marks.</Typography>
-                                        <ResponsiveContainer width="100%" height={250}>
+                                        <Typography fontWeight={600} mb={2}>Subject Wise Marks</Typography>
+                                        <ResponsiveContainer width="100%" height={320}>
                                             <PieChart>
-                                                <Pie data={reportData?.subjectWiseMarksPie || []} dataKey="value" nameKey="name" innerRadius={40} outerRadius={80} fill="#8884d8">
+                                                <Pie
+                                                    data={reportData?.subjectWiseMarksPie || []}
+                                                    dataKey="value"
+                                                    nameKey="name"
+                                                    cx="50%"
+                                                    cy="40%"
+                                                    outerRadius={80}
+                                                    label={(props) => {
+                                                        const { name, value } = props;
+                                                        return `${name}: ${value}%`;
+                                                    }}
+                                                    labelLine={false}
+                                                >
                                                     {(reportData?.subjectWiseMarksPie || []).map((_entry, idx) => (
                                                         <Cell key={`cell-${idx}`} fill={COLORS[idx % COLORS.length]} />
                                                     ))}
                                                 </Pie>
-                                                <ReTooltip />
+                                                <ReTooltip formatter={(value) => `${value}%`} />
+                                                <Legend
+                                                    verticalAlign="bottom"
+                                                    height={36}
+                                                    wrapperStyle={{ fontSize: '12px', paddingTop: '10px' }}
+                                                />
                                             </PieChart>
                                         </ResponsiveContainer>
                                     </Paper>

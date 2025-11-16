@@ -53,9 +53,9 @@ import {
 const MONTHLY_EXAM_VALUE = 'Monthly';
 
 const examOptions = [
-    { label: 'First Term', value: 'First' },
-    { label: 'Second Term', value: 'Mid' },
-    { label: 'Third Term', value: 'End' },
+    { label: 'First Term', value: 'First Term' },
+    { label: 'Second Term', value: 'Second Term' },
+    { label: 'Third Term', value: 'Third Term' },
     { label: 'Monthly Test', value: MONTHLY_EXAM_VALUE }
 ];
 
@@ -470,29 +470,33 @@ const ParentReport: React.FC = () => {
 
                                     {/* Subject Wise Marks (Pie Chart) */}
                                     <Paper sx={{ p: 3, flex: 1 }}>
-                                        <Typography fontWeight={600} mb={2}>Subject Wise Marks.</Typography>
-                                        <ResponsiveContainer width="100%" height={250}>
-                                            {isLoadingReport ? (
-                                                <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: 250 }}>
-                                                    <CircularProgress />
-                                                </Box>
-                                            ) : (
-                                                <PieChart>
-                                                    <Pie
-                                                        data={reportData?.subjectWiseMarksPie}
-                                                        dataKey="value"
-                                                        nameKey="name"
-                                                        outerRadius={80}
-                                                        label={(entry: any) => entry.name}
-                                                    >
-                                                        {(reportData?.subjectWiseMarksPie || []).map((_: any, idx: number) => (
-                                                            <Cell key={idx} fill={COLORS[idx % COLORS.length]} />
-                                                        ))}
-                                                    </Pie>
-                                                    <ReTooltip />
-                                                    <Legend />
-                                                </PieChart>
-                                            )}
+                                        <Typography fontWeight={600} mb={2}>Subject Wise Marks</Typography>
+                                        <ResponsiveContainer width="100%" height={320}>
+                                            <PieChart>
+                                                <Pie
+                                                    data={reportData?.subjectWiseMarksPie || []}
+                                                    dataKey="value"
+                                                    nameKey="name"
+                                                    cx="50%"
+                                                    cy="40%"
+                                                    outerRadius={80}
+                                                    label={(props) => {
+                                                        const { name, value } = props;
+                                                        return `${name}: ${value}%`;
+                                                    }}
+                                                    labelLine={false}
+                                                >
+                                                    {(reportData?.subjectWiseMarksPie || []).map((_entry, idx) => (
+                                                        <Cell key={`cell-${idx}`} fill={COLORS[idx % COLORS.length]} />
+                                                    ))}
+                                                </Pie>
+                                                <ReTooltip formatter={(value) => `${value}%`} />
+                                                <Legend
+                                                    verticalAlign="bottom"
+                                                    height={36}
+                                                    wrapperStyle={{ fontSize: '12px', paddingTop: '10px' }}
+                                                />
+                                            </PieChart>
                                         </ResponsiveContainer>
                                     </Paper>
                                 </Stack>

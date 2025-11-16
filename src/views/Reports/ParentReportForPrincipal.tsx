@@ -42,6 +42,8 @@ import { useQuery } from "@tanstack/react-query";
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import dayjs, { type Dayjs } from "dayjs";
+import { DatePicker } from "@mui/x-date-pickers/DatePicker";
+import axios from "axios";
 
 import {
     fetchParentReport,
@@ -65,8 +67,6 @@ interface Student {
         userId: string;
     };
 }
-import { DatePicker } from "@mui/x-date-pickers/DatePicker";
-import axios from "axios";
 
 // Standardize the Monthly Exam value to 'Monthly'
 const MONTHLY_EXAM_VALUE = 'Monthly';
@@ -494,7 +494,7 @@ const ParentReport: React.FC = () => {
                         borderBottom: `1px solid ${theme.palette.divider}`,
                         color: theme.palette.text.primary
                     }}>
-                        <Navbar title="Parent Report For Principal" sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} />
+                        <Navbar title="Student Report For Principal" sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} />
                     </AppBar>
 
                     <Stack spacing={3} sx={{ px: { xs: 2, md: 4 }, py: 3 }}>
@@ -549,9 +549,15 @@ const ParentReport: React.FC = () => {
                                         <DatePicker
                                             label="Start Date"
                                             value={startDate}
-                                            onChange={(newValue) => setStartDate(dayjs(newValue))}
+                                            onChange={(newValue) => setStartDate(newValue ? dayjs(newValue) : null)}
+                                            views={['year', 'month', 'day']}
+                                            format="YYYY-MM-DD"
                                             slotProps={{
-                                                textField: { size: 'small', fullWidth: true }
+                                                textField: {
+                                                    size: 'small',
+                                                    fullWidth: true,
+                                                    placeholder: 'YYYY-MM-DD'
+                                                }
                                             }}
                                         />
 
@@ -559,14 +565,20 @@ const ParentReport: React.FC = () => {
                                         <DatePicker
                                             label="End Date"
                                             value={endDate}
-                                            onChange={(newValue) => setEndDate(dayjs(newValue))}
+                                            onChange={(newValue) => setEndDate(newValue ? dayjs(newValue) : null)}
+                                            views={['year', 'month', 'day']}
+                                            format="YYYY-MM-DD"
                                             slotProps={{
-                                                textField: { size: 'small', fullWidth: true }
+                                                textField: {
+                                                    size: 'small',
+                                                    fullWidth: true,
+                                                    placeholder: 'YYYY-MM-DD'
+                                                }
                                             }}
                                         />
                                     </Stack>
 
-                                    <Typography variant="h6" sx={{ mb: 3, mt:5, fontWeight: 600 }}>
+                                    <Typography variant="h6" sx={{ mb: 3, mt: 5, fontWeight: 600 }}>
                                         Student Details
                                     </Typography>
                                     <Stack spacing={2}>
@@ -580,7 +592,7 @@ const ParentReport: React.FC = () => {
                                                 fullWidth
                                                 size="small"
                                             >
-                                                
+
                                                 <MenuItem value=""><em>None</em></MenuItem>
                                                 {yearOptions.map((y) => (
                                                     <MenuItem key={y} value={y}>{y}</MenuItem>
@@ -704,30 +716,51 @@ const ParentReport: React.FC = () => {
                                     <Paper sx={{ p: 3, flex: 2 }}>
                                         <Typography fontWeight={600} mb={2}>Overall Subject</Typography>
                                         <ResponsiveContainer width="100%" height={250}>
-                                            {/* Recharts bar chart rendering retained from original file */}
-                                            <BarChart data={reportData?.overallSubjectLineGraph || []}>
-                                                <XAxis dataKey="year" />
-                                                <YAxis />
-                                                <ReTooltip />
-                                                <Legend />
-                                                <Bar dataKey="firstTerm" stackId="a" fill="#8884d8" name="First Term" />
-                                                <Bar dataKey="secondTerm" stackId="a" fill="#82ca9d" name="Second Term" />
-                                                <Bar dataKey="thirdTerm" stackId="a" fill="#ffc658" name="Third Term" />
-                                            </BarChart>
+                                            {isLoadingReport ? (
+                                                <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: 250 }}>
+                                                    <CircularProgress />
+                                                </Box>
+                                            ) : (
+                                                <BarChart data={reportData?.overallSubjectLineGraph} barSize={50}>
+                                                    <XAxis dataKey="year" />
+                                                    <YAxis domain={[0, 100]} />
+                                                    <ReTooltip />
+                                                    <Bar dataKey="firstTerm" fill="#0d1542ff" name="First Term" />
+                                                    <Bar dataKey="secondTerm" fill="#1310b6ff" name="Second Term" />
+                                                    <Bar dataKey="thirdTerm" fill=" #77aef5ff" name="Third Term" />
+                                                </BarChart>
+                                            )}
                                         </ResponsiveContainer>
                                     </Paper>
 
                                     {/* Subject Wise Marks (Pie Chart) */}
                                     <Paper sx={{ p: 3, flex: 1 }}>
-                                        <Typography fontWeight={600} mb={2}>Subject Wise Marks.</Typography>
-                                        <ResponsiveContainer width="100%" height={250}>
+                                        <Typography fontWeight={600} mb={2}>Subject Wise Marks</Typography>
+                                        <ResponsiveContainer width="100%" height={320}>
                                             <PieChart>
-                                                <Pie data={reportData?.subjectWiseMarksPie || []} dataKey="value" nameKey="name" innerRadius={40} outerRadius={80} fill="#8884d8">
+                                                <Pie
+                                                    data={reportData?.subjectWiseMarksPie || []}
+                                                    dataKey="value"
+                                                    nameKey="name"
+                                                    cx="50%"
+                                                    cy="40%"
+                                                    outerRadius={80}
+                                                    label={(props) => {
+                                                        const { name, value } = props;
+                                                        return `${name}: ${value}%`;
+                                                    }}
+                                                    labelLine={false}
+                                                >
                                                     {(reportData?.subjectWiseMarksPie || []).map((_entry, idx) => (
                                                         <Cell key={`cell-${idx}`} fill={COLORS[idx % COLORS.length]} />
                                                     ))}
                                                 </Pie>
-                                                <ReTooltip />
+                                                <ReTooltip formatter={(value) => `${value}%`} />
+                                                <Legend
+                                                    verticalAlign="bottom"
+                                                    height={36}
+                                                    wrapperStyle={{ fontSize: '12px', paddingTop: '10px' }}
+                                                />
                                             </PieChart>
                                         </ResponsiveContainer>
                                     </Paper>

@@ -161,11 +161,11 @@ const Sidebar = ({ open, setOpen }: SidebarProps) => {
           href: "/parentReport", permission: "parentReport"
         },
         {
-          title: "Parent Teacher Report", icon: <SubdirectoryArrowRight fontSize="small" />,
+          title: "Student Report For Teacher", icon: <SubdirectoryArrowRight fontSize="small" />,
           href: "/parentTeacherReport", permission: "parentTeacherReport"
         },
         {
-          title: "Parent Principal Report", icon: <SubdirectoryArrowRight fontSize="small" />,
+          title: "Student Report For Principal", icon: <SubdirectoryArrowRight fontSize="small" />,
           href: "/parentPrincipalReport", permission: "parentPrincipalReport"
         },
       ],

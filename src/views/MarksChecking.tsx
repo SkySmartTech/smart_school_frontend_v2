@@ -24,9 +24,9 @@ import Navbar from "../components/Navbar";
 import { fetchGradesFromApi, fetchMarksStatus, fetchYearsFromApi, type DropdownOption, type MarksStatusItem } from "../api/marksCheckingApi";
 
 const exams = [
-    { label: "First Term", value: "First" },
-    { label: "Second Term", value: "Mid" },
-    { label: "Third Term", value: "End" },
+    { label: "First Term", value: "FiFirst Termrst" },
+    { label: "Second Term", value: "Second Term" },
+    { label: "Third Term", value: "Third Term" },
     { label: "Monthly Test", value: "Monthly" },
 ];
 
