@@ -568,9 +568,14 @@ const AddStudent = () => {
 
           {/* Students Table */}
           <Paper sx={{ p: { xs: 1.5, sm: 2 } }}>
-            <Typography variant={isMobile ? "subtitle1" : "h6"} gutterBottom>
-              Students List
-            </Typography>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+              <Typography variant={isMobile ? "subtitle1" : "h6"} gutterBottom sx={{ mb: 0 }}>
+                Students List
+              </Typography>
+              <Typography variant={isMobile ? "caption" : "body2"} sx={{ fontWeight: 'bold', color: 'primary.main' }}>
+                Total: {students.length} {students.length === 1 ? 'Student' : 'Students'}
+              </Typography>
+            </Box>
             {loading ? (
               <Box sx={{ display: 'flex', justifyContent: 'center', p: 3 }}>
                 <CircularProgress />

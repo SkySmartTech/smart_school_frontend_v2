@@ -121,9 +121,15 @@ const ManagementStaff: React.FC = () => {
     const fetchGrades = async () => {
       try {
         const grades = await fetchGradesFromApi();
-        setGradeOptions(grades);
-        if (grades.length > 0) {
-          setGrade(grades[0].value);
+        // Sort grades numerically (Grade 1, Grade 2, etc.)
+        const sortedGrades = [...grades].sort((a, b) => {
+          const gradeNumA = parseInt(a.label?.replace(/[^\d]/g, '') || '0', 10);
+          const gradeNumB = parseInt(b.label?.replace(/[^\d]/g, '') || '0', 10);
+          return gradeNumA - gradeNumB;
+        });
+        setGradeOptions(sortedGrades);
+        if (sortedGrades.length > 0) {
+          setGrade(sortedGrades[0].value);
         }
       } catch (error) {
         console.error("Failed to fetch grades:", error);

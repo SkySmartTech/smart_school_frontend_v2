@@ -1277,7 +1277,14 @@ const RegisterForm = ({ onSuccess = () => { }, onError = () => { } }: RegisterFo
                     helperText={errors.studentGrade?.message}
                     sx={{ "& .MuiOutlinedInput-root": { borderRadius: "10px", height: "40px" } }}
                   >
-                    {grades.map((g: any) => <MenuItem key={g.id} value={g.grade}>{g.grade}</MenuItem>)}
+                    {grades
+                      .slice()
+                      .sort((a: any, b: any) => {
+                        const gradeNumA = parseInt(a.grade?.replace(/[^\d]/g, '') || '0', 10);
+                        const gradeNumB = parseInt(b.grade?.replace(/[^\d]/g, '') || '0', 10);
+                        return gradeNumA - gradeNumB;
+                      })
+                      .map((g: any) => <MenuItem key={g.id} value={g.grade}>{g.grade}</MenuItem>)}
                   </TextField>
 
                   <TextField
@@ -1290,7 +1297,10 @@ const RegisterForm = ({ onSuccess = () => { }, onError = () => { } }: RegisterFo
                     helperText={errors.studentClass?.message}
                     sx={{ "& .MuiOutlinedInput-root": { borderRadius: "10px", height: "40px" } }}
                   >
-                    {classes.map((c: any) => <MenuItem key={c.id} value={c.class}>{c.class}</MenuItem>)}
+                    {classes
+                      .slice()
+                      .sort((a: any, b: any) => a.class.localeCompare(b.class))
+                      .map((c: any) => <MenuItem key={c.id} value={c.class}>{c.class}</MenuItem>)}
                   </TextField>
                 </Stack>
 
