@@ -105,7 +105,13 @@ const SystemManagement = () => {
         switch (activeTab) {
           case 0: // Grades
             const gradesData = await fetchGrades();
-            setGrades(gradesData);
+            const sortedGrades = [...gradesData].sort((a, b) => {
+              // Extract numeric value from grade string (e.g., "Grade 1" -> 1)
+              const gradeNumA = parseInt(a.grade?.replace(/[^\d]/g, '') || '0', 10);
+              const gradeNumB = parseInt(b.grade?.replace(/[^\d]/g, '') || '0', 10);
+              return gradeNumA - gradeNumB; // Ascending order (Grade 1, 2, 3, etc.)
+            });
+            setGrades(sortedGrades);
             break;
           case 1: // Subjects
             const subjectsData = await fetchSubjects();
@@ -149,6 +155,60 @@ const SystemManagement = () => {
 
     fetchData();
   }, [activeTab]);
+
+  const refreshTabData = async () => {
+    try {
+      switch (activeTab) {
+        case 0: {
+          const gradesData = await fetchGrades();
+          const sortedGrades = [...gradesData].sort((a, b) => {
+            const gradeNumA = parseInt(a.grade?.replace(/[^\d]/g, '') || '0', 10);
+            const gradeNumB = parseInt(b.grade?.replace(/[^\d]/g, '') || '0', 10);
+            return gradeNumA - gradeNumB;
+          });
+          setGrades(sortedGrades);
+          break;
+        }
+        case 1: {
+          const subjectsData = await fetchSubjects();
+          const sortedSubjects = [...subjectsData].sort((a, b) => {
+            const nameA = (a.mainSubject || a.subjectName || '').toLowerCase();
+            const nameB = (b.mainSubject || b.subjectName || '').toLowerCase();
+            return nameA.localeCompare(nameB);
+          });
+          setSubjects(sortedSubjects);
+          break;
+        }
+        case 2: {
+          const classesData = await fetchClasses();
+          const sortedClasses = [...classesData].sort((a, b) => {
+            const nameA = (a.class || '').toLowerCase();
+            const nameB = (b.class || '').toLowerCase();
+            return nameA.localeCompare(nameB);
+          });
+          setClasses(sortedClasses);
+          break;
+        }
+        case 3: {
+          const yearsData = await fetchYears();
+          const sortedYears = [...yearsData].sort((a, b) => {
+            const yearA = parseInt(a.year || '0');
+            const yearB = parseInt(b.year || '0');
+            return yearB - yearA;
+          });
+          setYears(sortedYears);
+          break;
+        }
+        case 4: {
+          const commonSettingsData = await fetchCommonSettings();
+          setCommonSettings(commonSettingsData);
+          break;
+        }
+      }
+    } catch (error) {
+      console.error('Error refreshing tab data:', error);
+    }
+  };
 
   const handleTabChange = (_event: React.SyntheticEvent, newValue: number) => {
     setActiveTab(newValue);
@@ -194,41 +254,7 @@ const SystemManagement = () => {
       showSnackbar('Item deleted successfully', 'success');
 
       // Refresh data
-      switch (activeTab) {
-        case 0: 
-          setGrades(await fetchGrades()); 
-          break;
-        case 1: 
-          const subjectsData = await fetchSubjects();
-          const sortedSubjects = [...subjectsData].sort((a, b) => {
-            const nameA = (a.mainSubject || a.subjectName || '').toLowerCase();
-            const nameB = (b.mainSubject || b.subjectName || '').toLowerCase();
-            return nameA.localeCompare(nameB);
-          });
-          setSubjects(sortedSubjects);
-          break;
-        case 2: 
-          const classesDataDeleted = await fetchClasses();
-          const sortedClassesDeleted = [...classesDataDeleted].sort((a, b) => {
-            const nameA = (a.class || '').toLowerCase();
-            const nameB = (b.class || '').toLowerCase();
-            return nameA.localeCompare(nameB);
-          });
-          setClasses(sortedClassesDeleted);
-          break;
-        case 3:
-          const yearsDataDeleted = await fetchYears();
-          const sortedYearsDeleted = [...yearsDataDeleted].sort((a, b) => {
-            const yearA = parseInt(a.year || '0');
-            const yearB = parseInt(b.year || '0');
-            return yearB - yearA;
-          });
-          setYears(sortedYearsDeleted);
-          break;
-        case 4: 
-          setCommonSettings(await fetchCommonSettings()); 
-          break;
-      }
+      await refreshTabData();
     } catch (error) {
       console.error('Error deleting item:', error);
       showSnackbar('Failed to delete item', 'error');
@@ -274,41 +300,7 @@ const SystemManagement = () => {
       setOpenForm(false);
 
       // Refresh data
-      switch (activeTab) {
-        case 0: 
-          setGrades(await fetchGrades()); 
-          break;
-        case 1: 
-          const subjectsData = await fetchSubjects();
-          const sortedSubjects = [...subjectsData].sort((a, b) => {
-            const nameA = (a.mainSubject || a.subjectName || '').toLowerCase();
-            const nameB = (b.mainSubject || b.subjectName || '').toLowerCase();
-            return nameA.localeCompare(nameB);
-          });
-          setSubjects(sortedSubjects);
-          break;
-        case 2: 
-          const classesDataSubmit = await fetchClasses();
-          const sortedClassesSubmit = [...classesDataSubmit].sort((a, b) => {
-            const nameA = (a.class || '').toLowerCase();
-            const nameB = (b.class || '').toLowerCase();
-            return nameA.localeCompare(nameB);
-          });
-          setClasses(sortedClassesSubmit);
-          break;
-        case 3:
-          const yearsDataSubmit = await fetchYears();
-          const sortedYearsSubmit = [...yearsDataSubmit].sort((a, b) => {
-            const yearA = parseInt(a.year || '0');
-            const yearB = parseInt(b.year || '0');
-            return yearB - yearA;
-          });
-          setYears(sortedYearsSubmit);
-          break;
-        case 4: 
-          setCommonSettings(await fetchCommonSettings()); 
-          break;
-      }
+      await refreshTabData();
     } catch (error: any) {
       console.error('Error saving data:', error);
 

@@ -427,9 +427,13 @@ const ManagementStaff: React.FC = () => {
           )}
 
           {/* Charts Section */}
-          <Stack direction="column" spacing={isMobile ? 2 : 3}>
+          <Stack 
+            direction={isMobile ? "column" : "row"} 
+            spacing={isMobile ? 2 : 3}
+            sx={{ width: "100%" }}
+          >
             {/* Subject Distribution Chart */}
-            <Paper elevation={2} sx={{ p: isMobile ? 2 : 3, width: "100%" }}>
+            <Paper elevation={2} sx={{ p: isMobile ? 2 : 3, width: isMobile ? "100%" : "50%", flex: isMobile ? "unset" : 1 }}>
               <Typography variant={isMobile ? "subtitle1" : "h6"} fontWeight={600} mb={2}>
                 Subject Distribution
               </Typography>
@@ -486,12 +490,12 @@ const ManagementStaff: React.FC = () => {
             </Paper>
 
             {/* Class Performance Chart */}
-            <Paper elevation={2} sx={{ p: isMobile ? 2 : 3, width: "100%" }}>
+            <Paper elevation={2} sx={{ p: isMobile ? 2 : 3, width: isMobile ? "100%" : "50%", flex: isMobile ? "unset" : 1 }}>
               <Typography variant={isMobile ? "subtitle1" : "h6"} fontWeight={600} mb={2}>
                 Class Performance
               </Typography>
-              <Box sx={{ overflowX: "auto", width: "100%" }}>
-                <ResponsiveContainer width={isMobile ? 600 : "100%"} height={isMobile ? 280 : 350}>
+              <Box sx={{ width: "100%", overflowX: "auto" }}>
+                <ResponsiveContainer width="100%" height={isMobile ? 280 : 350} minWidth={isMobile ? 300 : 400}>
                   {isLoading ? (
                     <Box sx={{ display: "flex", justifyContent: "center", alignItems: "center", height: "100%" }}>
                       <CircularProgress />
