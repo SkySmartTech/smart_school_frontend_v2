@@ -19,6 +19,13 @@ export interface DetailedMarksTableRow {
     studentGrade: string;
 }
 
+export interface YearOption {
+    id: number;
+    year: string;
+    created_at: string;
+    updated_at: string;
+}
+
 export interface OverallSubjectData {
     year: string;
     firstTerm: number;
@@ -30,6 +37,8 @@ export interface ParentReportData {
     studentName: string;
     studentGrade: string;
     studentClass: string;
+    currentYear?: number;
+    currentTerm?: string;
     studentMarksDetailedTable: DetailedMarksTableRow[];
     subjectWiseMarksPie: ParentSubjectPieData[];
     overallSubjectLineGraph: OverallSubjectData[];
@@ -170,12 +179,12 @@ export const fetchChildrenList = async (): Promise<ChildDetails[]> => {
 
 /**
  * API call to fetch parent report data
- * Route format: /api/parent-report-data/{studentAdmissionNo}/{start_date}/{end_date}/{exam}/{month}/{student_grade}/{student_class}
+ * Route format: /api/parent-report-data/{studentAdmissionNo}/{startYear}/{endYear}/{exam}/{month}/{student_grade}/{student_class}
  */
 export const fetchParentReport = async (
     studentAdmissionNo: string,
-    startDate: string,
-    endDate: string,
+    startYear: string,
+    endYear: string,
     exam: string,
     month: string,
     studentGrade: string,
@@ -186,8 +195,8 @@ export const fetchParentReport = async (
         const sanitizedMonth = month || 'null';
 
         // Constructing the URL according to your backend route format:
-        // /api/parent-report-data/{studentAdmissionNo}/{start_date}/{end_date}/{exam}/{month}/{student_grade}/{student_class}
-        const urlPath = `${API_BASE_URL}/api/parent-report-data/${encodeURIComponent(studentAdmissionNo)}/${startDate}/${endDate}/${exam}/${sanitizedMonth}/${encodeURIComponent(studentGrade)}/${encodeURIComponent(studentClass)}`;
+        // /api/parent-report-data/{studentAdmissionNo}/{startYear}/{endYear}/{exam}/{month}/{student_grade}/{student_class}
+        const urlPath = `${API_BASE_URL}/api/parent-report-data/${encodeURIComponent(studentAdmissionNo)}/${startYear}/${endYear}/${exam}/${sanitizedMonth}/${encodeURIComponent(studentGrade)}/${encodeURIComponent(studentClass)}`;
 
         console.log('API URL:', urlPath);
         console.log('Student Admission No:', studentAdmissionNo);
@@ -210,6 +219,8 @@ export const fetchParentReport = async (
             studentName: response.data.studentName || response.data.student_name || '',
             studentGrade: response.data.studentGrade || response.data.student_grade || '',
             studentClass: response.data.studentClass || response.data.student_class || '',
+            currentYear: response.data.current_year || response.data.currentYear,
+            currentTerm: response.data.current_term || response.data.currentTerm,
 
             // Transform highest_marks_per_subject and marks_and_grades into studentMarksDetailedTable
             studentMarksDetailedTable: transformToDetailedMarksTable(
@@ -223,7 +234,7 @@ export const fetchParentReport = async (
                 value: item.percentage || item.marks || 0
             })),
 
-            // Transform yearly_term_averages to bar chart data
+            // Transform yearly_term_averages to bar chart data - now returns only selected term
             overallSubjectLineGraph: (response.data.yearly_term_averages || []).map((item: any) => ({
                 year: item.year?.toString() || '',
                 firstTerm: item.terms?.find((t: any) => t.term === 'First Term')?.average_marks || 0,
@@ -312,6 +323,39 @@ export const fetchChildDetails = async (): Promise<ChildDetails> => {
                 throw new Error('Session expired. Please login again.');
             }
             throw new Error(error.response?.data?.message || 'Request failed');
+        }
+        throw new Error("Network error occurred");
+    }
+};
+
+/**
+ * Fetch list of academic years from the backend
+ * Route: /api/years
+ */
+export const fetchYears = async (): Promise<YearOption[]> => {
+    try {
+        const authHeader = getAuthHeader();
+        const response = await axios.get(`${API_BASE_URL}/api/years`, {
+            headers: authHeader.headers,
+        });
+
+        const yearsData = response.data;
+
+        if (!Array.isArray(yearsData)) {
+            throw new Error("Years data is not an array");
+        }
+
+        return yearsData;
+
+    } catch (error) {
+        if (axios.isAxiosError(error)) {
+            if (error.response?.status === 401) {
+                localStorage.removeItem('authToken');
+                localStorage.removeItem('token');
+                localStorage.removeItem('access_token');
+                throw new Error('Session expired. Please login again.');
+            }
+            throw new Error(error.response?.data?.message || 'Failed to fetch years');
         }
         throw new Error("Network error occurred");
     }

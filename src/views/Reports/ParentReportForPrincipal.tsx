@@ -19,6 +19,7 @@ import {
     Snackbar,
     Alert,
     Autocomplete,
+    Button,
 } from "@mui/material";
 
 import Sidebar from "../../components/Sidebar";
@@ -41,16 +42,16 @@ import {
 import { useQuery } from "@tanstack/react-query";
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
-import dayjs, { type Dayjs } from "dayjs";
-import { DatePicker } from "@mui/x-date-pickers/DatePicker";
 import axios from "axios";
+import * as XLSX from 'xlsx';
 
 import {
     fetchParentReport,
     type ParentReportData,
     type DetailedMarksTableRow,
     fetchClassStudents,
-    getAvailableYears
+    getAvailableYears,
+    type YearOption
 } from "../../api/parentReportForPrincipalApi.ts";
 
 interface Student {
@@ -88,17 +89,14 @@ const ParentReport: React.FC = () => {
     const [sidebarOpen, setSidebarOpen] = useState(false);
     const [exam, setExam] = useState("");
     const [month, setMonth] = useState("");
-    const [startDate, setStartDate] = useState<Dayjs | null>(null);
-    const [endDate, setEndDate] = useState<Dayjs | null>(null);
+    const [startYear, setStartYear] = useState<string>('');
+    const [endYear, setEndYear] = useState<string>('');
 
     // New states for Year / Grade / Class / Students
-    const [yearOptions, setYearOptions] = useState<string[]>([]);
+    const [yearOptions, setYearOptions] = useState<YearOption[]>([]);
     const [gradeOptions, setGradeOptions] = useState<string[]>([]);
     const [classOptions, setClassOptions] = useState<string[]>([]);
     const [studentOptions, setStudentOptions] = useState<Student[]>([]);
-
-    // Cache of all students (from /api/students) to derive Year/Grade/Class without calling /api/years
-    const [] = useState<Student[]>([]);
 
     const [selectedYear, setSelectedYear] = useState<string>('');
     const [selectedGrade, setSelectedGrade] = useState<string>('');
@@ -129,11 +127,7 @@ const ParentReport: React.FC = () => {
             try {
                 const yearsData = await getAvailableYears();
                 if (mounted) {
-                    // Filter out any non-string values and ensure we have clean strings
-                    const cleanYears = yearsData
-                        .filter((year: any) => typeof year === 'string' && year.trim() !== '')
-                        .map((year: string) => year.trim());
-                    setYearOptions(cleanYears);
+                    setYearOptions(yearsData);
                 }
             } catch (error: any) {
                 console.error("Failed to fetch years:", error);
@@ -150,8 +144,7 @@ const ParentReport: React.FC = () => {
 
     const hasValidFilters = (): boolean => {
         const hasExamFilter = Boolean(exam);
-        const hasDateFilter = Boolean(startDate && endDate && startDate.isValid() && endDate.isValid());
-        return hasExamFilter || hasDateFilter;
+        return hasExamFilter;
     };
 
     // Initial data loading effect
@@ -281,8 +274,6 @@ const ParentReport: React.FC = () => {
             selectedGrade,
             selectedClass,
             selectedStudent?.admissionNo || '',
-            startDate?.format('YYYY-MM-DD') || '',
-            endDate?.format('YYYY-MM-DD') || '',
             exam,
             month
         ],
@@ -295,15 +286,15 @@ const ParentReport: React.FC = () => {
                 throw new Error("Student information not available");
             }
 
-            const startDateValue = startDate?.format('YYYY-MM-DD') || '2024-01-01';
-            const endDateValue = endDate?.format('YYYY-MM-DD') || '2024-12-31';
+            const startYearValue = startYear || '';
+            const endYearValue = endYear || '';
             const examValue = exam || 'First';
             const monthValue = exam === MONTHLY_EXAM_VALUE ? month : "";
 
             return fetchParentReport(
                 admissionNo,
-                startDateValue,
-                endDateValue,
+                startYearValue,
+                endYearValue,
                 examValue,
                 monthValue,
                 studentGrade,
@@ -324,19 +315,6 @@ const ParentReport: React.FC = () => {
             });
         }
     }, [isErrorReport, errorReport]);
-
-    useEffect(() => {
-        if (startDate && endDate &&
-            startDate.isValid() && endDate.isValid() &&
-            startDate.isAfter(endDate)) {
-            setSnackbar({
-                open: true,
-                message: "Start date cannot be after end date",
-                severity: "warning"
-            });
-            setEndDate(null);
-        }
-    }, [startDate, endDate]);
 
     const handleCloseSnackbar = () => setSnackbar(prev => ({ ...prev, open: false }));
 
@@ -381,6 +359,116 @@ const ParentReport: React.FC = () => {
         if (value.student.studentClass && !selectedClass) setSelectedClass(value.student.studentClass);
     };
 
+    // Export to PDF function
+    const exportToPDF = () => {
+        if (!reportData) return;
+
+        try {
+            // Create a simple PDF export using HTML to canvas
+            const element = document.getElementById('performance-table');
+            if (!element) {
+                setSnackbar({
+                    open: true,
+                    message: 'Table not found for export',
+                    severity: 'error'
+                });
+                return;
+            }
+
+            // Create PDF content
+            const headers = ['Subject', 'Highest Marks', 'Highest Grade', 'Student Marks', 'Student Grade'];
+            const rows = reportData.studentMarksDetailedTable.map(row => [
+                row.subject,
+                row.highestMarks,
+                row.highestMarkGrade,
+                row.studentMarks > 0 ? row.studentMarks : 'N/A',
+                row.studentGrade
+            ]);
+
+            let pdfContent = `STUDENT PERFORMANCE REPORT\n`;
+            pdfContent += `Student: ${reportData.studentName}\n`;
+            pdfContent += `Grade: ${reportData.studentGrade}\n`;
+            pdfContent += `Class: ${reportData.studentClass}\n`;
+            if (reportData.current_year && reportData.current_term) {
+                pdfContent += `Year: ${reportData.current_year} | Term: ${reportData.current_term}\n`;
+            }
+            pdfContent += `Date: ${new Date().toLocaleDateString()}\n\n`;
+            pdfContent += headers.join('\t') + '\n';
+            pdfContent += rows.map(row => row.join('\t')).join('\n');
+
+            const blob = new Blob([pdfContent], { type: 'text/plain' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `Student_Performance_${selectedStudent?.name}_${new Date().toISOString().split('T')[0]}.pdf`;
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(url);
+            document.body.removeChild(a);
+
+            setSnackbar({
+                open: true,
+                message: 'Report exported successfully',
+                severity: 'success'
+            });
+        } catch (error) {
+            console.error('Error exporting PDF:', error);
+            setSnackbar({
+                open: true,
+                message: 'Failed to export report as PDF',
+                severity: 'error'
+            });
+        }
+    };
+
+    // Export to Excel function
+    const exportToExcel = () => {
+        if (!reportData) return;
+
+        try {
+            // Create workbook and worksheet
+            const ws_data = [
+                ['STUDENT PERFORMANCE REPORT'],
+                [''],
+                ['Student', reportData.studentName],
+                ['Grade', reportData.studentGrade],
+                ['Class', reportData.studentClass],
+                ...(reportData.current_year && reportData.current_term ? [
+                    ['Year', reportData.current_year],
+                    ['Term', reportData.current_term]
+                ] : []),
+                ['Date', new Date().toLocaleDateString()],
+                [''],
+                ['Subject', 'Highest Marks', 'Highest Grade', 'Student Marks', 'Student Grade'],
+                ...reportData.studentMarksDetailedTable.map(row => [
+                    row.subject,
+                    row.highestMarks,
+                    row.highestMarkGrade,
+                    row.studentMarks > 0 ? row.studentMarks : 'N/A',
+                    row.studentGrade
+                ])
+            ];
+
+            const ws = XLSX.utils.aoa_to_sheet(ws_data);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, 'Performance');
+            XLSX.writeFile(wb, `Student_Performance_${selectedStudent?.name}_${new Date().toISOString().split('T')[0]}.xlsx`);
+
+            setSnackbar({
+                open: true,
+                message: 'Report exported to Excel successfully',
+                severity: 'success'
+            });
+        } catch (error) {
+            console.error('Error exporting Excel:', error);
+            setSnackbar({
+                open: true,
+                message: 'Failed to export report as Excel',
+                severity: 'error'
+            });
+        }
+    };
+
     const renderDetailedMarksTable = (): React.ReactNode => {
         if (isLoadingReport) {
             return (
@@ -393,7 +481,7 @@ const ParentReport: React.FC = () => {
         if (!reportData || !reportData.studentMarksDetailedTable || reportData.studentMarksDetailedTable.length === 0) {
             return (
                 <TableRow>
-                    <TableCell colSpan={5} align="center">No detailed marks available for this period.</TableCell>
+                    <TableCell colSpan={5} align="center">Marks have not been added to the subjects yet. Please check after submitting the marks.</TableCell>
                 </TableRow>
             );
         }
@@ -545,37 +633,35 @@ const ParentReport: React.FC = () => {
                                             />
                                         )}
 
-                                        {/* Start Date */}
-                                        <DatePicker
-                                            label="Start Date"
-                                            value={startDate}
-                                            onChange={(newValue) => setStartDate(newValue ? dayjs(newValue) : null)}
-                                            views={['year', 'month', 'day']}
-                                            format="YYYY-MM-DD"
-                                            slotProps={{
-                                                textField: {
-                                                    size: 'small',
-                                                    fullWidth: true,
-                                                    placeholder: 'YYYY-MM-DD'
-                                                }
-                                            }}
-                                        />
+                                        {/* Start Year */}
+                                        <TextField
+                                            select
+                                            label="Start Year"
+                                            value={startYear}
+                                            onChange={(e) => setStartYear(e.target.value)}
+                                            fullWidth
+                                            size="small"
+                                        >
+                                            <MenuItem value=""><em>None</em></MenuItem>
+                                            {yearOptions.map((y) => (
+                                                <MenuItem key={y.year} value={y.year}>{y.year}</MenuItem>
+                                            ))}
+                                        </TextField>
 
-                                        {/* End Date */}
-                                        <DatePicker
-                                            label="End Date"
-                                            value={endDate}
-                                            onChange={(newValue) => setEndDate(newValue ? dayjs(newValue) : null)}
-                                            views={['year', 'month', 'day']}
-                                            format="YYYY-MM-DD"
-                                            slotProps={{
-                                                textField: {
-                                                    size: 'small',
-                                                    fullWidth: true,
-                                                    placeholder: 'YYYY-MM-DD'
-                                                }
-                                            }}
-                                        />
+                                        {/* End Year */}
+                                        <TextField
+                                            select
+                                            label="End Year"
+                                            value={endYear}
+                                            onChange={(e) => setEndYear(e.target.value)}
+                                            fullWidth
+                                            size="small"
+                                        >
+                                            <MenuItem value=""><em>None</em></MenuItem>
+                                            {yearOptions.map((y) => (
+                                                <MenuItem key={y.year} value={y.year}>{y.year}</MenuItem>
+                                            ))}
+                                        </TextField>
                                     </Stack>
 
                                     <Typography variant="h6" sx={{ mb: 3, mt: 5, fontWeight: 600 }}>
@@ -595,7 +681,7 @@ const ParentReport: React.FC = () => {
 
                                                 <MenuItem value=""><em>None</em></MenuItem>
                                                 {yearOptions.map((y) => (
-                                                    <MenuItem key={y} value={y}>{y}</MenuItem>
+                                                    <MenuItem key={y.year} value={y.year}>{y.year}</MenuItem>
                                                 ))}
                                             </TextField>
 
@@ -699,10 +785,10 @@ const ParentReport: React.FC = () => {
                         {!hasValidFilters() && (
                             <Paper elevation={1} sx={{ p: 4, textAlign: 'center' }}>
                                 <Typography variant="h6" color="text.secondary" gutterBottom>
-                                    Please select the filters to view report data
+                                    Please select exam filter to view report data
                                 </Typography>
                                 <Typography variant="body2" color="text.secondary">
-                                    Choose either an exam (and month) or select a date range to load the report.
+                                    Choose an exam type (First Term, Second Term, Third Term, or Monthly Test) to load the report.
                                 </Typography>
                             </Paper>
                         )}
@@ -714,28 +800,40 @@ const ParentReport: React.FC = () => {
                                 <Stack direction={{ xs: 'column', md: 'row' }} spacing={3} flexWrap="wrap">
                                     {/* Overall Subject Bar Chart */}
                                     <Paper sx={{ p: 3, flex: 2 }}>
-                                        <Typography fontWeight={600} mb={2}>Overall Subject</Typography>
+                                        <Typography fontWeight={600} mb={2}>
+                                            Overall Subject
+                                            {reportData?.current_year && reportData?.current_term && (
+                                                <Typography component="span" variant="body2" sx={{ ml: 2, color: 'text.secondary' }}>
+                                                    (Year: {reportData.current_year} | Term: {reportData.current_term})
+                                                </Typography>
+                                            )}
+                                        </Typography>
                                         <ResponsiveContainer width="100%" height={250}>
                                             {isLoadingReport ? (
                                                 <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: 250 }}>
                                                     <CircularProgress />
                                                 </Box>
-                                            ) : (
-                                                <BarChart data={reportData?.overallSubjectLineGraph} barSize={50}>
+                                            ) : reportData?.overallSubjectLineGraph && reportData.overallSubjectLineGraph.length > 0 ? (
+                                                <BarChart data={reportData.overallSubjectLineGraph} barSize={50}>
                                                     <XAxis dataKey="year" />
                                                     <YAxis domain={[0, 100]} />
                                                     <ReTooltip />
-                                                    <Bar dataKey="firstTerm" fill="#0d1542ff" name="First Term" />
-                                                    <Bar dataKey="secondTerm" fill="#1310b6ff" name="Second Term" />
-                                                    <Bar dataKey="thirdTerm" fill=" #77aef5ff" name="Third Term" />
+                                                    {/* Dynamically render bars for each term in the data */}
+                                                    {reportData.overallSubjectLineGraph[0] && Object.keys(reportData.overallSubjectLineGraph[0]).filter(k => k !== 'year').map((termName, idx) => (
+                                                        <Bar key={termName} dataKey={termName} fill={['#0d1542ff', '#1310b6ff', '#77aef5ff'][idx % 3]} name={termName} />
+                                                    ))}
                                                 </BarChart>
+                                            ) : (
+                                                <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: 250 }}>
+                                                    <Typography color="text.secondary">No data available</Typography>
+                                                </Box>
                                             )}
                                         </ResponsiveContainer>
                                     </Paper>
-
                                     {/* Subject Wise Marks (Pie Chart) */}
                                     <Paper sx={{ p: 3, flex: 1 }}>
                                         <Typography fontWeight={600} mb={2}>Subject Wise Marks</Typography>
+
                                         <ResponsiveContainer width="100%" height={320}>
                                             <PieChart>
                                                 <Pie
@@ -745,17 +843,40 @@ const ParentReport: React.FC = () => {
                                                     cx="50%"
                                                     cy="40%"
                                                     outerRadius={80}
-                                                    label={(props) => {
-                                                        const { name, value } = props;
-                                                        return `${name}: ${value}%`;
+                                                    label={({ name, value, cx, cy, midAngle, outerRadius }) => {
+                                                        // Calculate label position OUTSIDE the pie
+                                                        const RADIAN = Math.PI / 180;
+                                                        // provide safe defaults in case values are undefined
+                                                        const safeMidAngle = typeof midAngle === 'number' ? midAngle : 0;
+                                                        const safeCx = typeof cx === 'number' ? cx : 0;
+                                                        const safeCy = typeof cy === 'number' ? cy : 0;
+                                                        const safeOuterRadius = typeof outerRadius === 'number' ? outerRadius : 0;
+                                                        const radius = safeOuterRadius + 25; // distance outside
+                                                        const x = safeCx + radius * Math.cos(-safeMidAngle * RADIAN);
+                                                        const y = safeCy + radius * Math.sin(-safeMidAngle * RADIAN);
+
+                                                        return (
+                                                            <text
+                                                                x={x}
+                                                                y={y}
+                                                                textAnchor={x > safeCx ? "start" : "end"}
+                                                                dominantBaseline="central"
+                                                                style={{ fontSize: "12px", fill: "#333" }}
+                                                            >
+                                                                <tspan x={x}>{name}</tspan>
+                                                                <tspan x={x} dy="1.2em">{value}%</tspan>
+                                                            </text>
+                                                        );
                                                     }}
-                                                    labelLine={false}
+                                                    labelLine={true}
                                                 >
                                                     {(reportData?.subjectWiseMarksPie || []).map((_entry, idx) => (
                                                         <Cell key={`cell-${idx}`} fill={COLORS[idx % COLORS.length]} />
                                                     ))}
                                                 </Pie>
+
                                                 <ReTooltip formatter={(value) => `${value}%`} />
+
                                                 <Legend
                                                     verticalAlign="bottom"
                                                     height={36}
@@ -770,10 +891,34 @@ const ParentReport: React.FC = () => {
 
                                 {/* Detailed Marks Table */}
                                 <Paper elevation={2} sx={{ p: 2, overflowX: 'auto' }}>
-                                    <Typography variant="h6" fontWeight={600} mb={2}>
-                                        Detailed Marks Breakdown
-                                    </Typography>
-                                    <TableContainer>
+                                    <Stack direction="row" justifyContent="space-between" alignItems="center" mb={2}>
+                                        <Typography variant="h6" fontWeight={600}>
+                                            Students Performance {reportData?.current_year && reportData?.current_term && (
+                                                <Typography component="span" variant="body2" color="text.secondary">
+                                                    ({reportData.current_year} - {reportData.current_term})
+                                                </Typography>
+                                            )}
+                                        </Typography>
+                                        <Stack direction="row" spacing={1}>
+                                            <Button
+                                                variant="outlined"
+                                                size="small"
+                                                onClick={exportToPDF}
+                                                sx={{ textTransform: 'none' }}
+                                            >
+                                                Export PDF
+                                            </Button>
+                                            <Button
+                                                variant="outlined"
+                                                size="small"
+                                                onClick={exportToExcel}
+                                                sx={{ textTransform: 'none' }}
+                                            >
+                                                Export Excel
+                                            </Button>
+                                        </Stack>
+                                    </Stack>
+                                    <TableContainer id="performance-table">
                                         <Table size="small" stickyHeader>
                                             <TableHead>
                                                 <TableRow>

@@ -19,11 +19,26 @@ export interface DetailedMarksTableRow {
     studentGrade: string;
 }
 
+export interface TermData {
+    term: string;
+    average_marks: string;
+}
+
+export interface YearlyTermData {
+    year: number;
+    terms: TermData[];
+}
+
 export interface OverallSubjectData {
     year: string;
-    firstTerm: number;
-    secondTerm: number;
-    thirdTerm: number;
+    [key: string]: any; // dynamic term keys like 'First Term', 'Second Term', etc.
+}
+
+export interface YearOption {
+    id: number;
+    year: string;
+    created_at: string;
+    updated_at: string;
 }
 
 export interface ParentReportData {
@@ -34,6 +49,8 @@ export interface ParentReportData {
     subjectWiseMarksPie: ParentSubjectPieData[];
     overallSubjectLineGraph: OverallSubjectData[];
     individualSubjectAverages: { [subjectName: string]: LineChartData[] };
+    current_year?: number | string;
+    current_term?: string;
 }
 
 export interface ChildDetails {
@@ -184,12 +201,12 @@ export const fetchChildrenList = async (): Promise<ChildDetails[]> => {
 
 /**
  * API call to fetch parent report data
- * Route format: /api/parent-report-data/{studentAdmissionNo}/{start_date}/{end_date}/{exam}/{month}/{student_grade}/{student_class}
+ * Route format: /api/parent-report-data/{studentAdmissionNo}/{start_year}/{end_year}/{exam}/{month}/{student_grade}/{student_class}
  */
 export const fetchParentReport = async (
     studentAdmissionNo: string,
-    startDate: string,
-    endDate: string,
+    startYear: string,
+    endYear: string,
     exam: string,
     month: string,
     studentGrade: string,
@@ -198,10 +215,12 @@ export const fetchParentReport = async (
     try {
         // Convert empty/null values to "null" string for URL path
         const sanitizedMonth = month || 'null';
+        const sanitizedStartYear = startYear || 'null';
+        const sanitizedEndYear = endYear || 'null';
 
         // Constructing the URL according to your backend route format:
-        // /api/parent-report-data/{studentAdmissionNo}/{start_date}/{end_date}/{exam}/{month}/{student_grade}/{student_class}
-        const urlPath = `${API_BASE_URL}/api/parent-report-data/${encodeURIComponent(studentAdmissionNo)}/${startDate}/${endDate}/${exam}/${sanitizedMonth}/${encodeURIComponent(studentGrade)}/${encodeURIComponent(studentClass)}`;
+        // /api/parent-report-data/{studentAdmissionNo}/{start_year}/{end_year}/{exam}/{month}/{student_grade}/{student_class}
+        const urlPath = `${API_BASE_URL}/api/parent-report-data/${encodeURIComponent(studentAdmissionNo)}/${sanitizedStartYear}/${sanitizedEndYear}/${exam}/${sanitizedMonth}/${encodeURIComponent(studentGrade)}/${encodeURIComponent(studentClass)}`;
 
         console.log('API URL:', urlPath);
         console.log('Student Admission No:', studentAdmissionNo);
@@ -237,17 +256,25 @@ export const fetchParentReport = async (
                 value: item.percentage || item.marks || 0
             })),
 
-            // Transform yearly_term_averages to bar chart data
-            overallSubjectLineGraph: (response.data.yearly_term_averages || []).map((item: any) => ({
-                year: item.year?.toString() || '',
-                firstTerm: item.terms?.find((t: any) => t.term === 'First Term')?.average_marks || 0,
-                secondTerm: item.terms?.find((t: any) => t.term === 'Second Term')?.average_marks || 0,
-                thirdTerm: item.terms?.find((t: any) => t.term === 'Third Term')?.average_marks || 0,
-            })),
+            // Transform yearly_term_averages to bar chart data (dynamic terms)
+            overallSubjectLineGraph: (response.data.yearly_term_averages || []).map((item: any) => {
+                const obj: OverallSubjectData = { year: item.year?.toString() || '' };
+                if (Array.isArray(item.terms)) {
+                    item.terms.forEach((term: any) => {
+                        obj[term.term] = parseFloat(term.average_marks) || 0;
+                    });
+                }
+                return obj;
+            }),
 
             // Transform subject_yearly_marks to individual subject averages
             individualSubjectAverages: transformSubjectYearlyMarks(response.data.subject_yearly_marks || {}),
+            current_year: response.data.current_year,
+            current_term: response.data.current_term,
         };
+
+        // Log for debugging
+        console.log('Report Data - Current Year:', reportData.current_year, 'Current Term:', reportData.current_term);
 
         return reportData;
 
@@ -352,23 +379,25 @@ async function fetchAllStudentsRaw(): Promise<any[]> {
 }
 
 /**
- * Get available years.
- * Try /api/years first; if not available, derive from /api/students.
+ * Get available years with full year object details.
+ * Uses /api/years endpoint and returns YearOption array.
  */
-export async function getAvailableYears(): Promise<string[]> {
+export async function getAvailableYears(): Promise<YearOption[]> {
   try {
     // Try the dedicated endpoint first
     const res = await axios.get(`${API_BASE_URL}/api/years`, getAuthHeader());
     if (Array.isArray(res.data) && res.data.length > 0) {
-      // Extract year values - handle both string and object responses
-      return res.data.map((y: any) => {
-        if (typeof y === 'string') {
-          return y;
-        } else if (typeof y === 'object' && y !== null && y.year) {
-          return String(y.year);
-        }
-        return String(y);
-      });
+      // Check if response has year objects
+      if (res.data[0] && typeof res.data[0] === 'object' && 'year' in res.data[0]) {
+        return res.data as YearOption[];
+      }
+      // If plain strings, convert to YearOption format
+      return res.data.map((y: any) => ({
+        id: 0,
+        year: String(typeof y === 'object' ? y.year : y),
+        created_at: '',
+        updated_at: ''
+      }));
     }
     // If empty or unexpected, fall through to fallback
   } catch (error: any) {
@@ -390,7 +419,12 @@ export async function getAvailableYears(): Promise<string[]> {
       if (year) yearsSet.add(String(year));
     });
     const years = Array.from(yearsSet).sort((a, b) => b.localeCompare(a)); // newest first
-    return years;
+    return years.map(y => ({
+      id: 0,
+      year: y,
+      created_at: '',
+      updated_at: ''
+    }));
   } catch (error) {
     handleApiError(error, "getAvailableYears");
     return [];

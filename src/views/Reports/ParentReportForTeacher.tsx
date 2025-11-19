@@ -18,7 +18,11 @@ import {
     Snackbar,
     Alert,
     Autocomplete,
+    Button,
 } from "@mui/material";
+import * as XLSX from 'xlsx';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
 import Sidebar from "../../components/Sidebar";
 import Navbar from "../../components/Navbar";
@@ -40,13 +44,13 @@ import {
 import { useQuery } from "@tanstack/react-query";
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
-import dayjs, { type Dayjs } from "dayjs";
 
 import {
     fetchParentReport,
     type ParentReportData,
     type DetailedMarksTableRow,
-    fetchClassStudents
+    fetchClassStudents,
+    getAvailableYears
 } from "../../api/parentReportForTeacherApi";
 
 interface Student {
@@ -63,7 +67,6 @@ interface Student {
         userId: string;
     };
 }
-import { DatePicker } from "@mui/x-date-pickers/DatePicker";
 
 // Standardize the Monthly Exam value to 'Monthly'
 const MONTHLY_EXAM_VALUE = 'Monthly';
@@ -85,8 +88,10 @@ const ParentReport: React.FC = () => {
     const [sidebarOpen, setSidebarOpen] = useState(false);
     const [exam, setExam] = useState("");
     const [month, setMonth] = useState("");
-    const [startDate, setStartDate] = useState<Dayjs | null>(null);
-    const [endDate, setEndDate] = useState<Dayjs | null>(null);
+    const [startYear, setStartYear] = useState<string | null>(null);
+    const [endYear, setEndYear] = useState<string | null>(null);
+    const [availableYears, setAvailableYears] = useState<string[]>([]);
+    const [isLoadingYears, setIsLoadingYears] = useState(false);
 
     // Student related state
     const [studentOptions, setStudentOptions] = useState<Student[]>([]);
@@ -100,6 +105,33 @@ const ParentReport: React.FC = () => {
     };
     const [snackbar, setSnackbar] = useState<SnackbarState>({ open: false, message: '', severity: 'info' });
 
+    // Load available years on mount
+    useEffect(() => {
+        let mounted = true;
+        const loadYears = async () => {
+            setIsLoadingYears(true);
+            try {
+                const years = await getAvailableYears();
+                if (mounted) {
+                    setAvailableYears(years);
+                }
+            } catch (err: any) {
+                if (mounted) {
+                    setSnackbar({
+                        open: true,
+                        message: `Failed to load years: ${err?.message || 'Unknown error'}`,
+                        severity: "error"
+                    });
+                }
+            } finally {
+                if (mounted) setIsLoadingYears(false);
+            }
+        };
+
+        loadYears();
+        return () => { mounted = false; };
+    }, []);
+
     // Clear month when exam is not "Monthly"
     useEffect(() => {
         if (exam !== MONTHLY_EXAM_VALUE) {
@@ -109,8 +141,8 @@ const ParentReport: React.FC = () => {
 
     const hasValidFilters = (): boolean => {
         const hasExamFilter = Boolean(exam);
-        const hasDateFilter = Boolean(startDate && endDate && startDate.isValid() && endDate.isValid());
-        return hasExamFilter || hasDateFilter;
+        const hasYearFilter = Boolean(startYear && endYear);
+        return hasExamFilter || hasYearFilter;
     };
 
     // Load students on mount using the teacher info inside /api/user processed by fetchClassStudents()
@@ -153,8 +185,8 @@ const ParentReport: React.FC = () => {
         queryKey: [
             "parent-report",
             selectedStudent?.student.studentAdmissionNo || '',
-            startDate?.format('YYYY-MM-DD') || '',
-            endDate?.format('YYYY-MM-DD') || '',
+            startYear || '',
+            endYear || '',
             exam,
             month
         ],
@@ -167,15 +199,15 @@ const ParentReport: React.FC = () => {
                 throw new Error("Student information not available");
             }
 
-            const startDateValue = startDate?.format('YYYY-MM-DD') || '2024-01-01';
-            const endDateValue = endDate?.format('YYYY-MM-DD') || '2024-12-31';
+            const startYearValue = startYear || '2024';
+            const endYearValue = endYear || '2024';
             const examValue = exam || 'First';
             const monthValue = exam === MONTHLY_EXAM_VALUE ? month : "";
 
             return fetchParentReport(
                 admissionNo,
-                startDateValue,
-                endDateValue,
+                startYearValue,
+                endYearValue,
                 examValue,
                 monthValue,
                 studentGrade,
@@ -197,19 +229,6 @@ const ParentReport: React.FC = () => {
         }
     }, [isErrorReport, errorReport]);
 
-    useEffect(() => {
-        if (startDate && endDate &&
-            startDate.isValid() && endDate.isValid() &&
-            startDate.isAfter(endDate)) {
-            setSnackbar({
-                open: true,
-                message: "Start date cannot be after end date",
-                severity: "warning"
-            });
-            setEndDate(null);
-        }
-    }, [startDate, endDate]);
-
     const handleCloseSnackbar = () => setSnackbar(prev => ({ ...prev, open: false }));
 
     const handleStudentSelect = (value: Student | null) => {
@@ -219,6 +238,104 @@ const ParentReport: React.FC = () => {
         }
         // Student object selected
         setSelectedStudent(value);
+    };
+
+    // Get the term key based on selected exam
+    const getTermKeyForExam = (examValue: string): 'firstTerm' | 'secondTerm' | 'thirdTerm' | null => {
+        switch (examValue) {
+            case 'First Term':
+                return 'firstTerm';
+            case 'Second Term':
+                return 'secondTerm';
+            case 'Third Term':
+                return 'thirdTerm';
+            default:
+                return null;
+        }
+    };
+
+    // Filter bar chart data to show only selected term
+    const getFilteredBarChartData = () => {
+        if (!reportData?.overallSubjectLineGraph) {
+            return [];
+        }
+
+        const termKey = getTermKeyForExam(exam);
+        if (!termKey) {
+            return [];
+        }
+
+        return reportData.overallSubjectLineGraph.map(item => ({
+            year: item.year,
+            value: item[termKey as keyof typeof item] || 0
+        }));
+    };
+
+    // Export to PDF
+    const exportToPDF = () => {
+        if (!reportData || !reportData.studentMarksDetailedTable) return;
+
+        const doc = new jsPDF();
+        const pageWidth = doc.internal.pageSize.getWidth();
+        
+        // Add title
+        doc.setFontSize(16);
+        doc.text(`Student Performance Report`, pageWidth / 2, 15, { align: 'center' });
+        
+        // Add student info
+        doc.setFontSize(10);
+        doc.text(`Student: ${reportData.studentName}`, 15, 25);
+        doc.text(`Grade: ${reportData.studentGrade} | Class: ${reportData.studentClass}`, 15, 32);
+        if (reportData.currentYear && reportData.currentTerm) {
+            doc.text(`Current Year: ${reportData.currentYear} | Current Term: ${reportData.currentTerm}`, 15, 39);
+        }
+        
+        // Add table
+        const tableData = reportData.studentMarksDetailedTable.map(row => [
+            row.subject,
+            String(row.highestMarks),
+            row.highestMarkGrade,
+            row.studentMarks > 0 ? String(row.studentMarks) : 'N/A',
+            row.studentGrade !== 'N/A' ? row.studentGrade : 'N/A'
+        ]);
+
+        autoTable(doc, {
+            head: [['Subject', 'Highest Marks', 'Highest Grade', 'Student Marks', 'Student Grade']],
+            body: tableData,
+            startY: 50,
+            theme: 'grid',
+            headStyles: { fillColor: [13, 21, 66], textColor: 255, fontStyle: 'bold' },
+            alternateRowStyles: { fillColor: [240, 240, 240] }
+        });
+
+        doc.save(`Student_Performance_${reportData.studentName}_${new Date().toISOString().split('T')[0]}.pdf`);
+    };
+
+    // Export to Excel
+    const exportToExcel = () => {
+        if (!reportData || !reportData.studentMarksDetailedTable) return;
+
+        const worksheet = XLSX.utils.json_to_sheet([
+            {
+                'Student Name': reportData.studentName,
+                'Grade': reportData.studentGrade,
+                'Class': reportData.studentClass,
+                'Current Year': reportData.currentYear || '',
+                'Current Term': reportData.currentTerm || ''
+            },
+            {},
+            ...reportData.studentMarksDetailedTable.map(row => ({
+                'Subject': row.subject,
+                'Highest Marks': row.highestMarks,
+                'Highest Grade': row.highestMarkGrade,
+                'Student Marks': row.studentMarks > 0 ? row.studentMarks : 'N/A',
+                'Student Grade': row.studentGrade !== 'N/A' ? row.studentGrade : 'N/A'
+            }))
+        ]);
+
+        const workbook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(workbook, worksheet, 'Performance');
+        XLSX.writeFile(workbook, `Student_Performance_${reportData.studentName}_${new Date().toISOString().split('T')[0]}.xlsx`);
     };
 
     const renderDetailedMarksTable = (): React.ReactNode => {
@@ -233,7 +350,7 @@ const ParentReport: React.FC = () => {
         if (!reportData || !reportData.studentMarksDetailedTable || reportData.studentMarksDetailedTable.length === 0) {
             return (
                 <TableRow>
-                    <TableCell colSpan={5} align="center">No detailed marks available for this period.</TableCell>
+                    <TableCell colSpan={5} align="center">Marks have not been added to the subjects yet. Please check after submitting the marks.</TableCell>
                 </TableRow>
             );
         }
@@ -384,38 +501,38 @@ const ParentReport: React.FC = () => {
                                         />
                                     )}
 
-                                    {/* Start Date */}
-                                    <DatePicker
-                                        label="Start Date"
-                                        value={startDate}
-                                        onChange={(newValue) => setStartDate(newValue ? dayjs(newValue) : null)}
-                                        views={['year', 'month', 'day']}
-                                        format="YYYY-MM-DD"
-                                        slotProps={{
-                                            textField: {
-                                                size: 'small',
-                                                fullWidth: true,
-                                                placeholder: 'YYYY-MM-DD'
-                                            }
-                                        }}
+                                    {/* Start Year */}
+                                    <Autocomplete
                                         sx={{ minWidth: 200, flex: 1 }}
+                                        options={availableYears}
+                                        value={startYear}
+                                        onChange={(_, newValue) => setStartYear(newValue || null)}
+                                        loading={isLoadingYears}
+                                        renderInput={(params) => (
+                                            <TextField
+                                                {...params}
+                                                label="Start Year"
+                                                size="small"
+                                                placeholder="Select year"
+                                            />
+                                        )}
                                     />
 
-                                    {/* End Date */}
-                                    <DatePicker
-                                        label="End Date"
-                                        value={endDate}
-                                        onChange={(newValue) => setEndDate(newValue ? dayjs(newValue) : null)}
-                                        views={['year', 'month', 'day']}
-                                        format="YYYY-MM-DD"
-                                        slotProps={{
-                                            textField: {
-                                                size: 'small',
-                                                fullWidth: true,
-                                                placeholder: 'YYYY-MM-DD'
-                                            }
-                                        }}
+                                    {/* End Year */}
+                                    <Autocomplete
                                         sx={{ minWidth: 200, flex: 1 }}
+                                        options={availableYears}
+                                        value={endYear}
+                                        onChange={(_, newValue) => setEndYear(newValue || null)}
+                                        loading={isLoadingYears}
+                                        renderInput={(params) => (
+                                            <TextField
+                                                {...params}
+                                                label="End Year"
+                                                size="small"
+                                                placeholder="Select year"
+                                            />
+                                        )}
                                     />
 
                                 </Stack>
@@ -487,21 +604,30 @@ const ParentReport: React.FC = () => {
                                 <Stack direction={{ xs: 'column', md: 'row' }} spacing={3} flexWrap="wrap">
                                     {/* Overall Subject Bar Chart */}
                                     <Paper sx={{ p: 3, flex: 2 }}>
-                                        <Typography fontWeight={600} mb={2}>Overall Subject</Typography>
+                                        <Stack direction="row" justifyContent="space-between" alignItems="center" mb={2}>
+                                            <Typography fontWeight={600}>Overall Subject</Typography>
+                                            {exam && getTermKeyForExam(exam) && (
+                                                <Typography variant="body2" color="text.secondary">
+                                                    {exam}
+                                                </Typography>
+                                            )}
+                                        </Stack>
                                         <ResponsiveContainer width="100%" height={250}>
                                             {isLoadingReport ? (
                                                 <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: 250 }}>
                                                     <CircularProgress />
                                                 </Box>
-                                            ) : (
-                                                <BarChart data={reportData?.overallSubjectLineGraph} barSize={50}>
+                                            ) : getFilteredBarChartData().length > 0 ? (
+                                                <BarChart data={getFilteredBarChartData()} barSize={50}>
                                                     <XAxis dataKey="year" />
                                                     <YAxis domain={[0, 100]} />
                                                     <ReTooltip />
-                                                    <Bar dataKey="firstTerm" fill="#0d1542ff" name="First Term" />
-                                                    <Bar dataKey="secondTerm" fill="#1310b6ff" name="Second Term" />
-                                                    <Bar dataKey="thirdTerm" fill=" #77aef5ff" name="Third Term" />
+                                                    <Bar dataKey="value" fill="#0d1542ff" name={exam || 'Term'} />
                                                 </BarChart>
+                                            ) : (
+                                                <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: 250 }}>
+                                                    <Typography color="text.secondary">Select a term to view data</Typography>
+                                                </Box>
                                             )}
                                         </ResponsiveContainer>
                                     </Paper>
@@ -509,6 +635,7 @@ const ParentReport: React.FC = () => {
                                     {/* Subject Wise Marks (Pie Chart) */}
                                     <Paper sx={{ p: 3, flex: 1 }}>
                                         <Typography fontWeight={600} mb={2}>Subject Wise Marks</Typography>
+
                                         <ResponsiveContainer width="100%" height={320}>
                                             <PieChart>
                                                 <Pie
@@ -518,17 +645,40 @@ const ParentReport: React.FC = () => {
                                                     cx="50%"
                                                     cy="40%"
                                                     outerRadius={80}
-                                                    label={(props) => {
-                                                        const { name, value } = props;
-                                                        return `${name}: ${value}%`;
+                                                    label={({ name, value, cx, cy, midAngle, outerRadius }) => {
+                                                        // Calculate label position OUTSIDE the pie
+                                                        const RADIAN = Math.PI / 180;
+                                                        // provide safe defaults in case values are undefined
+                                                        const safeMidAngle = typeof midAngle === 'number' ? midAngle : 0;
+                                                        const safeCx = typeof cx === 'number' ? cx : 0;
+                                                        const safeCy = typeof cy === 'number' ? cy : 0;
+                                                        const safeOuterRadius = typeof outerRadius === 'number' ? outerRadius : 0;
+                                                        const radius = safeOuterRadius + 25; // distance outside
+                                                        const x = safeCx + radius * Math.cos(-safeMidAngle * RADIAN);
+                                                        const y = safeCy + radius * Math.sin(-safeMidAngle * RADIAN);
+
+                                                        return (
+                                                            <text
+                                                                x={x}
+                                                                y={y}
+                                                                textAnchor={x > safeCx ? "start" : "end"}
+                                                                dominantBaseline="central"
+                                                                style={{ fontSize: "12px", fill: "#333" }}
+                                                            >
+                                                                <tspan>{name}</tspan>
+                                                                <tspan x={x} dy="1.2em">{value}%</tspan>
+                                                            </text>
+                                                        );
                                                     }}
-                                                    labelLine={false}
+                                                    labelLine={true}
                                                 >
                                                     {(reportData?.subjectWiseMarksPie || []).map((_entry, idx) => (
                                                         <Cell key={`cell-${idx}`} fill={COLORS[idx % COLORS.length]} />
                                                     ))}
                                                 </Pie>
+
                                                 <ReTooltip formatter={(value) => `${value}%`} />
+
                                                 <Legend
                                                     verticalAlign="bottom"
                                                     height={36}
@@ -537,15 +687,44 @@ const ParentReport: React.FC = () => {
                                             </PieChart>
                                         </ResponsiveContainer>
                                     </Paper>
+
+
                                 </Stack>
 
                                 {renderSubjectAverageCharts()}
 
                                 {/* Detailed Marks Table */}
                                 <Paper elevation={2} sx={{ p: 2, overflowX: 'auto' }}>
-                                    <Typography variant="h6" fontWeight={600} mb={2}>
-                                        Detailed Marks Breakdown
-                                    </Typography>
+                                    <Stack direction="row" justifyContent="space-between" alignItems="center" mb={2}>
+                                        <Stack>
+                                            <Typography variant="h6" fontWeight={600}>
+                                                Students Performance
+                                            </Typography>
+                                            {reportData?.currentYear && reportData?.currentTerm && (
+                                                <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+                                                    Current Year: {reportData.currentYear} | Current Term: {reportData.currentTerm}
+                                                </Typography>
+                                            )}
+                                        </Stack>
+                                        <Stack direction="row" spacing={1}>
+                                            <Button
+                                                variant="contained"
+                                                size="small"
+                                                onClick={exportToPDF}
+                                                disabled={isLoadingReport || !reportData?.studentMarksDetailedTable}
+                                            >
+                                                Export PDF
+                                            </Button>
+                                            <Button
+                                                variant="contained"
+                                                size="small"
+                                                onClick={exportToExcel}
+                                                disabled={isLoadingReport || !reportData?.studentMarksDetailedTable}
+                                            >
+                                                Export Excel
+                                            </Button>
+                                        </Stack>
+                                    </Stack>
                                     <TableContainer>
                                         <Table size="small" stickyHeader>
                                             <TableHead>

@@ -26,10 +26,19 @@ export interface OverallSubjectData {
     thirdTerm: number;
 }
 
+export interface Year {
+    id: number;
+    year: string;
+    created_at?: string;
+    updated_at?: string;
+}
+
 export interface ParentReportData {
     studentName: string;
     studentGrade: string;
     studentClass: string;
+    currentYear?: number;
+    currentTerm?: string;
     studentMarksDetailedTable: DetailedMarksTableRow[];
     subjectWiseMarksPie: ParentSubjectPieData[];
     overallSubjectLineGraph: OverallSubjectData[];
@@ -225,6 +234,8 @@ export const fetchParentReport = async (
             studentName: response.data.studentName || response.data.student_name || '',
             studentGrade: response.data.studentGrade || response.data.student_grade || '',
             studentClass: response.data.studentClass || response.data.student_class || '',
+            currentYear: response.data.current_year || response.data.currentYear,
+            currentTerm: response.data.current_term || response.data.currentTerm,
 
             // Transform highest_marks_per_subject and marks_and_grades into studentMarksDetailedTable
             studentMarksDetailedTable: transformToDetailedMarksTable(
@@ -355,14 +366,18 @@ async function fetchAllStudentsRaw(): Promise<any[]> {
 /**
  * Get available years.
  * Try /api/years first; if not available, derive from /api/students.
+ * Extracts the 'year' property from Year objects.
  */
 export async function getAvailableYears(): Promise<string[]> {
   try {
     // Try the dedicated endpoint first
     const res = await axios.get(`${API_BASE_URL}/api/years`, getAuthHeader());
     if (Array.isArray(res.data) && res.data.length > 0) {
-      // Ensure strings
-      return res.data.map((y: any) => String(y));
+      // Extract 'year' property from each Year object
+      return res.data
+        .map((y: Year | any) => y.year || String(y))
+        .filter(Boolean)
+        .sort((a, b) => a.localeCompare(b)); // ascending order (oldest first)
     }
     // If empty or unexpected, fall through to fallback
   } catch (error: any) {
@@ -383,7 +398,7 @@ export async function getAvailableYears(): Promise<string[]> {
       const year = student?.year ?? student?.year?.toString?.();
       if (year) yearsSet.add(String(year));
     });
-    const years = Array.from(yearsSet).sort((a, b) => b.localeCompare(a)); // newest first
+    const years = Array.from(yearsSet).sort((a, b) => a.localeCompare(b)); // ascending order (oldest first)
     return years;
   } catch (error) {
     handleApiError(error, "getAvailableYears");

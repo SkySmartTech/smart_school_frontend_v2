@@ -483,6 +483,23 @@ const TeacherDashboard: React.FC = () => {
             return `Missing columns: ${missingColumns.join(', ')}`;
         }
 
+        // Check if file is the unmodified template
+        if (data.length === 1) {
+            const row = data[0];
+            if (row['Admission No'] === '12345' &&
+                row['Student Name'] === 'Surith Sunanda' &&
+                row['Grade'] === 'Grade 8' &&
+                row['Class'] === 'Araliya' &&
+                row['Subject'] === 'Mathematics' &&
+                row['Term'] === 'First Term' &&
+                row['Month'] === 'January' &&
+                row['Year'] === '2025' &&
+                row['Marks'] === '85' &&
+                row['Attendance'] === 'present') {
+                return 'Please modify the template data before uploading. The file appears to be the unmodified sample template.';
+            }
+        }
+
         for (let i = 0; i < data.length; i++) {
             const row = data[i];
 
@@ -581,7 +598,7 @@ const TeacherDashboard: React.FC = () => {
     const downloadTemplate = () => {
         const template: ExcelRow[] = [{
             'Admission No': '12345',
-            'Student Name': 'John Doe',
+            'Student Name': 'Surith Sunanda',
             'Grade': 'Grade 8',
             'Class': 'Araliya',
             'Subject': 'Mathematics',
