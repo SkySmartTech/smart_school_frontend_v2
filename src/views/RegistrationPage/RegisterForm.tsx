@@ -225,16 +225,6 @@ const RegisterForm = ({ onSuccess = () => { }, onError = () => { } }: RegisterFo
     setValue("profession", "");
     setValue("relation", "");
     setValue("parentContact", "");
-    setValue("name", "");
-    setValue("email", "");
-    setValue("address", "");
-    setValue("birthDay", "");
-    setValue("contact", "");
-    setValue("userType", "");
-    setValue("username", "");
-    setValue("password", "");
-    setValue("password_confirmation", "");
-    setValue("gender", "");
   };
 
   // Handle browser back button (popstate event) and page/tab close (beforeunload event)
@@ -538,6 +528,21 @@ const RegisterForm = ({ onSuccess = () => { }, onError = () => { } }: RegisterFo
     const currentMedium = watch("medium") || [];
 
     if (currentGrades.length && currentSubjects.length && currentClasses.length && currentMedium.length) {
+      // Check for duplicates in existing assignments
+      const isDuplicate = teacherAssignments.some(assignment => {
+        const gradeMatch = assignment.grades[0] === currentGrades[0];
+        const subjectMatch = assignment.subjects[0] === currentSubjects[0];
+        const classMatch = assignment.classes[0] === currentClasses[0];
+        const mediumMatch = assignment.medium[0] === currentMedium[0];
+        
+        return gradeMatch && subjectMatch && classMatch && mediumMatch;
+      });
+
+      if (isDuplicate) {
+        showError("This combination of Grade, Subject, Class, and Medium already exists");
+        return;
+      }
+
       const newAssignment: TeacherAssignment = {
         grades: currentGrades,
         subjects: currentSubjects,

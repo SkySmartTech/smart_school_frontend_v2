@@ -558,7 +558,7 @@ const ManagementStaff: React.FC = () => {
           {/* Table Section */}
           <Paper elevation={2} sx={{ p: isMobile ? 1.5 : 2, overflow: "auto" }}>
             <Typography variant={isMobile ? "subtitle1" : "h6"} fontWeight={600} mb={2} sx={{ px: isMobile ? 1 : 0 }}>
-              Detailed Marks Breakdown
+              Performance by Grade
             </Typography>
             <TableContainer sx={{ maxHeight: isMobile ? 400 : 600 }}>
               <Table size={isMobile ? "small" : "medium"} stickyHeader>

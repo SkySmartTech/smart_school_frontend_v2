@@ -168,7 +168,7 @@ const ClassTeacherReport: React.FC = () => {
     const [startYear, setStartYear] = useState<string>("");
     const [endYear, setEndYear] = useState<string>("");
     const [month, setMonth] = useState<string>("01");
-    const [grade, setGrade] = useState("1");
+    const [grade, setGrade] = useState<string>("");
     const [className, setClassName] = useState("Olu");
     const [exam, setExam] = useState("First Term");
     const [grades, setGrades] = useState<DropdownOption[]>([]);
@@ -233,9 +233,9 @@ const ClassTeacherReport: React.FC = () => {
             });
 
             setGrades(sortedGrades);
-            // Set default grade if not already set
+            // Set default grade (use the label, e.g. "Grade 8") if not already set
             if (sortedGrades.length > 0 && !grade) {
-                setGrade(sortedGrades[0].value);
+                setGrade(sortedGrades[0].label);
             }
         }
     }, [gradesData, grade]);
@@ -453,8 +453,9 @@ const ClassTeacherReport: React.FC = () => {
                                             Loading grades...
                                         </MenuItem>
                                     ) : (
+                                        // Use the label as the selected value so the API receives "Grade X"
                                         grades.map((g) => (
-                                            <MenuItem key={g.value} value={g.value}>
+                                            <MenuItem key={g.value} value={g.label}>
                                                 {g.label}
                                             </MenuItem>
                                         ))
