@@ -105,6 +105,12 @@ const Sidebar = ({ open, setOpen }: SidebarProps) => {
           permission: "addMarks"
         },
         {
+          title: "Edit Marks",
+          icon: <SubdirectoryArrowRight fontSize="small" />,
+          href: "/editMarks",
+          permission: "editMarks"
+        },
+        {
           title: "Add Class Teacher",
           icon: <SubdirectoryArrowRight fontSize="small" />,
           href: "/addClassTeacher",
