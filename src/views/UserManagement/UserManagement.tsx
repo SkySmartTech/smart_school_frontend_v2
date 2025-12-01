@@ -37,7 +37,6 @@ import {
   GridToolbarContainer,
   GridToolbarColumnsButton,
   GridToolbarFilterButton,
-  GridToolbarDensitySelector,
   GridToolbarExport,
   type GridColDef,
   GridActionsCellItem,
@@ -1045,7 +1044,7 @@ const UserManagement: React.FC = () => {
         gap: isMobile ? 1 : 0,
         p: 1
       }}>
-        <Stack direction={isMobile ? 'column' : 'row'} spacing={1} sx={{ width: isMobile ? '100%' : 'auto' }}>
+        <Stack direction="row" spacing={1} sx={{ width: isMobile ? '100%' : 'auto', flexWrap: 'wrap' }}>
           <Tooltip title="Refresh data">
             <IconButton onClick={() => refetch()} size={isMobile ? 'small' : 'medium'}>
               <RefreshIcon />
@@ -1076,7 +1075,6 @@ const UserManagement: React.FC = () => {
         <Stack direction="row" spacing={0.5} sx={{ width: isMobile ? '100%' : 'auto', justifyContent: isMobile ? 'center' : 'flex-end' }}>
           <GridToolbarColumnsButton />
           <GridToolbarFilterButton />
-          <GridToolbarDensitySelector />
           <GridToolbarExport />
         </Stack>
       </GridToolbarContainer>
@@ -1089,40 +1087,44 @@ const UserManagement: React.FC = () => {
     const commonFields = (
       <Box sx={{
         display: 'grid',
-        gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)', md: 'repeat(3, 1fr)' },
-        gap: 2
+        gridTemplateColumns: { xs: '1fr', sm: '1fr', md: 'repeat(2, 1fr)', lg: 'repeat(3, 1fr)' },
+        gap: isMobile ? 1.5 : 2
       }}>
         <TextField
           label="Name*"
           name="name"
           value={form.name}
           onChange={handleChange}
-          sx={{ minWidth: 120 }}
+          sx={{ minWidth: isMobile ? 'auto' : 120 }}
           size="small"
+          fullWidth
         />
         <TextField
           label="Username*"
           name="username"
           value={form.username}
           onChange={handleChange}
-          sx={{ minWidth: 120 }}
+          sx={{ minWidth: isMobile ? 'auto' : 120 }}
           size="small"
+          fullWidth
         />
         <TextField
           label="Email*"
           name="email"
           value={form.email}
           onChange={handleChange}
-          sx={{ minWidth: 120 }}
+          sx={{ minWidth: isMobile ? 'auto' : 120 }}
           size="small"
+          fullWidth
         />
         <TextField
           label="Address"
           name="address"
           value={form.address || ''}
           onChange={handleChange}
-          sx={{ minWidth: 120 }}
+          sx={{ minWidth: isMobile ? 'auto' : 120 }}
           size="small"
+          fullWidth
         />
         <TextField
           label="Birthday"
@@ -1131,16 +1133,18 @@ const UserManagement: React.FC = () => {
           value={form.birthDay || ''}
           onChange={handleChange}
           InputLabelProps={{ shrink: true }}
-          sx={{ minWidth: 120 }}
+          sx={{ minWidth: isMobile ? 'auto' : 120 }}
           size="small"
+          fullWidth
         />
         <TextField
           label="Phone No"
           name="contact"
           value={form.contact || ''}
           onChange={handleChange}
-          sx={{ minWidth: 120 }}
+          sx={{ minWidth: isMobile ? 'auto' : 120 }}
           size="small"
+          fullWidth
         />
         <TextField
           type="file"
@@ -1184,8 +1188,9 @@ const UserManagement: React.FC = () => {
           name="userRole"
           value={form.userRole || ''}
           onChange={(e) => handleSelectChange(e, "userRole")}
-          sx={{ minWidth: 120 }}
+          sx={{ minWidth: isMobile ? 'auto' : 120 }}
           size="small"
+          fullWidth
         >
           {userRoleOptions.map((userRole: string) => (
             <MenuItem key={userRole} value={userRole}>
@@ -1199,8 +1204,9 @@ const UserManagement: React.FC = () => {
           name="userType"
           value={form.userType || ''}
           onChange={(e) => handleSelectChange(e, "userType")}
-          sx={{ minWidth: 120 }}
+          sx={{ minWidth: isMobile ? 'auto' : 120 }}
           size="small"
+          fullWidth
         >
           {userTypeOptions.map((userType: string) => (
             <MenuItem key={userType} value={userType}>
@@ -1214,8 +1220,9 @@ const UserManagement: React.FC = () => {
           name="gender"
           value={form.gender || ''}
           onChange={(e) => handleSelectChange(e, "gender")}
-          sx={{ minWidth: 120 }}
+          sx={{ minWidth: isMobile ? 'auto' : 120 }}
           size="small"
+          fullWidth
         >
           {genderOptions.map((gender: string) => (
             <MenuItem key={gender} value={gender}>
@@ -1232,8 +1239,9 @@ const UserManagement: React.FC = () => {
               type="password"
               value={form.password || ''}
               onChange={handleChange}
-              sx={{ minWidth: 120 }}
+              sx={{ minWidth: isMobile ? 'auto' : 120 }}
               size="small"
+              fullWidth
             />
             <TextField
               select
@@ -1241,8 +1249,9 @@ const UserManagement: React.FC = () => {
               name="status"
               value={form.status.toString()}
               onChange={(e) => handleSelectChange(e, "status")}
-              sx={{ minWidth: 120 }}
+              sx={{ minWidth: isMobile ? 'auto' : 120 }}
               size="small"
+              fullWidth
             >
               {statusOptions.map((option) => (
                 <MenuItem key={option.label} value={option.value.toString()}>
@@ -1259,8 +1268,9 @@ const UserManagement: React.FC = () => {
               type="password"
               value={form.password || ''}
               onChange={handleChange}
-              sx={{ minWidth: 120 }}
+              sx={{ minWidth: isMobile ? 'auto' : 120 }}
               size="small"
+              fullWidth
             />
             <TextField
               select
@@ -1269,9 +1279,10 @@ const UserManagement: React.FC = () => {
               value={form.status.toString()}
               onChange={(e) => handleSelectChange(e, "status")}
               sx={{
-                minWidth: 120
+                minWidth: isMobile ? 'auto' : 120
               }}
               size="small"
+              fullWidth
             >
               {statusOptions.map((option) => (
                 <MenuItem key={option.label} value={option.value.toString()}>
@@ -1291,8 +1302,8 @@ const UserManagement: React.FC = () => {
             {commonFields}
             <Box sx={{
               display: 'grid',
-              gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)', md: 'repeat(3, 1fr)' },
-              gap: 2
+              gridTemplateColumns: { xs: '1fr', sm: '1fr', md: 'repeat(2, 1fr)', lg: 'repeat(3, 1fr)' },
+              gap: isMobile ? 1.5 : 2
             }}>
               <TextField
                 select
@@ -1300,9 +1311,10 @@ const UserManagement: React.FC = () => {
                 name="grade"
                 value={form.grade || ''}
                 onChange={(e) => handleSelectChange(e, "grade")}
-                sx={{ minWidth: 120 }}
+                sx={{ minWidth: isMobile ? 'auto' : 120 }}
                 size="small"
                 disabled={isLoadingGrades}
+                fullWidth
               >
                 {grades.map((grade) => (
                   <MenuItem key={grade.id} value={grade.grade}>
@@ -1316,8 +1328,9 @@ const UserManagement: React.FC = () => {
                 name="medium"
                 value={form.medium || ''}
                 onChange={(e) => handleSelectChange(e, "medium")}
-                sx={{ minWidth: 120 }}
+                sx={{ minWidth: isMobile ? 'auto' : 120 }}
                 size="small"
+                fullWidth
               >
                 {mediumOptions.map((medium: string) => (
                   <MenuItem key={medium} value={medium}>
@@ -1330,8 +1343,9 @@ const UserManagement: React.FC = () => {
                 name="studentAdmissionNo"
                 value={form.studentAdmissionNo || ''}
                 onChange={handleChange}
-                sx={{ minWidth: 120 }}
+                sx={{ minWidth: isMobile ? 'auto' : 120 }}
                 size="small"
+                fullWidth
               />
               <TextField
                 select
@@ -1368,8 +1382,8 @@ const UserManagement: React.FC = () => {
 
             <Box sx={{
               display: 'grid',
-              gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)', md: 'repeat(4, 1fr)' },
-              gap: 2
+              gridTemplateColumns: { xs: '1fr', sm: '1fr', md: 'repeat(2, 1fr)', lg: 'repeat(4, 1fr)' },
+              gap: isMobile ? 1.5 : 2
             }}>
               <TextField
                 select
@@ -1377,9 +1391,10 @@ const UserManagement: React.FC = () => {
                 name="grade"
                 value={form.grade || ''}
                 onChange={(e) => handleSelectChange(e, "grade")}
-                sx={{ minWidth: 120 }}
+                sx={{ minWidth: isMobile ? 'auto' : 120 }}
                 size="small"
                 disabled={isLoadingGrades}
+                fullWidth
               >
                 {grades.map((grade) => (
                   <MenuItem key={grade.id} value={grade.grade}>
@@ -1394,9 +1409,10 @@ const UserManagement: React.FC = () => {
                 name="class"
                 value={form.class || ''}
                 onChange={(e) => handleSelectChange(e, "class")}
-                sx={{ minWidth: 120 }}
+                sx={{ minWidth: isMobile ? 'auto' : 120 }}
                 size="small"
                 disabled={isLoadingClasses}
+                fullWidth
               >
                 {classes.map((cls) => (
                   <MenuItem key={cls.id} value={cls.class}>
@@ -1411,9 +1427,10 @@ const UserManagement: React.FC = () => {
                 name="subject"
                 value={form.subject || ''}
                 onChange={(e) => handleSelectChange(e, "subject")}
-                sx={{ minWidth: 120 }}
+                sx={{ minWidth: isMobile ? 'auto' : 120 }}
                 size="small"
                 disabled={isLoadingSubjects}
+                fullWidth
               >
                 {(subjects || []).slice().sort((a, b) =>
                   (a.mainSubject || '').localeCompare(b.mainSubject || '')
@@ -1430,8 +1447,9 @@ const UserManagement: React.FC = () => {
                 name="medium"
                 value={form.medium || ''}
                 onChange={(e) => handleSelectChange(e, "medium")}
-                sx={{ minWidth: 120 }}
+                sx={{ minWidth: isMobile ? 'auto' : 120 }}
                 size="small"
+                fullWidth
               >
                 {mediumOptions.map(med => (
                   <MenuItem key={med} value={med}>{med}</MenuItem>
@@ -1449,25 +1467,25 @@ const UserManagement: React.FC = () => {
             </Button>
 
             {teacherAssignments.length > 0 && (
-              <TableContainer component={Paper} sx={{ maxWidth: '100%', overflowX: 'auto' }}>
-                <MuiTable size={isMobile ? "small" : "medium"}>
+              <TableContainer component={Paper} sx={{ maxWidth: '100%', overflowX: 'auto', border: `1px solid ${theme.palette.divider}`, borderRadius: 1 }}>
+                <MuiTable size={isMobile ? "small" : "medium"} sx={{ minWidth: isMobile ? '100%' : 'auto' }}>
                   <TableHead>
-                    <TableRow>
-                      <TableCell>Grade</TableCell>
-                      <TableCell>Class</TableCell>
-                      <TableCell>Subject</TableCell>
-                      <TableCell>Medium</TableCell>
-                      <TableCell>Actions</TableCell>
+                    <TableRow sx={{ bgcolor: isMobile ? theme.palette.action.hover : 'inherit' }}>
+                      <TableCell sx={{ fontSize: isMobile ? '0.7rem' : '0.875rem', padding: isMobile ? '6px 4px' : '8px 16px', fontWeight: 'bold' }}>Grade</TableCell>
+                      <TableCell sx={{ fontSize: isMobile ? '0.7rem' : '0.875rem', padding: isMobile ? '6px 4px' : '8px 16px', fontWeight: 'bold' }}>Class</TableCell>
+                      <TableCell sx={{ fontSize: isMobile ? '0.7rem' : '0.875rem', padding: isMobile ? '6px 4px' : '8px 16px', fontWeight: 'bold' }}>Subject</TableCell>
+                      <TableCell sx={{ fontSize: isMobile ? '0.7rem' : '0.875rem', padding: isMobile ? '6px 4px' : '8px 16px', fontWeight: 'bold' }}>Medium</TableCell>
+                      <TableCell sx={{ fontSize: isMobile ? '0.7rem' : '0.875rem', padding: isMobile ? '6px 4px' : '8px 16px', fontWeight: 'bold' }}>Actions</TableCell>
                     </TableRow>
                   </TableHead>
                   <TableBody>
                     {teacherAssignments.map((assignment) => (
-                      <TableRow key={assignment.id}>
-                        <TableCell>{assignment.teacherGrade}</TableCell>
-                        <TableCell>{assignment.teacherClass}</TableCell>
-                        <TableCell>{assignment.subject}</TableCell>
-                        <TableCell>{assignment.medium}</TableCell>
-                        <TableCell>
+                      <TableRow key={assignment.id} sx={{ '&:hover': { bgcolor: theme.palette.action.hover } }}>
+                        <TableCell sx={{ fontSize: isMobile ? '0.7rem' : '0.875rem', padding: isMobile ? '6px 4px' : '8px 16px' }}>{assignment.teacherGrade}</TableCell>
+                        <TableCell sx={{ fontSize: isMobile ? '0.7rem' : '0.875rem', padding: isMobile ? '6px 4px' : '8px 16px' }}>{assignment.teacherClass}</TableCell>
+                        <TableCell sx={{ fontSize: isMobile ? '0.7rem' : '0.875rem', padding: isMobile ? '6px 4px' : '8px 16px' }}>{assignment.subject}</TableCell>
+                        <TableCell sx={{ fontSize: isMobile ? '0.7rem' : '0.875rem', padding: isMobile ? '6px 4px' : '8px 16px' }}>{assignment.medium}</TableCell>
+                        <TableCell sx={{ fontSize: isMobile ? '0.7rem' : '0.875rem', padding: isMobile ? '6px 4px' : '8px 16px' }}>
                           <IconButton
                             onClick={() => {
                               setTeacherAssignments(prev =>
@@ -1494,16 +1512,17 @@ const UserManagement: React.FC = () => {
 
             <Box sx={{
               display: 'grid',
-              gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)', md: 'repeat(4, 1fr)' },
-              gap: 2
+              gridTemplateColumns: { xs: '1fr', sm: '1fr', md: 'repeat(2, 1fr)', lg: 'repeat(4, 1fr)' },
+              gap: isMobile ? 1.5 : 2
             }}>
               <TextField
                 label="Profession"
                 name="profession"
                 value={form.profession || ''}
                 onChange={handleChange}
-                sx={{ minWidth: 120 }}
+                sx={{ minWidth: isMobile ? 'auto' : 120 }}
                 size="small"
+                fullWidth
               />
               <TextField
                 select
@@ -1511,8 +1530,9 @@ const UserManagement: React.FC = () => {
                 name="relation"
                 value={form.relation || ''}
                 onChange={(e) => handleSelectChange(e, "relation")}
-                sx={{ minWidth: 120 }}
+                sx={{ minWidth: isMobile ? 'auto' : 120 }}
                 size="small"
+                fullWidth
               >
                 {relationOptions.map((relation: string) => (
                   <MenuItem key={relation} value={relation}>
@@ -1525,16 +1545,18 @@ const UserManagement: React.FC = () => {
                 name="parentContact"
                 value={form.parentContact || ''}
                 onChange={handleChange}
-                sx={{ minWidth: 120 }}
+                sx={{ minWidth: isMobile ? 'auto' : 120 }}
                 size="small"
+                fullWidth
               />
               <TextField
                 label="Student Admission No"
                 name="studentAdmissionNo"
                 value={form.studentAdmissionNo || ''}
                 onChange={handleChange}
-                sx={{ minWidth: 120 }}
+                sx={{ minWidth: isMobile ? 'auto' : 120 }}
                 size="small"
+                fullWidth
               />
             </Box>
 
@@ -1548,25 +1570,25 @@ const UserManagement: React.FC = () => {
             </Button>
 
             {parentEntries.length > 0 && (
-              <TableContainer component={Paper} sx={{ maxWidth: '100%', overflowX: 'auto' }}>
-                <MuiTable size={isMobile ? "small" : "medium"}>
+              <TableContainer component={Paper} sx={{ maxWidth: '100%', overflowX: 'auto', border: `1px solid ${theme.palette.divider}`, borderRadius: 1 }}>
+                <MuiTable size={isMobile ? "small" : "medium"} sx={{ minWidth: isMobile ? '100%' : 'auto' }}>
                   <TableHead>
-                    <TableRow>
-                      <TableCell>Relation</TableCell>
-                      <TableCell>Profession</TableCell>
-                      <TableCell>Parent Contact</TableCell>
-                      <TableCell>Student Admission No</TableCell>
-                      <TableCell>Actions</TableCell>
+                    <TableRow sx={{ bgcolor: isMobile ? theme.palette.action.hover : 'inherit' }}>
+                      <TableCell sx={{ fontSize: isMobile ? '0.7rem' : '0.875rem', padding: isMobile ? '6px 4px' : '8px 16px', fontWeight: 'bold' }}>Relation</TableCell>
+                      <TableCell sx={{ fontSize: isMobile ? '0.7rem' : '0.875rem', padding: isMobile ? '6px 4px' : '8px 16px', fontWeight: 'bold' }}>Profession</TableCell>
+                      <TableCell sx={{ fontSize: isMobile ? '0.7rem' : '0.875rem', padding: isMobile ? '6px 4px' : '8px 16px', fontWeight: 'bold' }}>Parent Contact</TableCell>
+                      <TableCell sx={{ fontSize: isMobile ? '0.7rem' : '0.875rem', padding: isMobile ? '6px 4px' : '8px 16px', fontWeight: 'bold' }}>Admission No</TableCell>
+                      <TableCell sx={{ fontSize: isMobile ? '0.7rem' : '0.875rem', padding: isMobile ? '6px 4px' : '8px 16px', fontWeight: 'bold' }}>Actions</TableCell>
                     </TableRow>
                   </TableHead>
                   <TableBody>
                     {parentEntries.map((p) => (
-                      <TableRow key={p.id}>
-                        <TableCell>{p.relation}</TableCell>
-                        <TableCell>{p.profession}</TableCell>
-                        <TableCell>{p.parentContact}</TableCell>
-                        <TableCell>{p.studentAdmissionNo}</TableCell>
-                        <TableCell>
+                      <TableRow key={p.id} sx={{ '&:hover': { bgcolor: theme.palette.action.hover } }}>
+                        <TableCell sx={{ fontSize: isMobile ? '0.7rem' : '0.875rem', padding: isMobile ? '6px 4px' : '8px 16px' }}>{p.relation}</TableCell>
+                        <TableCell sx={{ fontSize: isMobile ? '0.7rem' : '0.875rem', padding: isMobile ? '6px 4px' : '8px 16px' }}>{p.profession}</TableCell>
+                        <TableCell sx={{ fontSize: isMobile ? '0.7rem' : '0.875rem', padding: isMobile ? '6px 4px' : '8px 16px' }}>{p.parentContact}</TableCell>
+                        <TableCell sx={{ fontSize: isMobile ? '0.7rem' : '0.875rem', padding: isMobile ? '6px 4px' : '8px 16px' }}>{p.studentAdmissionNo}</TableCell>
+                        <TableCell sx={{ fontSize: isMobile ? '0.7rem' : '0.875rem', padding: isMobile ? '6px 4px' : '8px 16px' }}>
                           <IconButton
                             onClick={() => setParentEntries(prev => prev.filter(x => x.id !== p.id))}
                             size={isMobile ? "small" : "medium"}
@@ -1610,8 +1632,8 @@ const UserManagement: React.FC = () => {
           />
         </AppBar>
 
-        <Stack spacing={isMobile ? 2 : 3} sx={{ p: isMobile ? 2 : 3, overflow: 'auto', width: '100%' }}>
-          <Paper ref={formTopRef} sx={{ p: isMobile ? 2 : 3, borderRadius: 2 }}>
+        <Stack spacing={isMobile ? 1.5 : 3} sx={{ p: isMobile ? 1.5 : 3, overflow: 'auto', width: '100%', boxSizing: 'border-box' }}>
+          <Paper ref={formTopRef} sx={{ p: isMobile ? 1.5 : 3, borderRadius: 2, width: '100%', boxSizing: 'border-box' }}>
             <Typography variant={isMobile ? "subtitle1" : "h6"} sx={{ mb: 2, color: theme.palette.primary.main, fontWeight: 600 }}>
               {editId !== null ? "Edit User" : "Create New User"}
             </Typography>
@@ -1644,11 +1666,13 @@ const UserManagement: React.FC = () => {
          <Paper sx={{ 
             p: isMobile ? 1 : 2, 
             borderRadius: 2, 
-            height: isMobile ? 600 : 720, 
+            height: isMobile ? 500 : 720, 
             display: 'flex', 
             flexDirection: 'column', 
             overflow: 'hidden',
-            maxWidth: '100%'
+            maxWidth: '100%',
+            width: '100%',
+            boxSizing: 'border-box'
           }}>
             <Stack spacing={2}>
               <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
@@ -1722,9 +1746,11 @@ const UserManagement: React.FC = () => {
                     paginationModel: { pageSize: isMobile ? 5 : 10, page: 0 },
                   },
                 }}
+                rowHeight={isMobile ? 48 : 52}
                 sx={{
                   border: 'none',
                   height: '100%',
+                  minHeight: isMobile ? 360 : '100%',
                   width: '100%',
                   maxWidth: '100%',
                   boxSizing: 'border-box',
@@ -1738,13 +1764,13 @@ const UserManagement: React.FC = () => {
                   },
                   '& .MuiDataGrid-cell': {
                     borderBottom: `1px solid ${theme.palette.divider}`,
-                    fontSize: isMobile ? '0.75rem' : '0.875rem',
-                    padding: isMobile ? '4px 8px' : '8px 16px',
+                    fontSize: isMobile ? '0.78rem' : '0.875rem',
+                    padding: isMobile ? '6px 8px' : '8px 16px',
                   },
                   '& .MuiDataGrid-columnHeaders': {
                     backgroundColor: theme.palette.background.paper,
                     borderBottom: `1px solid ${theme.palette.divider}`,
-                    fontSize: isMobile ? '0.75rem' : '0.875rem',
+                    fontSize: isMobile ? '0.78rem' : '0.875rem',
                   },
                   '& .MuiDataGrid-toolbarContainer': {
                     padding: theme.spacing(1),
@@ -1787,10 +1813,10 @@ const UserManagement: React.FC = () => {
                     },
                   },
                   '& .MuiDataGrid-columnHeader': {
-                    padding: isMobile ? '4px 8px' : '8px 16px',
+                    padding: isMobile ? '6px 8px' : '8px 16px',
                   },
                   '& .MuiDataGrid-row': {
-                    minHeight: isMobile ? '40px !important' : '52px !important',
+                    minHeight: isMobile ? '48px !important' : '52px !important',
                   },
                 }}
                 ref={dataGridRef}

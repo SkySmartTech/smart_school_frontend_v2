@@ -37,6 +37,7 @@ export interface ParentReportData {
     studentName: string;
     studentGrade: string;
     studentClass: string;
+    studentAdmissionNo: string;
     currentYear?: number;
     currentTerm?: string;
     studentMarksDetailedTable: DetailedMarksTableRow[];
@@ -86,7 +87,7 @@ const transformToDetailedMarksTable = (
 
     // Combine highest marks with student marks
     highestMarksData.forEach(highestItem => {
-        const studentData = studentMarksMap.get(highestItem.subject) || { marks: 0, grade: 'N/A' };
+        const studentData = studentMarksMap.get(highestItem.subject) || { marks: 0, grade: 'Absent' };
 
         result.push({
             subject: highestItem.subject,
@@ -232,8 +233,9 @@ export const fetchParentReport = async (
         // Transform the response data to match expected structure
         const reportData: ParentReportData = {
             studentName: response.data.studentName || response.data.student_name || '',
-            studentGrade: response.data.studentGrade || response.data.student_grade || '',
-            studentClass: response.data.studentClass || response.data.student_class || '',
+            studentGrade: response.data.studentGrade || response.data.student_grade || studentGrade || '',
+            studentClass: response.data.studentClass || response.data.student_class || studentClass || '',
+            studentAdmissionNo: response.data.studentAdmissionNo || response.data.student_admission_no || studentAdmissionNo || '',
             currentYear: response.data.current_year || response.data.currentYear,
             currentTerm: response.data.current_term || response.data.currentTerm,
 

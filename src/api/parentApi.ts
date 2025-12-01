@@ -71,7 +71,7 @@ const transformToDetailedMarksTable = (
 
     // Combine highest marks with student marks
     highestMarksData.forEach(highestItem => {
-        const studentData = studentMarksMap.get(highestItem.subject) || { marks: 0, grade: 'N/A' };
+        const studentData = studentMarksMap.get(highestItem.subject) || { marks: 0, grade: 'Absent' };
 
         result.push({
             subject: highestItem.subject,

@@ -44,6 +44,8 @@ import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import axios from "axios";
 import * as XLSX from 'xlsx';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
 import {
     fetchParentReport,
@@ -364,47 +366,60 @@ const ParentReport: React.FC = () => {
         if (!reportData) return;
 
         try {
-            // Create a simple PDF export using HTML to canvas
-            const element = document.getElementById('performance-table');
-            if (!element) {
-                setSnackbar({
-                    open: true,
-                    message: 'Table not found for export',
-                    severity: 'error'
-                });
-                return;
+            const doc = new jsPDF();
+            const pageWidth = doc.internal.pageSize.getWidth();
+            
+            doc.setFontSize(16);
+            doc.text(`Student Performance Report`, pageWidth / 2, 15, { align: 'center' });
+            
+            doc.setFontSize(10);
+            let currentY = 25;
+            
+            // Student Details Section - Use selectedStudent for name and student details
+            const studentName = selectedStudent?.name || reportData.studentName || 'Absent';
+            const studentAdmissionNo = selectedStudent?.student?.studentAdmissionNo || 'Absent';
+            const studentGrade = selectedStudent?.student?.studentGrade || reportData.studentGrade || 'Absent';
+            const studentClass = selectedStudent?.student?.studentClass || reportData.studentClass || 'Absent';
+            
+            doc.text(`Student Name: ${studentName}`, 15, currentY);
+            currentY += 7;
+            doc.text(`Admission No: ${studentAdmissionNo}`, 15, currentY);
+            currentY += 7;
+            doc.text(`Grade: ${studentGrade} | Class: ${studentClass}`, 15, currentY);
+            currentY += 7;
+            
+            if (reportData.current_year && reportData.current_term) {
+                doc.text(`Current Year: ${reportData.current_year} | Current Term: ${reportData.current_term}`, 15, currentY);
+                currentY += 7;
             }
-
-            // Create PDF content
-            const headers = ['Subject', 'Highest Marks', 'Highest Grade', 'Student Marks', 'Student Grade'];
-            const rows = reportData.studentMarksDetailedTable.map(row => [
+            
+            const tableData = reportData.studentMarksDetailedTable.map(row => [
                 row.subject,
                 row.highestMarks,
                 row.highestMarkGrade,
-                row.studentMarks > 0 ? row.studentMarks : 'N/A',
-                row.studentGrade
+                row.studentMarks > 0 ? row.studentMarks : 'Absent',
+                row.studentGrade !== 'Absent' ? row.studentGrade : 'Absent'
             ]);
 
-            let pdfContent = `STUDENT PERFORMANCE REPORT\n`;
-            pdfContent += `Student: ${reportData.studentName}\n`;
-            pdfContent += `Grade: ${reportData.studentGrade}\n`;
-            pdfContent += `Class: ${reportData.studentClass}\n`;
-            if (reportData.current_year && reportData.current_term) {
-                pdfContent += `Year: ${reportData.current_year} | Term: ${reportData.current_term}\n`;
+            // Compute overall average (consider only present marks)
+            const rowsWithMarksPDF = reportData.studentMarksDetailedTable.filter(r => typeof r.studentMarks === 'number' && r.studentMarks > 0);
+            if (rowsWithMarksPDF.length > 0) {
+                const totalPdfMarks = rowsWithMarksPDF.reduce((s, cur) => s + cur.studentMarks, 0);
+                const avgPdf = (totalPdfMarks / rowsWithMarksPDF.length).toFixed(1);
+                // Append overall average row to table data
+                tableData.push(['Overall Average', '', '', avgPdf, '']);
             }
-            pdfContent += `Date: ${new Date().toLocaleDateString()}\n\n`;
-            pdfContent += headers.join('\t') + '\n';
-            pdfContent += rows.map(row => row.join('\t')).join('\n');
 
-            const blob = new Blob([pdfContent], { type: 'text/plain' });
-            const url = window.URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `Student_Performance_${selectedStudent?.name}_${new Date().toISOString().split('T')[0]}.pdf`;
-            document.body.appendChild(a);
-            a.click();
-            window.URL.revokeObjectURL(url);
-            document.body.removeChild(a);
+            autoTable(doc, {
+                head: [['Subject', 'Highest Marks', 'Highest Grade', 'Student Marks', 'Student Grade']],
+                body: tableData,
+                startY: currentY + 5,
+                theme: 'grid',
+                headStyles: { fillColor: [13, 21, 66], textColor: 255, fontStyle: 'bold' },
+                alternateRowStyles: { fillColor: [240, 240, 240] }
+            });
+
+            doc.save(`Student_Performance_${studentName}_${new Date().toISOString().split('T')[0]}.pdf`);
 
             setSnackbar({
                 open: true,
@@ -423,50 +438,270 @@ const ParentReport: React.FC = () => {
 
     // Export to Excel function
     const exportToExcel = () => {
-        if (!reportData) return;
+        if (!reportData || !reportData.studentMarksDetailedTable || !selectedStudent) return;
 
-        try {
-            // Create workbook and worksheet
-            const ws_data = [
-                ['STUDENT PERFORMANCE REPORT'],
-                [''],
-                ['Student', reportData.studentName],
-                ['Grade', reportData.studentGrade],
-                ['Class', reportData.studentClass],
-                ...(reportData.current_year && reportData.current_term ? [
-                    ['Year', reportData.current_year],
-                    ['Term', reportData.current_term]
-                ] : []),
-                ['Date', new Date().toLocaleDateString()],
-                [''],
-                ['Subject', 'Highest Marks', 'Highest Grade', 'Student Marks', 'Student Grade'],
-                ...reportData.studentMarksDetailedTable.map(row => [
-                    row.subject,
-                    row.highestMarks,
-                    row.highestMarkGrade,
-                    row.studentMarks > 0 ? row.studentMarks : 'N/A',
-                    row.studentGrade
-                ])
-            ];
+        const studentName = selectedStudent.name || reportData.studentName || 'Absent';
+        const studentAdmissionNo = selectedStudent.student?.studentAdmissionNo || 'Absent';
+        const studentGrade = selectedStudent.student?.studentGrade || reportData.studentGrade || 'Absent';
+        const studentClass = selectedStudent.student?.studentClass || reportData.studentClass || 'Absent';
 
-            const ws = XLSX.utils.aoa_to_sheet(ws_data);
-            const wb = XLSX.utils.book_new();
-            XLSX.utils.book_append_sheet(wb, ws, 'Performance');
-            XLSX.writeFile(wb, `Student_Performance_${selectedStudent?.name}_${new Date().toISOString().split('T')[0]}.xlsx`);
+        // Create workbook
+        const workbook = XLSX.utils.book_new();
 
-            setSnackbar({
-                open: true,
-                message: 'Report exported to Excel successfully',
-                severity: 'success'
-            });
-        } catch (error) {
-            console.error('Error exporting Excel:', error);
-            setSnackbar({
-                open: true,
-                message: 'Failed to export report as Excel',
-                severity: 'error'
+        // ========== SHEET 1: SUMMARY ==========
+        // Include student info and a compact marks table so the user sees marks immediately
+        const marksRowsForSummary = reportData.studentMarksDetailedTable.map(row => (
+            [
+                row.subject,
+                row.highestMarks,
+                row.highestMarkGrade,
+                row.studentMarks > 0 ? row.studentMarks : 'Absent',
+                row.studentGrade !== 'Absent' ? row.studentGrade : 'Absent'
+            ]
+        ));
+
+        // compute totals for display in both sheets
+        const rowsWithMarks = reportData.studentMarksDetailedTable.filter(r => typeof r.studentMarks === 'number' && r.studentMarks > 0);
+        let totalMarksVal: number | null = null;
+        let avgMarksVal: string | null = null;
+        if (rowsWithMarks.length > 0) {
+            totalMarksVal = rowsWithMarks.reduce((s, cur) => s + cur.studentMarks, 0);
+            avgMarksVal = (totalMarksVal / rowsWithMarks.length).toFixed(2);
+        }
+
+        const summaryData: any[] = [
+            ['STUDENT PERFORMANCE REPORT'],
+            [],
+            ['Student Name:', studentName],
+            ['Admission No:', studentAdmissionNo],
+            ['Grade:', studentGrade],
+            ['Class:', studentClass],
+            ['Current Year:', reportData.current_year ? String(reportData.current_year) : 'Absent'],
+            ['Current Term:', reportData.current_term || 'Absent'],
+            [],
+            ['MARKS DETAILS'],
+            ['Subject', 'Highest Marks', 'Highest Grade', 'Student Marks', 'Student Grade'],
+            ...marksRowsForSummary
+        ];
+
+        // append total/average row into summary if available
+        if (avgMarksVal !== null) {
+            summaryData.push(['TOTAL/AVERAGE', '', '', totalMarksVal, avgMarksVal]);
+        }
+
+        const summaryWorksheet = XLSX.utils.aoa_to_sheet(summaryData);
+
+        // Set column widths for summary
+        summaryWorksheet['!cols'] = [
+            { wch: 25 },  // Subject / Label
+            { wch: 15 },
+            { wch: 15 },
+            { wch: 15 },
+            { wch: 15 }
+        ];
+
+        // Style the title row
+        if (summaryWorksheet['A1']) {
+            summaryWorksheet['A1'].s = {
+                font: { bold: true, size: 14, color: { rgb: 'FFFFFF' } },
+                fill: { fgColor: { rgb: '0D1542' } },
+                alignment: { horizontal: 'center', vertical: 'center' }
+            };
+        }
+
+        // Merge cells for title (A1:E1) to span the marks columns too
+        if (!summaryWorksheet['!merges']) {
+            summaryWorksheet['!merges'] = [];
+        }
+        summaryWorksheet['!merges'].push({ s: { r: 0, c: 0 }, e: { r: 0, c: 4 } });
+
+        // Style info labels (bold left column)
+        for (let row = 3; row <= 8; row++) {
+            const cellRef = `A${row}`;
+            if (summaryWorksheet[cellRef]) {
+                summaryWorksheet[cellRef].s = {
+                    font: { bold: true, size: 11 },
+                    alignment: { horizontal: 'left', vertical: 'center' }
+                };
+            }
+        }
+
+        // Style the small marks table header (row index where header appears)
+        const summaryMarksHeaderRow = 11; // 1-based index where header is placed
+        ['A', 'B', 'C', 'D', 'E'].forEach(col => {
+            const cellRef = `${col}${summaryMarksHeaderRow}`;
+            if (summaryWorksheet[cellRef]) {
+                const horiz = (col === 'C' || col === 'E') ? 'right' : 'center';
+                summaryWorksheet[cellRef].s = {
+                    font: { bold: true, color: { rgb: 'FFFFFF' } },
+                    fill: { fgColor: { rgb: '0D1542' } },
+                    alignment: { horizontal: horiz as any, vertical: 'center' }
+                };
+            }
+        });
+
+        // Style marks rows in summary (alternating colors, left align subject)
+        const summaryStartDataRow = summaryMarksHeaderRow + 1;
+        const summaryEndDataRow = summaryStartDataRow + marksRowsForSummary.length - 1;
+        for (let row = summaryStartDataRow; row <= summaryEndDataRow; row++) {
+            ['A', 'B', 'C', 'D', 'E'].forEach((col, idx) => {
+                const cellRef = `${col}${row}`;
+                if (summaryWorksheet[cellRef]) {
+                    const isEven = (row - summaryStartDataRow) % 2 === 0;
+                    const horiz = (idx === 0) ? 'left' : (idx === 2 || idx === 4) ? 'right' : 'center';
+                    summaryWorksheet[cellRef].s = {
+                        fill: isEven ? { fgColor: { rgb: 'F7F7F7' } } : { fgColor: { rgb: 'FFFFFF' } },
+                        alignment: { horizontal: horiz as any, vertical: 'center' },
+                        border: {
+                            top: { style: 'thin', color: { rgb: 'CCCCCC' } },
+                            bottom: { style: 'thin', color: { rgb: 'CCCCCC' } },
+                            left: { style: 'thin', color: { rgb: 'CCCCCC' } },
+                            right: { style: 'thin', color: { rgb: 'CCCCCC' } }
+                        }
+                    };
+                }
             });
         }
+
+        // Style total row if exists in summary
+        if (avgMarksVal !== null) {
+            const totalRowIndex = summaryEndDataRow + 1;
+            ['A', 'B', 'C', 'D', 'E'].forEach((col, idx) => {
+                const cellRef = `${col}${totalRowIndex}`;
+                if (summaryWorksheet[cellRef]) {
+                    summaryWorksheet[cellRef].s = {
+                        font: { bold: true, color: { rgb: 'FFFFFF' } },
+                        fill: { fgColor: { rgb: '4CAF50' } },
+                        alignment: { horizontal: idx === 0 ? 'left' : 'center', vertical: 'center' }
+                    };
+                }
+            });
+        }
+
+        XLSX.utils.book_append_sheet(workbook, summaryWorksheet, 'Summary');
+
+        // ========== SHEET 2: MARKS DETAILS ==========
+        const marksData: any[] = [
+            ['MARKS DETAILS'],
+            [],
+            ['Subject', 'Highest Marks', 'Highest Grade', 'Student Marks', 'Student Grade']
+        ];
+
+        // Add student marks rows
+        reportData.studentMarksDetailedTable.forEach(row => {
+            marksData.push([
+                row.subject,
+                row.highestMarks,
+                row.highestMarkGrade,
+                row.studentMarks > 0 ? row.studentMarks : 'Absent',
+                row.studentGrade !== 'Absent' ? row.studentGrade : 'Absent'
+            ]);
+        });
+
+        // Calculate totals if there are marks (use previously computed totals)
+        if (avgMarksVal !== null && totalMarksVal !== null) {
+            marksData.push(['TOTAL/AVERAGE', '', '', totalMarksVal, avgMarksVal]);
+        }
+
+        const marksWorksheet = XLSX.utils.aoa_to_sheet(marksData);
+
+        // Set column widths for marks sheet
+        marksWorksheet['!cols'] = [
+            { wch: 25 },  // Subject
+            { wch: 15 },  // Highest Marks
+            { wch: 15 },  // Highest Grade
+            { wch: 15 },  // Student Marks
+            { wch: 15 }   // Student Grade
+        ];
+
+        // Style title row
+        if (marksWorksheet['A1']) {
+            marksWorksheet['A1'].s = { 
+                font: { bold: true, size: 14, color: { rgb: 'FFFFFF' } }, 
+                fill: { fgColor: { rgb: '0D1542' } },
+                alignment: { horizontal: 'center', vertical: 'center' }
+            };
+        }
+
+        // Merge cells for marks title (A1:E1)
+        if (!marksWorksheet['!merges']) {
+            marksWorksheet['!merges'] = [];
+        }
+        marksWorksheet['!merges'].push({ s: { r: 0, c: 0 }, e: { r: 0, c: 4 } });
+
+        // Style header row (row 3)
+        ['A', 'B', 'C', 'D', 'E'].forEach(col => {
+            const cellRef = `${col}3`;
+            if (marksWorksheet[cellRef]) {
+                const horiz = (col === 'C' || col === 'E') ? 'right' : 'center';
+                marksWorksheet[cellRef].s = {
+                    font: { bold: true, size: 11, color: { rgb: 'FFFFFF' } },
+                    fill: { fgColor: { rgb: '0D1542' } },
+                    alignment: { horizontal: horiz as any, vertical: 'center' }
+                };
+            }
+        });
+
+        // Style data rows with alternating colors
+        const startDataRow = 4;
+        const endDataRow = startDataRow + reportData.studentMarksDetailedTable.length - 1;
+        
+        for (let row = startDataRow; row <= endDataRow; row++) {
+            ['A', 'B', 'C', 'D', 'E'].forEach((col, idx) => {
+                const cellRef = `${col}${row}`;
+                if (marksWorksheet[cellRef]) {
+                    const isEven = (row - startDataRow) % 2 === 0;
+                    const horiz = (idx === 0) ? 'left' : (idx === 2 || idx === 4) ? 'right' : 'center';
+                    marksWorksheet[cellRef].s = {
+                        fill: isEven ? { fgColor: { rgb: 'F0F0F0' } } : { fgColor: { rgb: 'FFFFFF' } },
+                        alignment: { 
+                            horizontal: horiz as any,
+                            vertical: 'center',
+                            wrapText: true 
+                        },
+                        border: {
+                            top: { style: 'thin', color: { rgb: 'CCCCCC' } },
+                            bottom: { style: 'thin', color: { rgb: 'CCCCCC' } },
+                            left: { style: 'thin', color: { rgb: 'CCCCCC' } },
+                            right: { style: 'thin', color: { rgb: 'CCCCCC' } }
+                        }
+                    };
+                }
+            });
+        }
+
+        // Style total row if exists
+        const totalRowNum = endDataRow + 1;
+        if (rowsWithMarks.length > 0) {
+            ['A', 'B', 'C', 'D', 'E'].forEach((col, idx) => {
+                const cellRef = `${col}${totalRowNum}`;
+                if (marksWorksheet[cellRef]) {
+                    const horiz = (idx === 0) ? 'left' : (idx === 2 || idx === 4) ? 'right' : 'center';
+                    marksWorksheet[cellRef].s = {
+                        font: { bold: true, size: 11, color: { rgb: 'FFFFFF' } },
+                        fill: { fgColor: { rgb: '4CAF50' } },
+                        alignment: { horizontal: horiz as any, vertical: 'center' },
+                        border: {
+                            top: { style: 'thin', color: { rgb: 'CCCCCC' } },
+                            bottom: { style: 'thin', color: { rgb: 'CCCCCC' } },
+                            left: { style: 'thin', color: { rgb: 'CCCCCC' } },
+                            right: { style: 'thin', color: { rgb: 'CCCCCC' } }
+                        }
+                    };
+                }
+            });
+        }
+
+        XLSX.utils.book_append_sheet(workbook, marksWorksheet, 'Marks Details');
+
+        const filename = `Student_Performance_${studentName}_${new Date().toISOString().split('T')[0]}.xlsx`;
+        XLSX.writeFile(workbook, filename);
+
+        setSnackbar({
+            open: true,
+            message: 'Report exported to Excel successfully',
+            severity: 'success'
+        });
     };
 
     const renderDetailedMarksTable = (): React.ReactNode => {
@@ -488,15 +723,15 @@ const ParentReport: React.FC = () => {
 
         const rowsWithMarks = reportData.studentMarksDetailedTable.filter(row => row.studentMarks > 0);
         const totalMarks = rowsWithMarks.reduce((sum: number, current: DetailedMarksTableRow) => sum + current.studentMarks, 0);
-        const averageMarks = rowsWithMarks.length > 0 ? (totalMarks / rowsWithMarks.length).toFixed(1) : 'N/A';
+        const averageMarks = rowsWithMarks.length > 0 ? (totalMarks / rowsWithMarks.length).toFixed(1) : 'Absent';
 
         const rows = reportData.studentMarksDetailedTable.map((row: DetailedMarksTableRow, idx: number) => (
             <TableRow key={idx} hover>
                 <TableCell sx={{ fontWeight: 'bold' }}>{row.subject}</TableCell>
                 <TableCell align="center">{row.highestMarks}</TableCell>
                 <TableCell align="center">{row.highestMarkGrade}</TableCell>
-                <TableCell align="center">{row.studentMarks > 0 ? row.studentMarks : 'N/A'}</TableCell>
-                <TableCell align="center">{row.studentGrade !== 'N/A' ? row.studentGrade : 'N/A'}</TableCell>
+                <TableCell align="center">{row.studentMarks > 0 ? row.studentMarks : 'Absent'}</TableCell>
+                <TableCell align="center">{row.studentGrade !== 'Absent' ? row.studentGrade : 'Absent'}</TableCell>
             </TableRow>
         ));
 
@@ -600,7 +835,38 @@ const ParentReport: React.FC = () => {
                                         direction={{ xs: 'column', md: 'row' }}
                                         spacing={2}
                                     >
-                                        {/* Exam Type */}
+                                       
+                                        {/* Start Year */}
+                                        <TextField
+                                            select
+                                            label="Start Year"
+                                            value={startYear}
+                                            onChange={(e) => setStartYear(e.target.value)}
+                                            fullWidth
+                                            size="small"
+                                        >
+                                            <MenuItem value=""><em>None</em></MenuItem>
+                                            {yearOptions.map((y) => (
+                                                <MenuItem key={y.year} value={y.year}>{y.year}</MenuItem>
+                                            ))}
+                                        </TextField>
+
+                                        {/* End Year */}
+                                        <TextField
+                                            select
+                                            label="End Year"
+                                            value={endYear}
+                                            onChange={(e) => setEndYear(e.target.value)}
+                                            fullWidth
+                                            size="small"
+                                        >
+                                            <MenuItem value=""><em>None</em></MenuItem>
+                                            {yearOptions.map((y) => (
+                                                <MenuItem key={y.year} value={y.year}>{y.year}</MenuItem>
+                                            ))}
+                                        </TextField>
+
+                                         {/* Exam Type */}
                                         <Autocomplete
                                             fullWidth
                                             options={examOptions}
@@ -633,35 +899,7 @@ const ParentReport: React.FC = () => {
                                             />
                                         )}
 
-                                        {/* Start Year */}
-                                        <TextField
-                                            select
-                                            label="Start Year"
-                                            value={startYear}
-                                            onChange={(e) => setStartYear(e.target.value)}
-                                            fullWidth
-                                            size="small"
-                                        >
-                                            <MenuItem value=""><em>None</em></MenuItem>
-                                            {yearOptions.map((y) => (
-                                                <MenuItem key={y.year} value={y.year}>{y.year}</MenuItem>
-                                            ))}
-                                        </TextField>
 
-                                        {/* End Year */}
-                                        <TextField
-                                            select
-                                            label="End Year"
-                                            value={endYear}
-                                            onChange={(e) => setEndYear(e.target.value)}
-                                            fullWidth
-                                            size="small"
-                                        >
-                                            <MenuItem value=""><em>None</em></MenuItem>
-                                            {yearOptions.map((y) => (
-                                                <MenuItem key={y.year} value={y.year}>{y.year}</MenuItem>
-                                            ))}
-                                        </TextField>
                                     </Stack>
 
                                     <Typography variant="h6" sx={{ mb: 3, mt: 5, fontWeight: 600 }}>

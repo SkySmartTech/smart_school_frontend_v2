@@ -608,7 +608,7 @@ const ManagementStaff: React.FC = () => {
                     <TableRow>
                       <TableCell colSpan={tableSubjects.length + 2} align="center">
                         <Typography variant="body2" color="text.secondary" sx={{ fontSize: isMobile ? "0.75rem" : "0.875rem" }}>
-                          No data available for the selected criteria
+                          Marks have not been added to the subjects yet. Please check after submitting the marks.
                         </Typography>
                       </TableCell>
                     </TableRow>
