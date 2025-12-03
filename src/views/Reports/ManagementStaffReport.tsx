@@ -558,7 +558,7 @@ const ManagementStaff: React.FC = () => {
           {/* Table Section */}
           <Paper elevation={2} sx={{ p: isMobile ? 1.5 : 2, overflow: "auto" }}>
             <Typography variant={isMobile ? "subtitle1" : "h6"} fontWeight={600} mb={2} sx={{ px: isMobile ? 1 : 0 }}>
-              Detailed Marks Breakdown
+              Performance by Grade
             </Typography>
             <TableContainer sx={{ maxHeight: isMobile ? 400 : 600 }}>
               <Table size={isMobile ? "small" : "medium"} stickyHeader>
@@ -608,7 +608,7 @@ const ManagementStaff: React.FC = () => {
                     <TableRow>
                       <TableCell colSpan={tableSubjects.length + 2} align="center">
                         <Typography variant="body2" color="text.secondary" sx={{ fontSize: isMobile ? "0.75rem" : "0.875rem" }}>
-                          No data available for the selected criteria
+                          Marks have not been added to the subjects yet. Please check after submitting the marks.
                         </Typography>
                       </TableCell>
                     </TableRow>

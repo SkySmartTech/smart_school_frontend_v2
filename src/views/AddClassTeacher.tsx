@@ -68,6 +68,7 @@ const AddClassTeacher = () => {
   const [currentClass, setCurrentClass] = useState<{grade: string; className: string; teacherId: string} | null>(null);
   const [isNewAssignment, setIsNewAssignment] = useState(false);
   const [popupLoading, setPopupLoading] = useState(false);
+  const [popupError, setPopupError] = useState<string | null>(null);
   const [popupFormData, setPopupFormData] = useState<PopupFormData>({
     searchTerm: "",
     selectedGrade: "",
@@ -122,6 +123,7 @@ const AddClassTeacher = () => {
   const handleOpenPopup = async (grade: string, className: string, teacherId: string) => {
     setIsNewAssignment(false);
     setCurrentClass({ grade, className, teacherId });
+    setPopupError(null);
     setPopupFormData({
       searchTerm: "",
       selectedGrade: grade, 
@@ -139,7 +141,7 @@ const AddClassTeacher = () => {
         teachers: searchedTeachers
       }));
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to search teachers");
+      setPopupError(err instanceof Error ? err.message : "Failed to search teachers");
     } finally {
       setPopupLoading(false);
     }
@@ -148,6 +150,7 @@ const AddClassTeacher = () => {
   const handleOpenNew = async () => {
     setIsNewAssignment(true);
     setCurrentClass(null);
+    setPopupError(null);
     setPopupFormData({
       searchTerm: "",
       selectedGrade: "",
@@ -169,7 +172,7 @@ const AddClassTeacher = () => {
       setAllGrades(grades);
       setAllClasses(classes);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load grades and classes");
+      setPopupError(err instanceof Error ? err.message : "Failed to load grades and classes");
     } finally {
       setPopupLoading(false);
     }
@@ -197,6 +200,7 @@ const AddClassTeacher = () => {
       teachers: []
     });
     setSelectedTeacher(null);
+    setPopupError(null);
   };
 
   const handleSearch = async () => {
@@ -225,7 +229,7 @@ const AddClassTeacher = () => {
         teachers: searchedTeachers
       }));
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to search teachers");
+      setPopupError(err instanceof Error ? err.message : "Failed to search teachers");
     } finally {
       setPopupLoading(false);
     }
@@ -254,7 +258,7 @@ const AddClassTeacher = () => {
         const teachers = await fetchTeachersByGradeAndClass(currentGrade, newClass);
         setPopupFormData(prev => ({ ...prev, teachers }));
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Failed to fetch teachers");
+        setPopupError(err instanceof Error ? err.message : "Failed to fetch teachers");
       } finally {
         setPopupLoading(false);
       }
@@ -263,7 +267,7 @@ const AddClassTeacher = () => {
 
   const handleSaveAssignment = async () => {
     if (!selectedTeacher) {
-      setError("Please select a teacher");
+      setPopupError("Please select a teacher");
       return;
     }
 
@@ -271,7 +275,7 @@ const AddClassTeacher = () => {
     const classToAssign = currentClass?.className ?? popupFormData.selectedClass;
 
     if (!gradeToAssign || !classToAssign) {
-      setError("Please select both Grade and Class to assign the teacher.");
+      setPopupError("Please select both Grade and Class to assign the teacher.");
       return;
     }
 
@@ -299,7 +303,7 @@ const AddClassTeacher = () => {
         setError(result.message);
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to save assignment");
+      setPopupError(err instanceof Error ? err.message : "Failed to save assignment");
     } finally {
       setPopupLoading(false);
     }
@@ -585,6 +589,11 @@ const AddClassTeacher = () => {
           </DialogTitle>
           
           <DialogContent>
+            {popupError && (
+              <Alert severity="error" sx={{ mb: 2 }} onClose={() => setPopupError(null)}>
+                {popupError}
+              </Alert>
+            )}
             <Stack spacing={2} sx={{ mt: 2 }}>
               <TextField
                 placeholder="Search teachers by name or staff no..."

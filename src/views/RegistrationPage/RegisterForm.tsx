@@ -90,7 +90,7 @@ const RegisterForm = ({ onSuccess = () => { }, onError = () => { } }: RegisterFo
   }, [subjects]);
 
   const gender = ["Male", "Female"];
-  const roles = ["Teacher", "Student", "Parent"];
+  const roles = ["Teacher", "Student", "Parent", "Principal"];
   const mediumOptions = ["Sinhala", "English", "Tamil"];
 
   const steps: string[] = ['Basic Information', 'Role Details'];
@@ -225,16 +225,6 @@ const RegisterForm = ({ onSuccess = () => { }, onError = () => { } }: RegisterFo
     setValue("profession", "");
     setValue("relation", "");
     setValue("parentContact", "");
-    setValue("name", "");
-    setValue("email", "");
-    setValue("address", "");
-    setValue("birthDay", "");
-    setValue("contact", "");
-    setValue("userType", "");
-    setValue("username", "");
-    setValue("password", "");
-    setValue("password_confirmation", "");
-    setValue("gender", "");
   };
 
   // Handle browser back button (popstate event) and page/tab close (beforeunload event)
@@ -309,6 +299,15 @@ const RegisterForm = ({ onSuccess = () => { }, onError = () => { } }: RegisterFo
     mutationFn: registerUser,
     onSuccess: (data) => {
       setRegisteredUser({ userId: data.userId, userType: data.userType });
+      // If the selected role is Principal, there is no role-details step. Complete registration.
+      if (selectedRole === "Principal" || (data?.userType && String(data.userType).toLowerCase() === "principal")) {
+        showSuccess("Registration successful! Please contact the Admin to get access to Login.");
+        setTimeout(() => {
+          navigate("/login");
+        }, 1000);
+        return;
+      }
+
       setActiveStep(1);
     },
     onError: (error: any) => {
@@ -413,7 +412,8 @@ const RegisterForm = ({ onSuccess = () => { }, onError = () => { } }: RegisterFo
         }
       });
 
-      formData.append('userRole', 'user');
+      // Append the actual selected role (falls back to 'user')
+      formData.append('userRole', selectedRole || 'user');
 
       registerBasicUser(formData);
     } else {
@@ -538,6 +538,21 @@ const RegisterForm = ({ onSuccess = () => { }, onError = () => { } }: RegisterFo
     const currentMedium = watch("medium") || [];
 
     if (currentGrades.length && currentSubjects.length && currentClasses.length && currentMedium.length) {
+      // Check for duplicates in existing assignments
+      const isDuplicate = teacherAssignments.some(assignment => {
+        const gradeMatch = assignment.grades[0] === currentGrades[0];
+        const subjectMatch = assignment.subjects[0] === currentSubjects[0];
+        const classMatch = assignment.classes[0] === currentClasses[0];
+        const mediumMatch = assignment.medium[0] === currentMedium[0];
+        
+        return gradeMatch && subjectMatch && classMatch && mediumMatch;
+      });
+
+      if (isDuplicate) {
+        showError("This combination of Grade, Subject, Class, and Medium already exists");
+        return;
+      }
+
       const newAssignment: TeacherAssignment = {
         grades: currentGrades,
         subjects: currentSubjects,
@@ -1472,15 +1487,28 @@ const RegisterForm = ({ onSuccess = () => { }, onError = () => { } }: RegisterFo
               {isPending ? <CircularProgress size={24} /> : 'Sign Up'}
             </Button>
           ) : (
-            <Button
-              onClick={handleNext}
-              variant="contained"
-              disabled={isPending}
-              fullWidth={true}
-              sx={{ order: { xs: 1, sm: 2 }, width: { sm: 'auto' } }}
-            >
-              {isPending ? <CircularProgress size={24} /> : 'Next'}
-            </Button>
+            // If on the basic step and Principal is selected, show a Submit button
+            activeStep === 0 && selectedRole === "Principal" ? (
+              <Button
+                onClick={handleNext}
+                variant="contained"
+                disabled={isPending}
+                fullWidth={true}
+                sx={{ order: { xs: 1, sm: 2 }, width: { sm: 'auto' } }}
+              >
+                {isPending ? <CircularProgress size={24} /> : 'Submit'}
+              </Button>
+            ) : (
+              <Button
+                onClick={handleNext}
+                variant="contained"
+                disabled={isPending}
+                fullWidth={true}
+                sx={{ order: { xs: 1, sm: 2 }, width: { sm: 'auto' } }}
+              >
+                {isPending ? <CircularProgress size={24} /> : 'Next'}
+              </Button>
+            )
           )}
         </Box>
 

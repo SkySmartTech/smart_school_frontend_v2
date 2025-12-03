@@ -203,51 +203,115 @@ const ParentReport: React.FC = () => {
     const exportToExcel = () => {
         if (!reportData || !reportData.studentMarksDetailedTable) return;
 
-        const dataToExport = reportData.studentMarksDetailedTable.map(row => ({
-            Subject: row.subject,
-            'Highest Marks': row.highestMarks,
-            'Highest Grade': row.highestMarkGrade,
-            'Student Marks': row.studentMarks > 0 ? row.studentMarks : 'N/A',
-            'Student Grade': row.studentGrade !== 'N/A' ? row.studentGrade : 'N/A'
-        }));
+        // Resolve student details with fallbacks (reportData -> selectedChild -> N/A)
+        const studentName = reportData.studentName || selectedChild?.studentName || 'Absent';
+        const studentGrade = reportData.studentGrade || selectedChild?.grade || 'Absent';
+        const studentClass = reportData.studentClass || selectedChild?.className || 'Absent';
+        const admissionNo = selectedChild?.admissionNo || (reportData as any).studentAdmissionNo || 'Absent';
 
-        const ws = XLSX.utils.json_to_sheet(dataToExport);
+        // Prepare a students_info summary (all children) if available
+        const studentsInfoList = childrenData && childrenData.length > 0
+            ? childrenData.map(c => `${c.studentName || 'Absent'} (${c.admissionNo || 'Absent'})`).join(' ; ')
+            : 'Absent';
+
+        // Calculate overall average (same logic as the table rendering)
+        const rowsWithMarks = reportData.studentMarksDetailedTable.filter((r: DetailedMarksTableRow) => r.studentMarks > 0);
+        const totalMarks = rowsWithMarks.reduce((sum: number, current: DetailedMarksTableRow) => sum + current.studentMarks, 0);
+        const overallAverage = rowsWithMarks.length > 0 ? (totalMarks / rowsWithMarks.length).toFixed(1) : 'Absent';
+
+        // Build AOAs: header metadata + table header + table rows
+        const headerAoA: Array<Array<string>> = [
+            ['Student', studentName],
+            ['Grade', studentGrade],
+            ['Class', studentClass],
+            ['Admission No', admissionNo],
+            ['Students', studentsInfoList],
+            ['Year', reportData.currentYear ? String(reportData.currentYear) : 'Absent'],
+            ['Term', reportData.currentTerm || 'Absent'],
+            ['Overall Average', String(overallAverage)]
+        ];
+
+        const tableHeader = ['Subject', 'Highest Marks', 'Highest Grade', 'Student Marks', 'Student Grade'];
+
+        const tableRows = reportData.studentMarksDetailedTable.map(row => ([
+            row.subject,
+            String(row.highestMarks),
+            row.highestMarkGrade,
+            row.studentMarks > 0 ? String(row.studentMarks) : 'Absent',
+            row.studentGrade !== 'Absent' ? row.studentGrade : 'Absent'
+        ]));
+
+        const combinedAoA: Array<Array<string>> = [
+            ...headerAoA,
+            [],
+            tableHeader,
+            ...tableRows,
+        ];
+
+        const ws = XLSX.utils.aoa_to_sheet(combinedAoA);
         const wb = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(wb, ws, 'Performance');
-        XLSX.writeFile(wb, `${selectedChild?.studentName}_Performance_${new Date().toISOString().split('T')[0]}.xlsx`);
-        
-        setSnackbar({
-            open: true,
-            message: 'Report exported to Excel successfully',
-            severity: 'success'
-        });
+
+        // Filename fallback
+        const fileNameBase = (studentName && studentName !== 'Absent') ? studentName : 'Student';
+        XLSX.writeFile(wb, `${fileNameBase}_Performance_${new Date().toISOString().split('T')[0]}.xlsx`);
+
+        setSnackbar({ open: true, message: 'Report exported to Excel successfully', severity: 'success' });
     };
 
     const exportToPDF = () => {
         if (!reportData || !reportData.studentMarksDetailedTable) return;
 
+        // Resolve student details with fallbacks (reportData -> selectedChild -> N/A)
+        const studentName = reportData.studentName || selectedChild?.studentName || 'Absent';
+        const studentGrade = reportData.studentGrade || selectedChild?.grade || 'Absent';
+        const studentClass = reportData.studentClass || selectedChild?.className || 'Absent';
+        const admissionNo = selectedChild?.admissionNo || (reportData as any).studentAdmissionNo || 'Absent';
+
+        // Prepare a students_info summary (all children) if available
+        const studentsInfoList = childrenData && childrenData.length > 0
+            ? childrenData.map(c => `${c.studentName || 'Absent'} (${c.admissionNo || 'Absent'})`).join('\n')
+            : 'Absent';
+
+        // Calculate overall average
+        const rowsWithMarks = reportData.studentMarksDetailedTable.filter((r: DetailedMarksTableRow) => r.studentMarks > 0);
+        const totalMarks = rowsWithMarks.reduce((sum: number, current: DetailedMarksTableRow) => sum + current.studentMarks, 0);
+        const overallAverage = rowsWithMarks.length > 0 ? (totalMarks / rowsWithMarks.length).toFixed(1) : 'Absent';
+
         const doc = new jsPDF();
         const pageWidth = doc.internal.pageSize.getWidth();
-        
+
         // Add title
         doc.setFontSize(16);
         doc.text('Students Performance Report', pageWidth / 2, 15, { align: 'center' });
-        
+
         // Add student and report info
         doc.setFontSize(11);
         let yPosition = 25;
-        doc.text(`Student: ${selectedChild?.studentName || 'N/A'}`, 14, yPosition);
+        doc.text(`Student: ${studentName}`, 14, yPosition);
         yPosition += 7;
-        doc.text(`Year: ${reportData.currentYear || 'N/A'} | Term: ${reportData.currentTerm || 'N/A'}`, 14, yPosition);
-        yPosition += 10;
+        doc.text(`Grade: ${studentGrade} | Class: ${studentClass} | Admission No: ${admissionNo}`, 14, yPosition);
+        yPosition += 7;
+        doc.text(`Year: ${reportData.currentYear || 'Absent'} | Term: ${reportData.currentTerm || 'Absent'} | Overall Average: ${overallAverage}`, 14, yPosition);
+        yPosition += 8;
+
+        // If multiple children, add the students_info list
+        if (studentsInfoList !== 'Absent') {
+            doc.setFontSize(10);
+            doc.text('Students:', 14, yPosition);
+            yPosition += 6;
+            const splitLines = doc.splitTextToSize(studentsInfoList, pageWidth - 28);
+            doc.text(splitLines, 14, yPosition);
+            yPosition += (splitLines.length * 6) + 4;
+        }
 
         // Prepare table data
         const tableData = reportData.studentMarksDetailedTable.map(row => [
             row.subject,
             row.highestMarks.toString(),
             row.highestMarkGrade,
-            row.studentMarks > 0 ? row.studentMarks.toString() : 'N/A',
-            row.studentGrade !== 'N/A' ? row.studentGrade : 'N/A'
+            row.studentMarks > 0 ? row.studentMarks.toString() : 'Absent',
+            row.studentGrade !== 'Absent' ? row.studentGrade : 'Absent'
         ]);
 
         // Add table
@@ -256,30 +320,16 @@ const ParentReport: React.FC = () => {
             body: tableData,
             startY: yPosition,
             margin: { top: 10, right: 14, bottom: 14, left: 14 },
-            styles: {
-                fontSize: 10,
-                cellPadding: 5,
-            },
-            headStyles: {
-                fillColor: [13, 21, 66],
-                textColor: [255, 255, 255],
-                fontStyle: 'bold',
-            },
-            bodyStyles: {
-                textColor: [51, 51, 51],
-            },
-            alternateRowStyles: {
-                fillColor: [240, 240, 240],
-            },
+            styles: { fontSize: 10, cellPadding: 5 },
+            headStyles: { fillColor: [13, 21, 66], textColor: [255, 255, 255], fontStyle: 'bold' },
+            bodyStyles: { textColor: [51, 51, 51] },
+            alternateRowStyles: { fillColor: [240, 240, 240] },
         });
 
-        doc.save(`${selectedChild?.studentName}_Performance_${new Date().toISOString().split('T')[0]}.pdf`);
-        
-        setSnackbar({
-            open: true,
-            message: 'Report exported to PDF successfully',
-            severity: 'success'
-        });
+        const fileNameBase = (studentName && studentName !== 'Absent') ? studentName : 'Student';
+        doc.save(`${fileNameBase}_Performance_${new Date().toISOString().split('T')[0]}.pdf`);
+
+        setSnackbar({ open: true, message: 'Report exported to PDF successfully', severity: 'success' });
     };
 
     const renderDetailedMarksTable = (): React.ReactNode => {
@@ -301,15 +351,15 @@ const ParentReport: React.FC = () => {
 
         const rowsWithMarks = reportData.studentMarksDetailedTable.filter(row => row.studentMarks > 0);
         const totalMarks = rowsWithMarks.reduce((sum: number, current: DetailedMarksTableRow) => sum + current.studentMarks, 0);
-        const averageMarks = rowsWithMarks.length > 0 ? (totalMarks / rowsWithMarks.length).toFixed(1) : 'N/A';
+        const averageMarks = rowsWithMarks.length > 0 ? (totalMarks / rowsWithMarks.length).toFixed(1) : 'Absent';
 
         const rows = reportData.studentMarksDetailedTable.map((row: DetailedMarksTableRow, idx: number) => (
             <TableRow key={idx} hover>
                 <TableCell sx={{ fontWeight: 'bold' }}>{row.subject}</TableCell>
                 <TableCell align="center">{row.highestMarks}</TableCell>
                 <TableCell align="center">{row.highestMarkGrade}</TableCell>
-                <TableCell align="center">{row.studentMarks > 0 ? row.studentMarks : 'N/A'}</TableCell>
-                <TableCell align="center">{row.studentGrade !== 'N/A' ? row.studentGrade : 'N/A'}</TableCell>
+                <TableCell align="center">{row.studentMarks > 0 ? row.studentMarks : 'Absent'}</TableCell>
+                <TableCell align="center">{row.studentGrade !== 'Absent' ? row.studentGrade : 'Absent'}</TableCell>
             </TableRow>
         ));
 

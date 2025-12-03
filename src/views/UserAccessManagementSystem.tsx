@@ -28,6 +28,7 @@ const defaultPermissions: Record<PermissionKey, boolean> = {
 
     //Add marks 
     addMarks: false,
+    editMarks: false,
     addClassTeacher: false,
     addStudent: false,
     //Reports
@@ -450,6 +451,8 @@ const UserAccessManagementSystem = () => {
                                             )}
 
                                             {renderCheckbox("addMarks", "Add Marks", true)}
+
+                                            {renderCheckbox("editMarks", "Edit Marks", true)}
 
                                             {renderCheckbox("addClassTeacher", "Add Class Teacher", true)}
 

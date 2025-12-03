@@ -22,15 +22,10 @@ const RegistrationPage = React.lazy(() => import("./views/RegistrationPage/Regis
 
 // Dashboard pages
 const AddMarks = React.lazy(() => import("./views/Dashboard/AddMarks"));
+const EditMarks = React.lazy(() => import("./views/EditMarks"));
 const StudentDashboard = React.lazy(() => import("./views/Dashboard/StudentDashboard"));
 const SystemManagementPage = React.lazy(() => import("./views/SystemMangementPage"));
 const UserProfile = React.lazy(() => import("./views/UserProfile"));
-
-// const HelpPage = React.lazy(() => import("./views/Dashboard/HelpPage"));
-// const SettingPage = React.lazy(() => import("./views/Dashboard/SettingPage"));
-// const DayPlanUpload = React.lazy(() => import("./views/Dashboard/DayPlan/DayPlanUpload"));
-// const DayPlanReport = React.lazy(() => import("./views/Dashboard/DayPlanReport/DayPlanReport"));
-// const DayPlanSummary = React.lazy(() => import("./views/Dashboard/DayPlanSummary/DayPlanSummary"));
 
 // // Administration pages
 
@@ -127,11 +122,11 @@ function AppRoutes() {
         />
 
         <Route
-          path="/addStudent"
+          path="/editMarks"
           element={
-            <ProtectedRoute permission="addStudent">
+            <ProtectedRoute permission="editMarks">
               <Suspense fallback={<PageLoader />}>
-                <AddStudent />
+                <EditMarks />
               </Suspense>
             </ProtectedRoute>
           }

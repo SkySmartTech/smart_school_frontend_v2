@@ -137,24 +137,6 @@ const handleApiError = (error: any, operation: string) => {
 // API Functions
 // ==========================
 
-export async function fetchStudentMarks(filters: FetchMarksFilters): Promise<StudentMark[]> {
-  try {
-    const requestBody = {
-      grade: filters.grade || "",
-      class: filters.class || "",
-      subject: filters.subject || "",
-      term: filters.term || "",
-      month: filters.month || "",
-      search: filters.searchQuery || "",
-    };
-
-    const res = await axios.post(`${API_BASE_URL}/api/add-marks`, requestBody, getAuthHeader());
-    return Array.isArray(res.data) ? res.data : [];
-  } catch (error) {
-    handleApiError(error, "fetchStudentMarks");
-    return [];
-  }
-}
 
 export async function submitStudentMarks(marksToSubmit: Partial<StudentMark>[]): Promise<void> {
   try {
@@ -201,7 +183,8 @@ export async function submitStudentMarks(marksToSubmit: Partial<StudentMark>[]):
       throw new Error("Missing required fields in marks submission (month is required for Monthly term)");
     }
 
-    await axios.post(`${API_BASE_URL}/api/add-marks`, {
+    // POST to the update endpoint when editing/updating existing marks
+    await axios.post(`${API_BASE_URL}/api/update-marks`, {
       marks: formattedMarks
     }, getAuthHeader());
   } catch (error) {
@@ -336,41 +319,6 @@ export async function fetchAdmissionData(grade: string, classValue: string, keyw
   }
 }
 
-// Fetch marks using filters (Grade/Class/Year/Term/Subject)
-export async function fetchFilteredMarks(
-  grade: string,
-  classValue: string,
-  year: string,
-  term: string,
-  subject: string
-): Promise<StudentMark[]> {
-  try {
-    const url = `${API_BASE_URL}/api/search-marks/${encodeURIComponent(grade)}/${encodeURIComponent(classValue)}/${encodeURIComponent(year)}/${encodeURIComponent(term)}/${encodeURIComponent(subject)}`;
-    const res = await axios.get(url, getAuthHeader());
-
-    if (!Array.isArray(res.data)) return [];
-
-    // Map API response to our StudentMark shape when possible
-    return res.data.map((item: any, index: number) => ({
-      id: item.id ?? index + 1,
-      student_admission: item.studentAdmissionNo ?? item.student_admission ?? '',
-      student_name: item.studentName ?? item.student_name ?? '',
-      student_grade: item.studentGrade ?? item.student_grade ?? '',
-      student_class: item.studentClass ?? item.student_class ?? classValue ?? '',
-      subject: item.subject ?? subject ?? '',
-      term: item.term ?? term ?? '',
-      marks: item.marks !== undefined ? String(item.marks) : '',
-      student_grade_value: item.marksGrade ?? item.student_grade_value ?? '',
-      month: item.month ?? null,
-      year: item.year ?? year ?? '',
-      status: item.status === 1 || item.status === true || item.status === '1'
-    }));
-  } catch (error) {
-    handleApiError(error, "fetchFilteredMarks");
-    return [];
-  }
-}
-
 // New function to calculate grade
 export async function calculateGrade(marks: string): Promise<string> {
   try {
@@ -379,6 +327,52 @@ export async function calculateGrade(marks: string): Promise<string> {
   } catch (error) {
     handleApiError(error, "calculateGrade");
     return "Error";
+  }
+}
+
+// Calculate grade based on marks using local logic
+export function calculateGradeLocal(marks: number): string {
+  if (marks < 0 || marks > 100) return "Invalid";
+  if (marks <= 39) return "F";
+  if (marks < 50) return "S";
+  if (marks < 65) return "C";
+  if (marks < 75) return "B";
+  return "A";
+}
+
+// Fetch filtered marks for a specific Grade, Class, Year, Term, and Subject
+export async function fetchFilteredMarks(
+  grade: string,
+  classValue: string,
+  year: string,
+  term: string,
+  subject: string
+): Promise<StudentMark[]> {
+  try {
+    const res = await axios.get(
+      `${API_BASE_URL}/api/search-marks/${encodeURIComponent(grade)}/${encodeURIComponent(classValue)}/${encodeURIComponent(year)}/${encodeURIComponent(term)}/${encodeURIComponent(subject)}`,
+      getAuthHeader()
+    );
+
+    return Array.isArray(res.data)
+      ? res.data.map((item: any, index: number) => ({
+          id: item.id ?? index + 1,
+          student_admission: item.studentAdmissionNo || item.student_admission || "",
+          student_name: item.studentName || item.student_name || "",
+          student_grade: item.studentGrade || grade || "",
+          student_class: item.studentClass || classValue || "",
+          subject: item.subject || subject || "",
+          term: item.term || term || "",
+          marks: String(item.marks ?? ""),
+          student_grade_value: item.marksGrade || item.student_grade_value || "",
+          month: item.month || undefined,
+          year: item.year || year || "",
+          status: item.status === 1 || item.status === true || item.status === "1" || item.status === "present",
+        }))
+      : [];
+  } catch (error) {
+    handleApiError(error, "fetchFilteredMarks");
+    return [];
   }
 }
 

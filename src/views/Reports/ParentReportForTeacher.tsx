@@ -19,7 +19,13 @@ import {
     Alert,
     Autocomplete,
     Button,
+    useMediaQuery,
+    Collapse,
+    IconButton,
+    Divider,
 } from "@mui/material";
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import ExpandLessIcon from '@mui/icons-material/ExpandLess';
 import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -85,6 +91,9 @@ const COLORS = ["#4285F4", "#34A853", "#FBBC05", "#EA4335", "#9C27B0", "#FF5722"
 
 const ParentReport: React.FC = () => {
     const theme = useTheme();
+    const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
+    const isTablet = useMediaQuery(theme.breakpoints.down('md'));
+    
     const [sidebarOpen, setSidebarOpen] = useState(false);
     const [exam, setExam] = useState("");
     const [month, setMonth] = useState("");
@@ -92,6 +101,7 @@ const ParentReport: React.FC = () => {
     const [endYear, setEndYear] = useState<string | null>(null);
     const [availableYears, setAvailableYears] = useState<string[]>([]);
     const [isLoadingYears, setIsLoadingYears] = useState(false);
+    const [filtersExpanded, setFiltersExpanded] = useState(true);
 
     // Student related state
     const [studentOptions, setStudentOptions] = useState<Student[]>([]);
@@ -145,7 +155,7 @@ const ParentReport: React.FC = () => {
         return hasExamFilter || hasYearFilter;
     };
 
-    // Load students on mount using the teacher info inside /api/user processed by fetchClassStudents()
+    // Load students on mount
     useEffect(() => {
         let mounted = true;
         const loadStudents = async () => {
@@ -236,7 +246,6 @@ const ParentReport: React.FC = () => {
             setSelectedStudent(null);
             return;
         }
-        // Student object selected
         setSelectedStudent(value);
     };
 
@@ -273,69 +282,324 @@ const ParentReport: React.FC = () => {
 
     // Export to PDF
     const exportToPDF = () => {
-        if (!reportData || !reportData.studentMarksDetailedTable) return;
+        if (!reportData || !reportData.studentMarksDetailedTable || !selectedStudent) return;
 
         const doc = new jsPDF();
         const pageWidth = doc.internal.pageSize.getWidth();
         
-        // Add title
         doc.setFontSize(16);
         doc.text(`Student Performance Report`, pageWidth / 2, 15, { align: 'center' });
         
-        // Add student info
         doc.setFontSize(10);
-        doc.text(`Student: ${reportData.studentName}`, 15, 25);
-        doc.text(`Grade: ${reportData.studentGrade} | Class: ${reportData.studentClass}`, 15, 32);
+        let currentY = 25;
+        
+        // Student Details Section - Use selectedStudent for name and student details
+        const studentName = selectedStudent.name || reportData.studentName || 'Absent';
+        const studentAdmissionNo = selectedStudent.student.studentAdmissionNo || reportData.studentAdmissionNo || 'Absent';
+        const studentGrade = selectedStudent.student.studentGrade || reportData.studentGrade || 'Absent';
+        const studentClass = selectedStudent.student.studentClass || reportData.studentClass || 'Absent';
+        
+        doc.text(`Student Name: ${studentName}`, 15, currentY);
+        currentY += 7;
+        doc.text(`Admission No: ${studentAdmissionNo}`, 15, currentY);
+        currentY += 7;
+        doc.text(`Grade: ${studentGrade} | Class: ${studentClass}`, 15, currentY);
+        currentY += 7;
+        
         if (reportData.currentYear && reportData.currentTerm) {
-            doc.text(`Current Year: ${reportData.currentYear} | Current Term: ${reportData.currentTerm}`, 15, 39);
+            doc.text(`Current Year: ${reportData.currentYear} | Current Term: ${reportData.currentTerm}`, 15, currentY);
+            currentY += 7;
         }
         
-        // Add table
         const tableData = reportData.studentMarksDetailedTable.map(row => [
             row.subject,
-            String(row.highestMarks),
+            row.highestMarks,
             row.highestMarkGrade,
-            row.studentMarks > 0 ? String(row.studentMarks) : 'N/A',
-            row.studentGrade !== 'N/A' ? row.studentGrade : 'N/A'
+            row.studentMarks > 0 ? row.studentMarks : 'Absent',
+            row.studentGrade !== 'Absent' ? row.studentGrade : 'Absent'
         ]);
+
+        // Compute overall average (consider only present marks)
+        const rowsWithMarksPDF = reportData.studentMarksDetailedTable.filter(r => typeof r.studentMarks === 'number' && r.studentMarks > 0);
+        if (rowsWithMarksPDF.length > 0) {
+            const totalPdfMarks = rowsWithMarksPDF.reduce((s, cur) => s + cur.studentMarks, 0);
+            const avgPdf = (totalPdfMarks / rowsWithMarksPDF.length).toFixed(1);
+            // Append overall average row to table data
+            tableData.push(['Overall Average', '', '', avgPdf, '']);
+        }
 
         autoTable(doc, {
             head: [['Subject', 'Highest Marks', 'Highest Grade', 'Student Marks', 'Student Grade']],
             body: tableData,
-            startY: 50,
+            startY: currentY + 5,
             theme: 'grid',
             headStyles: { fillColor: [13, 21, 66], textColor: 255, fontStyle: 'bold' },
             alternateRowStyles: { fillColor: [240, 240, 240] }
         });
 
-        doc.save(`Student_Performance_${reportData.studentName}_${new Date().toISOString().split('T')[0]}.pdf`);
+        doc.save(`Student_Performance_${studentName}_${new Date().toISOString().split('T')[0]}.pdf`);
     };
 
     // Export to Excel
     const exportToExcel = () => {
-        if (!reportData || !reportData.studentMarksDetailedTable) return;
+        if (!reportData || !reportData.studentMarksDetailedTable || !selectedStudent) return;
 
-        const worksheet = XLSX.utils.json_to_sheet([
-            {
-                'Student Name': reportData.studentName,
-                'Grade': reportData.studentGrade,
-                'Class': reportData.studentClass,
-                'Current Year': reportData.currentYear || '',
-                'Current Term': reportData.currentTerm || ''
-            },
-            {},
-            ...reportData.studentMarksDetailedTable.map(row => ({
-                'Subject': row.subject,
-                'Highest Marks': row.highestMarks,
-                'Highest Grade': row.highestMarkGrade,
-                'Student Marks': row.studentMarks > 0 ? row.studentMarks : 'N/A',
-                'Student Grade': row.studentGrade !== 'N/A' ? row.studentGrade : 'N/A'
-            }))
-        ]);
+        const studentName = selectedStudent.name || reportData.studentName || 'Absent';
+        const studentAdmissionNo = selectedStudent.student.studentAdmissionNo || reportData.studentAdmissionNo || 'Absent';
+        const studentGrade = selectedStudent.student.studentGrade || reportData.studentGrade || 'Absent';
+        const studentClass = selectedStudent.student.studentClass || reportData.studentClass || 'Absent';
 
+        // Create workbook
         const workbook = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(workbook, worksheet, 'Performance');
-        XLSX.writeFile(workbook, `Student_Performance_${reportData.studentName}_${new Date().toISOString().split('T')[0]}.xlsx`);
+
+        // ========== SHEET 1: SUMMARY ==========
+        // Include student info and a compact marks table so the user sees marks immediately
+        const marksRowsForSummary = reportData.studentMarksDetailedTable.map(row => (
+            [
+                row.subject,
+                row.highestMarks,
+                row.highestMarkGrade,
+                row.studentMarks > 0 ? row.studentMarks : 'Absent',
+                row.studentGrade !== 'Absent' ? row.studentGrade : 'Absent'
+            ]
+        ));
+
+        // compute totals for display in both sheets
+        const rowsWithMarks = reportData.studentMarksDetailedTable.filter(r => typeof r.studentMarks === 'number' && r.studentMarks > 0);
+        let totalMarksVal: number | null = null;
+        let avgMarksVal: string | null = null;
+        if (rowsWithMarks.length > 0) {
+            totalMarksVal = rowsWithMarks.reduce((s, cur) => s + cur.studentMarks, 0);
+            avgMarksVal = (totalMarksVal / rowsWithMarks.length).toFixed(2);
+        }
+
+        const summaryData: any[] = [
+            ['STUDENT PERFORMANCE REPORT'],
+            [],
+            ['Student Name:', studentName],
+            ['Admission No:', studentAdmissionNo],
+            ['Grade:', studentGrade],
+            ['Class:', studentClass],
+            ['Current Year:', reportData.currentYear ? String(reportData.currentYear) : 'Absent'],
+            ['Current Term:', reportData.currentTerm || 'Absent'],
+            [],
+            ['MARKS DETAILS'],
+            ['Subject', 'Highest Marks', 'Highest Grade', 'Student Marks', 'Student Grade'],
+            ...marksRowsForSummary
+        ];
+
+        // append total/average row into summary if available
+        if (avgMarksVal !== null) {
+            summaryData.push(['TOTAL/AVERAGE', '', '', totalMarksVal, avgMarksVal]);
+        }
+
+        const summaryWorksheet = XLSX.utils.aoa_to_sheet(summaryData);
+
+        // Set column widths for summary
+        summaryWorksheet['!cols'] = [
+            { wch: 25 },  // Subject / Label
+            { wch: 15 },
+            { wch: 15 },
+            { wch: 15 },
+            { wch: 15 }
+        ];
+
+        // Style the title row
+        if (summaryWorksheet['A1']) {
+            summaryWorksheet['A1'].s = {
+                font: { bold: true, size: 14, color: { rgb: 'FFFFFF' } },
+                fill: { fgColor: { rgb: '0D1542' } },
+                alignment: { horizontal: 'center', vertical: 'center' }
+            };
+        }
+
+        // Merge cells for title (A1:E1) to span the marks columns too
+        if (!summaryWorksheet['!merges']) {
+            summaryWorksheet['!merges'] = [];
+        }
+        summaryWorksheet['!merges'].push({ s: { r: 0, c: 0 }, e: { r: 0, c: 4 } });
+
+        // Style info labels (bold left column)
+        for (let row = 3; row <= 8; row++) {
+            const cellRef = `A${row}`;
+            if (summaryWorksheet[cellRef]) {
+                summaryWorksheet[cellRef].s = {
+                    font: { bold: true, size: 11 },
+                    alignment: { horizontal: 'left', vertical: 'center' }
+                };
+            }
+        }
+
+        // Style the small marks table header (row index where header appears)
+        const summaryMarksHeaderRow = 11; // 1-based index where header is placed
+        ['A', 'B', 'C', 'D', 'E'].forEach(col => {
+            const cellRef = `${col}${summaryMarksHeaderRow}`;
+            if (summaryWorksheet[cellRef]) {
+                const horiz = (col === 'C' || col === 'E') ? 'right' : 'center';
+                summaryWorksheet[cellRef].s = {
+                    font: { bold: true, color: { rgb: 'FFFFFF' } },
+                    fill: { fgColor: { rgb: '0D1542' } },
+                    alignment: { horizontal: horiz as any, vertical: 'center' }
+                };
+            }
+        });
+
+        // Style marks rows in summary (alternating colors, left align subject)
+        const summaryStartDataRow = summaryMarksHeaderRow + 1;
+        const summaryEndDataRow = summaryStartDataRow + marksRowsForSummary.length - 1;
+        for (let row = summaryStartDataRow; row <= summaryEndDataRow; row++) {
+            ['A', 'B', 'C', 'D', 'E'].forEach((col, idx) => {
+                const cellRef = `${col}${row}`;
+                if (summaryWorksheet[cellRef]) {
+                    const isEven = (row - summaryStartDataRow) % 2 === 0;
+                    const horiz = (idx === 0) ? 'left' : (idx === 2 || idx === 4) ? 'right' : 'center';
+                    summaryWorksheet[cellRef].s = {
+                        fill: isEven ? { fgColor: { rgb: 'F7F7F7' } } : { fgColor: { rgb: 'FFFFFF' } },
+                        alignment: { horizontal: horiz as any, vertical: 'center' },
+                        border: {
+                            top: { style: 'thin', color: { rgb: 'CCCCCC' } },
+                            bottom: { style: 'thin', color: { rgb: 'CCCCCC' } },
+                            left: { style: 'thin', color: { rgb: 'CCCCCC' } },
+                            right: { style: 'thin', color: { rgb: 'CCCCCC' } }
+                        }
+                    };
+                }
+            });
+        }
+
+        // Style total row if exists in summary
+        if (avgMarksVal !== null) {
+            const totalRowIndex = summaryEndDataRow + 1;
+            ['A', 'B', 'C', 'D', 'E'].forEach((col, idx) => {
+                const cellRef = `${col}${totalRowIndex}`;
+                if (summaryWorksheet[cellRef]) {
+                    summaryWorksheet[cellRef].s = {
+                        font: { bold: true, color: { rgb: 'FFFFFF' } },
+                        fill: { fgColor: { rgb: '4CAF50' } },
+                        alignment: { horizontal: idx === 0 ? 'left' : 'center', vertical: 'center' }
+                    };
+                }
+            });
+        }
+
+        XLSX.utils.book_append_sheet(workbook, summaryWorksheet, 'Summary');
+
+        // ========== SHEET 2: MARKS DETAILS ==========
+        const marksData: any[] = [
+            ['MARKS DETAILS'],
+            [],
+            ['Subject', 'Highest Marks', 'Highest Grade', 'Student Marks', 'Student Grade']
+        ];
+
+        // Add student marks rows
+        reportData.studentMarksDetailedTable.forEach(row => {
+            marksData.push([
+                row.subject,
+                row.highestMarks,
+                row.highestMarkGrade,
+                row.studentMarks > 0 ? row.studentMarks : 'Absent',
+                row.studentGrade !== 'Absent' ? row.studentGrade : 'Absent'
+            ]);
+        });
+
+        // Calculate totals if there are marks (use previously computed totals)
+        if (avgMarksVal !== null && totalMarksVal !== null) {
+            marksData.push(['TOTAL/AVERAGE', '', '', totalMarksVal, avgMarksVal]);
+        }
+
+        const marksWorksheet = XLSX.utils.aoa_to_sheet(marksData);
+
+        // Set column widths for marks sheet
+        marksWorksheet['!cols'] = [
+            { wch: 25 },  // Subject
+            { wch: 15 },  // Highest Marks
+            { wch: 15 },  // Highest Grade
+            { wch: 15 },  // Student Marks
+            { wch: 15 }   // Student Grade
+        ];
+
+        // Style title row
+        if (marksWorksheet['A1']) {
+            marksWorksheet['A1'].s = { 
+                font: { bold: true, size: 14, color: { rgb: 'FFFFFF' } }, 
+                fill: { fgColor: { rgb: '0D1542' } },
+                alignment: { horizontal: 'center', vertical: 'center' }
+            };
+        }
+
+        // Merge cells for marks title (A1:E1)
+        if (!marksWorksheet['!merges']) {
+            marksWorksheet['!merges'] = [];
+        }
+        marksWorksheet['!merges'].push({ s: { r: 0, c: 0 }, e: { r: 0, c: 4 } });
+
+        // Style header row (row 3)
+        ['A', 'B', 'C', 'D', 'E'].forEach(col => {
+            const cellRef = `${col}3`;
+            if (marksWorksheet[cellRef]) {
+                const horiz = (col === 'C' || col === 'E') ? 'right' : 'center';
+                marksWorksheet[cellRef].s = {
+                    font: { bold: true, size: 11, color: { rgb: 'FFFFFF' } },
+                    fill: { fgColor: { rgb: '0D1542' } },
+                    alignment: { horizontal: horiz as any, vertical: 'center' }
+                };
+            }
+        });
+
+        // Style data rows with alternating colors
+        const startDataRow = 4;
+        const endDataRow = startDataRow + reportData.studentMarksDetailedTable.length - 1;
+        
+        for (let row = startDataRow; row <= endDataRow; row++) {
+            ['A', 'B', 'C', 'D', 'E'].forEach((col, idx) => {
+                const cellRef = `${col}${row}`;
+                if (marksWorksheet[cellRef]) {
+                    const isEven = (row - startDataRow) % 2 === 0;
+                    const horiz = (idx === 0) ? 'left' : (idx === 2 || idx === 4) ? 'right' : 'center';
+                    marksWorksheet[cellRef].s = {
+                        fill: isEven ? { fgColor: { rgb: 'F0F0F0' } } : { fgColor: { rgb: 'FFFFFF' } },
+                        alignment: { 
+                            horizontal: horiz as any,
+                            vertical: 'center',
+                            wrapText: true 
+                        },
+                        border: {
+                            top: { style: 'thin', color: { rgb: 'CCCCCC' } },
+                            bottom: { style: 'thin', color: { rgb: 'CCCCCC' } },
+                            left: { style: 'thin', color: { rgb: 'CCCCCC' } },
+                            right: { style: 'thin', color: { rgb: 'CCCCCC' } }
+                        }
+                    };
+                }
+            });
+        }
+
+        // Style total row if exists
+        const totalRowNum = endDataRow + 1;
+        if (rowsWithMarks.length > 0) {
+            ['A', 'B', 'C', 'D', 'E'].forEach((col, idx) => {
+                const cellRef = `${col}${totalRowNum}`;
+                if (marksWorksheet[cellRef]) {
+                    const horiz = (idx === 0) ? 'left' : (idx === 2 || idx === 4) ? 'right' : 'center';
+                    marksWorksheet[cellRef].s = {
+                        font: { bold: true, size: 11, color: { rgb: 'FFFFFF' } },
+                        fill: { fgColor: { rgb: '4CAF50' } },
+                        alignment: { horizontal: horiz as any, vertical: 'center' },
+                        border: {
+                            top: { style: 'thin', color: { rgb: 'CCCCCC' } },
+                            bottom: { style: 'thin', color: { rgb: 'CCCCCC' } },
+                            left: { style: 'thin', color: { rgb: 'CCCCCC' } },
+                            right: { style: 'thin', color: { rgb: 'CCCCCC' } }
+                        }
+                    };
+                }
+            });
+        }
+
+        XLSX.utils.book_append_sheet(workbook, marksWorksheet, 'Marks Details');
+
+        const filename = `Student_Performance_${studentName}_${new Date().toISOString().split('T')[0]}.xlsx`;
+        XLSX.writeFile(workbook, filename);
     };
 
     const renderDetailedMarksTable = (): React.ReactNode => {
@@ -350,22 +614,26 @@ const ParentReport: React.FC = () => {
         if (!reportData || !reportData.studentMarksDetailedTable || reportData.studentMarksDetailedTable.length === 0) {
             return (
                 <TableRow>
-                    <TableCell colSpan={5} align="center">Marks have not been added to the subjects yet. Please check after submitting the marks.</TableCell>
+                    <TableCell colSpan={5} align="center">
+                        <Typography variant="body2" sx={{ py: 2 }}>
+                            Marks have not been added to the subjects yet. Please check after submitting the marks.
+                        </Typography>
+                    </TableCell>
                 </TableRow>
             );
         }
 
         const rowsWithMarks = reportData.studentMarksDetailedTable.filter(row => row.studentMarks > 0);
         const totalMarks = rowsWithMarks.reduce((sum: number, current: DetailedMarksTableRow) => sum + current.studentMarks, 0);
-        const averageMarks = rowsWithMarks.length > 0 ? (totalMarks / rowsWithMarks.length).toFixed(1) : 'N/A';
+        const averageMarks = rowsWithMarks.length > 0 ? (totalMarks / rowsWithMarks.length).toFixed(1) : 'Absent';
 
         const rows = reportData.studentMarksDetailedTable.map((row: DetailedMarksTableRow, idx: number) => (
             <TableRow key={idx} hover>
-                <TableCell sx={{ fontWeight: 'bold' }}>{row.subject}</TableCell>
+                <TableCell sx={{ fontWeight: 'bold', minWidth: isMobile ? 100 : 'auto' }}>{row.subject}</TableCell>
                 <TableCell align="center">{row.highestMarks}</TableCell>
                 <TableCell align="center">{row.highestMarkGrade}</TableCell>
-                <TableCell align="center">{row.studentMarks > 0 ? row.studentMarks : 'N/A'}</TableCell>
-                <TableCell align="center">{row.studentGrade !== 'N/A' ? row.studentGrade : 'N/A'}</TableCell>
+                <TableCell align="center">{row.studentMarks > 0 ? row.studentMarks : 'Absent'}</TableCell>
+                <TableCell align="center">{row.studentGrade !== 'Absent' ? row.studentGrade : 'Absent'}</TableCell>
             </TableRow>
         ));
 
@@ -403,15 +671,45 @@ const ParentReport: React.FC = () => {
         }
 
         const subjects = Object.keys(individualSubjectAverages);
+        
+        // For mobile, show one chart per row
+        if (isMobile) {
+            return (
+                <Stack spacing={3}>
+                    {subjects.map((subjectName) => (
+                        <Paper key={subjectName} sx={{ p: 2 }}>
+                            <Typography fontWeight={600} mb={2} variant="subtitle1">{subjectName} Subject</Typography>
+                            <ResponsiveContainer width="100%" height={200}>
+                                {individualSubjectAverages[subjectName] && individualSubjectAverages[subjectName]!.length > 0 ? (
+                                    <LineChart data={individualSubjectAverages[subjectName]}>
+                                        <XAxis dataKey="x" tick={{ fontSize: 10 }} />
+                                        <YAxis domain={[0, 100]} label={{ value: 'Marks', angle: -90, position: 'insideLeft', style: { fontSize: 10 } }} tick={{ fontSize: 10 }} />
+                                        <ReTooltip />
+                                        <Line type="monotone" dataKey="y" stroke="#42A5F5" name="Average Marks" strokeWidth={2} />
+                                    </LineChart>
+                                ) : (
+                                    <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: 200 }}>
+                                        <Typography variant="body2" color="text.secondary">No data for {subjectName}</Typography>
+                                    </Box>
+                                )}
+                            </ResponsiveContainer>
+                        </Paper>
+                    ))}
+                </Stack>
+            );
+        }
+
+        // For tablet and desktop, show multiple charts per row
         const subjectRows = [];
-        for (let i = 0; i < subjects.length; i += 3) {
-            subjectRows.push(subjects.slice(i, i + 3));
+        const chartsPerRow = isTablet ? 2 : 3;
+        for (let i = 0; i < subjects.length; i += chartsPerRow) {
+            subjectRows.push(subjects.slice(i, i + chartsPerRow));
         }
 
         return (
             <Stack spacing={3}>
                 {subjectRows.map((row, rowIndex) => (
-                    <Stack key={rowIndex} direction={{ xs: 'column', md: 'row' }} spacing={3}>
+                    <Stack key={rowIndex} direction="row" spacing={3}>
                         {row.map((subjectName) => (
                             <Paper key={subjectName} sx={{ p: 3, flex: 1, minWidth: 0 }}>
                                 <Typography fontWeight={600} mb={2}>{subjectName} Subject</Typography>
@@ -431,7 +729,7 @@ const ParentReport: React.FC = () => {
                                 </ResponsiveContainer>
                             </Paper>
                         ))}
-                        {row.length < 3 && Array.from({ length: 3 - row.length }).map((_, emptyIndex) => (
+                        {row.length < chartsPerRow && Array.from({ length: chartsPerRow - row.length }).map((_, emptyIndex) => (
                             <Box key={`empty-${rowIndex}-${emptyIndex}`} sx={{ flex: 1 }} />
                         ))}
                     </Stack>
@@ -447,100 +745,112 @@ const ParentReport: React.FC = () => {
                 <Sidebar open={sidebarOpen} setOpen={setSidebarOpen} />
                 <Box sx={{ flexGrow: 1, overflowX: 'hidden' }}>
                     <AppBar position="static" sx={{
-                        boxShadow: "none", bgcolor: theme.palette.background.paper,
+                        boxShadow: "none", 
+                        bgcolor: theme.palette.background.paper,
                         borderBottom: `1px solid ${theme.palette.divider}`,
                         color: theme.palette.text.primary
                     }}>
                         <Navbar title="Student Report For Teacher" sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} />
                     </AppBar>
 
-                    <Stack spacing={3} sx={{ px: { xs: 2, md: 4 }, py: 3 }}>
-                        {/* Single row for Filters and Student Details */}
-                        <Stack direction={{ xs: 'column', md: 'row' }} spacing={3} alignItems="stretch" sx={{ width: '100%' }}>
-                            {/* Filter Section */}
-                            <Paper elevation={2} sx={{ p: 3, flexGrow: 1 }}>
-                                <Typography variant="h6" sx={{ mb: 2, fontWeight: 600 }}>
+                    <Stack spacing={3} sx={{ px: { xs: 1.5, sm: 2, md: 4 }, py: { xs: 2, md: 3 } }}>
+                        {/* Filter Section with Collapsible on Mobile */}
+                        <Paper elevation={2} sx={{ p: { xs: 2, md: 3 } }}>
+                            <Stack 
+                                direction="row" 
+                                justifyContent="space-between" 
+                                alignItems="center"
+                                onClick={() => isMobile && setFiltersExpanded(!filtersExpanded)}
+                                sx={{ cursor: isMobile ? 'pointer' : 'default', mb: filtersExpanded ? 2 : 0 }}
+                            >
+                                <Typography variant="h6" sx={{ fontWeight: 600, fontSize: { xs: '1rem', md: '1.25rem' } }}>
                                     Report Filters
                                 </Typography>
-                                <Stack
-                                    direction="row"
-                                    spacing={2}
-                                    flexWrap="wrap" // allows wrapping on smaller screens
-                                    alignItems="center"
-                                >
-
-                                    {/* Exam Type Selection */}
-                                    <Autocomplete
-                                        sx={{ minWidth: 200, flex: 1 }}
-                                        options={examOptions}
-                                        value={examOptions.find(opt => opt.value === exam) || null}
-                                        onChange={(_, newValue) => setExam(newValue?.value || '')}
-                                        getOptionLabel={(option) => option.label}
-                                        renderInput={(params) => (
-                                            <TextField
-                                                {...params}
-                                                label="Exam Type"
-                                                size="small"
-                                            />
-                                        )}
-                                    />
-
-                                    {exam === MONTHLY_EXAM_VALUE && (
+                                {isMobile && (
+                                    <IconButton size="small">
+                                        {filtersExpanded ? <ExpandLessIcon /> : <ExpandMoreIcon />}
+                                    </IconButton>
+                                )}
+                            </Stack>
+                            
+                            <Collapse in={filtersExpanded || !isMobile}>
+                                <Stack spacing={2}>
+                                    {/* Year Filters */}
+                                    <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
                                         <Autocomplete
-                                            sx={{ minWidth: 200, flex: 1 }}
-                                            options={months}
-                                            value={month}
-                                            onChange={(_, newValue) => setMonth(newValue || '')}
+                                            fullWidth
+                                            options={availableYears}
+                                            value={startYear}
+                                            onChange={(_, newValue) => setStartYear(newValue || null)}
+                                            loading={isLoadingYears}
                                             renderInput={(params) => (
                                                 <TextField
                                                     {...params}
-                                                    label="Month"
+                                                    label="Start Year"
+                                                    size="small"
+                                                    placeholder="Select year"
+                                                />
+                                            )}
+                                        />
+
+                                        <Autocomplete
+                                            fullWidth
+                                            options={availableYears}
+                                            value={endYear}
+                                            onChange={(_, newValue) => setEndYear(newValue || null)}
+                                            loading={isLoadingYears}
+                                            renderInput={(params) => (
+                                                <TextField
+                                                    {...params}
+                                                    label="End Year"
+                                                    size="small"
+                                                    placeholder="Select year"
+                                                />
+                                            )}
+                                        />
+                                    </Stack>
+
+                                    {/* Exam and Month Filters */}
+                                    <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
+                                        <Autocomplete
+                                            fullWidth
+                                            options={examOptions}
+                                            value={examOptions.find(opt => opt.value === exam) || null}
+                                            onChange={(_, newValue) => setExam(newValue?.value || '')}
+                                            getOptionLabel={(option) => option.label}
+                                            renderInput={(params) => (
+                                                <TextField
+                                                    {...params}
+                                                    label="Exam Type"
                                                     size="small"
                                                 />
                                             )}
                                         />
-                                    )}
 
-                                    {/* Start Year */}
-                                    <Autocomplete
-                                        sx={{ minWidth: 200, flex: 1 }}
-                                        options={availableYears}
-                                        value={startYear}
-                                        onChange={(_, newValue) => setStartYear(newValue || null)}
-                                        loading={isLoadingYears}
-                                        renderInput={(params) => (
-                                            <TextField
-                                                {...params}
-                                                label="Start Year"
-                                                size="small"
-                                                placeholder="Select year"
+                                        {exam === MONTHLY_EXAM_VALUE && (
+                                            <Autocomplete
+                                                fullWidth
+                                                options={months}
+                                                value={month}
+                                                onChange={(_, newValue) => setMonth(newValue || '')}
+                                                renderInput={(params) => (
+                                                    <TextField
+                                                        {...params}
+                                                        label="Month"
+                                                        size="small"
+                                                    />
+                                                )}
                                             />
                                         )}
-                                    />
+                                    </Stack>
 
-                                    {/* End Year */}
-                                    <Autocomplete
-                                        sx={{ minWidth: 200, flex: 1 }}
-                                        options={availableYears}
-                                        value={endYear}
-                                        onChange={(_, newValue) => setEndYear(newValue || null)}
-                                        loading={isLoadingYears}
-                                        renderInput={(params) => (
-                                            <TextField
-                                                {...params}
-                                                label="End Year"
-                                                size="small"
-                                                placeholder="Select year"
-                                            />
-                                        )}
-                                    />
+                                    <Divider sx={{ my: 2 }} />
 
-                                </Stack>
-                                <Typography variant="h6" sx={{ mb: 2, mt: 5, fontWeight: 600, }}>
-                                    Student Details
-                                </Typography>
+                                    {/* Student Selection */}
+                                    <Typography variant="subtitle1" sx={{ fontWeight: 600, fontSize: { xs: '0.95rem', md: '1rem' } }}>
+                                        Student Details
+                                    </Typography>
 
-                                <Stack spacing={2}>
                                     <Autocomplete
                                         fullWidth
                                         id="student-select"
@@ -567,31 +877,31 @@ const ParentReport: React.FC = () => {
 
                                     {/* Display selected student info */}
                                     {selectedStudent && (
-                                        <Box sx={{ mt: 2 }}>
-                                            <Typography variant="body2" color="text.secondary">
-                                                Admission No: {selectedStudent.student.studentAdmissionNo}
-                                            </Typography>
-                                            <Typography variant="body2" color="text.secondary">
-                                                Grade: {selectedStudent.student.studentGrade}
-                                            </Typography>
-                                            <Typography variant="body2" color="text.secondary">
-                                                Class: {selectedStudent.student.studentClass}
-                                            </Typography>
-                                        </Box>
+                                        <Paper variant="outlined" sx={{ p: 2, bgcolor: 'grey.50' }}>
+                                            <Stack spacing={0.5}>
+                                                <Typography variant="body2" color="text.secondary">
+                                                    <strong>Admission No:</strong> {selectedStudent.student.studentAdmissionNo}
+                                                </Typography>
+                                                <Typography variant="body2" color="text.secondary">
+                                                    <strong>Grade:</strong> {selectedStudent.student.studentGrade}
+                                                </Typography>
+                                                <Typography variant="body2" color="text.secondary">
+                                                    <strong>Class:</strong> {selectedStudent.student.studentClass}
+                                                </Typography>
+                                            </Stack>
+                                        </Paper>
                                     )}
                                 </Stack>
-                            </Paper>
-
-
-                        </Stack>
+                            </Collapse>
+                        </Paper>
 
                         {/* Show message if no valid filters */}
                         {!hasValidFilters() && (
-                            <Paper elevation={1} sx={{ p: 4, textAlign: 'center' }}>
-                                <Typography variant="h6" color="text.secondary" gutterBottom>
+                            <Paper elevation={1} sx={{ p: { xs: 3, md: 4 }, textAlign: 'center' }}>
+                                <Typography variant="h6" color="text.secondary" gutterBottom sx={{ fontSize: { xs: '1rem', md: '1.25rem' } }}>
                                     Please select the filters to view report data
                                 </Typography>
-                                <Typography variant="body2" color="text.secondary">
+                                <Typography variant="body2" color="text.secondary" sx={{ fontSize: { xs: '0.875rem', md: '0.875rem' } }}>
                                     Choose either an exam (and month) or select a date range to load the report.
                                 </Typography>
                             </Paper>
@@ -601,42 +911,48 @@ const ParentReport: React.FC = () => {
                         {hasValidFilters() && selectedStudent && (
                             <>
                                 {/* Charts Section */}
-                                <Stack direction={{ xs: 'column', md: 'row' }} spacing={3} flexWrap="wrap">
+                                <Stack direction={{ xs: 'column', md: 'row' }} spacing={3}>
                                     {/* Overall Subject Bar Chart */}
-                                    <Paper sx={{ p: 3, flex: 2 }}>
+                                    <Paper sx={{ p: { xs: 2, md: 3 }, flex: { xs: 1, md: 2 } }}>
                                         <Stack direction="row" justifyContent="space-between" alignItems="center" mb={2}>
-                                            <Typography fontWeight={600}>Overall Subject</Typography>
+                                            <Typography fontWeight={600} sx={{ fontSize: { xs: '0.95rem', md: '1rem' } }}>
+                                                Overall Subject
+                                            </Typography>
                                             {exam && getTermKeyForExam(exam) && (
-                                                <Typography variant="body2" color="text.secondary">
+                                                <Typography variant="body2" color="text.secondary" sx={{ fontSize: { xs: '0.75rem', md: '0.875rem' } }}>
                                                     {exam}
                                                 </Typography>
                                             )}
                                         </Stack>
-                                        <ResponsiveContainer width="100%" height={250}>
+                                        <ResponsiveContainer width="100%" height={isMobile ? 200 : 250}>
                                             {isLoadingReport ? (
-                                                <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: 250 }}>
+                                                <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
                                                     <CircularProgress />
                                                 </Box>
                                             ) : getFilteredBarChartData().length > 0 ? (
-                                                <BarChart data={getFilteredBarChartData()} barSize={50}>
-                                                    <XAxis dataKey="year" />
-                                                    <YAxis domain={[0, 100]} />
+                                                <BarChart data={getFilteredBarChartData()} barSize={isMobile ? 30 : 50}>
+                                                    <XAxis dataKey="year" tick={{ fontSize: isMobile ? 10 : 12 }} />
+                                                    <YAxis domain={[0, 100]} tick={{ fontSize: isMobile ? 10 : 12 }} />
                                                     <ReTooltip />
                                                     <Bar dataKey="value" fill="#0d1542ff" name={exam || 'Term'} />
                                                 </BarChart>
                                             ) : (
-                                                <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: 250 }}>
-                                                    <Typography color="text.secondary">Select a term to view data</Typography>
+                                                <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
+                                                    <Typography color="text.secondary" sx={{ fontSize: { xs: '0.875rem', md: '1rem' } }}>
+                                                        Select a term to view data
+                                                    </Typography>
                                                 </Box>
                                             )}
                                         </ResponsiveContainer>
                                     </Paper>
 
                                     {/* Subject Wise Marks (Pie Chart) */}
-                                    <Paper sx={{ p: 3, flex: 1 }}>
-                                        <Typography fontWeight={600} mb={2}>Subject Wise Marks</Typography>
+                                    <Paper sx={{ p: { xs: 2, md: 3 }, flex: 1 }}>
+                                        <Typography fontWeight={600} mb={2} sx={{ fontSize: { xs: '0.95rem', md: '1rem' } }}>
+                                            Subject Wise Marks
+                                        </Typography>
 
-                                        <ResponsiveContainer width="100%" height={320}>
+                                        <ResponsiveContainer width="100%" height={isMobile ? 280 : 320}>
                                             <PieChart>
                                                 <Pie
                                                     data={reportData?.subjectWiseMarksPie || []}
@@ -644,16 +960,14 @@ const ParentReport: React.FC = () => {
                                                     nameKey="name"
                                                     cx="50%"
                                                     cy="40%"
-                                                    outerRadius={80}
+                                                    outerRadius={isMobile ? 60 : 80}
                                                     label={({ name, value, cx, cy, midAngle, outerRadius }) => {
-                                                        // Calculate label position OUTSIDE the pie
                                                         const RADIAN = Math.PI / 180;
-                                                        // provide safe defaults in case values are undefined
                                                         const safeMidAngle = typeof midAngle === 'number' ? midAngle : 0;
                                                         const safeCx = typeof cx === 'number' ? cx : 0;
                                                         const safeCy = typeof cy === 'number' ? cy : 0;
                                                         const safeOuterRadius = typeof outerRadius === 'number' ? outerRadius : 0;
-                                                        const radius = safeOuterRadius + 25; // distance outside
+                                                        const radius = safeOuterRadius + (isMobile ? 15 : 25);
                                                         const x = safeCx + radius * Math.cos(-safeMidAngle * RADIAN);
                                                         const y = safeCy + radius * Math.sin(-safeMidAngle * RADIAN);
 
@@ -663,7 +977,7 @@ const ParentReport: React.FC = () => {
                                                                 y={y}
                                                                 textAnchor={x > safeCx ? "start" : "end"}
                                                                 dominantBaseline="central"
-                                                                style={{ fontSize: "12px", fill: "#333" }}
+                                                                style={{ fontSize: isMobile ? "10px" : "12px", fill: "#333" }}
                                                             >
                                                                 <tspan>{name}</tspan>
                                                                 <tspan x={x} dy="1.2em">{value}%</tspan>
@@ -682,36 +996,42 @@ const ParentReport: React.FC = () => {
                                                 <Legend
                                                     verticalAlign="bottom"
                                                     height={36}
-                                                    wrapperStyle={{ fontSize: '12px', paddingTop: '10px' }}
+                                                    wrapperStyle={{ fontSize: isMobile ? '10px' : '12px', paddingTop: '10px' }}
                                                 />
                                             </PieChart>
                                         </ResponsiveContainer>
                                     </Paper>
-
-
                                 </Stack>
 
                                 {renderSubjectAverageCharts()}
 
                                 {/* Detailed Marks Table */}
-                                <Paper elevation={2} sx={{ p: 2, overflowX: 'auto' }}>
-                                    <Stack direction="row" justifyContent="space-between" alignItems="center" mb={2}>
+                                <Paper elevation={2} sx={{ p: { xs: 1.5, md: 2 }, overflowX: 'auto' }}>
+                                    <Stack 
+                                        direction={{ xs: 'column', sm: 'row' }} 
+                                        justifyContent="space-between" 
+                                        alignItems={{ xs: 'flex-start', sm: 'center' }} 
+                                        mb={2}
+                                        spacing={{ xs: 1.5, sm: 0 }}
+                                    >
                                         <Stack>
-                                            <Typography variant="h6" fontWeight={600}>
+                                            <Typography variant="h6" fontWeight={600} sx={{ fontSize: { xs: '1rem', md: '1.25rem' } }}>
                                                 Students Performance
                                             </Typography>
                                             {reportData?.currentYear && reportData?.currentTerm && (
-                                                <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+                                                <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5, fontSize: { xs: '0.75rem', md: '0.875rem' } }}>
                                                     Current Year: {reportData.currentYear} | Current Term: {reportData.currentTerm}
                                                 </Typography>
                                             )}
                                         </Stack>
-                                        <Stack direction="row" spacing={1}>
+                                        <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} sx={{ width: { xs: '100%', sm: 'auto' } }}>
                                             <Button
                                                 variant="contained"
                                                 size="small"
                                                 onClick={exportToPDF}
                                                 disabled={isLoadingReport || !reportData?.studentMarksDetailedTable}
+                                                fullWidth={isMobile}
+                                                sx={{ fontSize: { xs: '0.75rem', md: '0.875rem' } }}
                                             >
                                                 Export PDF
                                             </Button>
@@ -720,6 +1040,8 @@ const ParentReport: React.FC = () => {
                                                 size="small"
                                                 onClick={exportToExcel}
                                                 disabled={isLoadingReport || !reportData?.studentMarksDetailedTable}
+                                                fullWidth={isMobile}
+                                                sx={{ fontSize: { xs: '0.75rem', md: '0.875rem' } }}
                                             >
                                                 Export Excel
                                             </Button>
@@ -729,11 +1051,11 @@ const ParentReport: React.FC = () => {
                                         <Table size="small" stickyHeader>
                                             <TableHead>
                                                 <TableRow>
-                                                    <TableCell sx={{ fontWeight: 'bold' }}>Subject</TableCell>
-                                                    <TableCell align="center" sx={{ fontWeight: 'bold' }}>Highest Marks</TableCell>
-                                                    <TableCell align="center" sx={{ fontWeight: 'bold' }}>Highest Grade</TableCell>
-                                                    <TableCell align="center" sx={{ fontWeight: 'bold' }}>Student Marks</TableCell>
-                                                    <TableCell align="center" sx={{ fontWeight: 'bold' }}>Student Grade</TableCell>
+                                                    <TableCell sx={{ fontWeight: 'bold', fontSize: { xs: '0.75rem', md: '0.875rem' } }}>Subject</TableCell>
+                                                    <TableCell align="center" sx={{ fontWeight: 'bold', fontSize: { xs: '0.75rem', md: '0.875rem' } }}>Highest Marks</TableCell>
+                                                    <TableCell align="center" sx={{ fontWeight: 'bold', fontSize: { xs: '0.75rem', md: '0.875rem' } }}>Highest Grade</TableCell>
+                                                    <TableCell align="center" sx={{ fontWeight: 'bold', fontSize: { xs: '0.75rem', md: '0.875rem' } }}>Student Marks</TableCell>
+                                                    <TableCell align="center" sx={{ fontWeight: 'bold', fontSize: { xs: '0.75rem', md: '0.875rem' } }}>Student Grade</TableCell>
                                                 </TableRow>
                                             </TableHead>
                                             <TableBody>
