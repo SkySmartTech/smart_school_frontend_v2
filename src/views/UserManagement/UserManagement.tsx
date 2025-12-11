@@ -89,7 +89,7 @@ import {
 import Navbar from "../../components/Navbar";
 import { debounce } from 'lodash';
 
-type UserCategory = 'Student' | 'Teacher' | 'Parent';
+type UserCategory = 'Student' | 'Teacher' | 'Parent' | 'ManagementStaff';
 
 interface FormState extends Omit<User, 'id'> {
   id?: number;
@@ -107,6 +107,14 @@ type ParentEntry = {
   profession: string;
   parentContact: string;
   studentAdmissionNo: string;
+};
+
+type StaffEntry = {
+  id: string;
+  designation: string;
+  department: string;
+  staffContact: string;
+  staffId: string;
 };
 
 const UserManagement: React.FC = () => {
@@ -137,6 +145,10 @@ const UserManagement: React.FC = () => {
     studentGrade: "",
     teacherGrade: "",
     teacherGrades: [],
+    designation: "",
+    department: "",
+    staffContact: "",
+    staffId: "",
   });
   const [editId, setEditId] = useState<number | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -393,10 +405,13 @@ const UserManagement: React.FC = () => {
     }
 
     // Determine whether to send password:
+    // For Staff updates, never send password. For other types, send only if explicitly changed.
     const passwordToSend =
-      editId === null
-        ? form.password
-        : (form.password && form.password !== PASSWORD_MASK ? form.password : undefined); 
+      activeTab === 'ManagementStaff' && editId !== null
+        ? undefined
+        : editId === null
+          ? form.password
+          : (form.password && form.password !== PASSWORD_MASK ? form.password : undefined); 
 
     const baseUserData: any = {
       name: form.name,
@@ -488,6 +503,24 @@ const UserManagement: React.FC = () => {
         break;
       }
 
+      case 'ManagementStaff': {
+        // For Staff, we handle just a single entry (no array support)
+        userData = {
+          ...baseUserData,
+          designation: form.designation || '',
+          department: form.department || '',
+          staffContact: form.staffContact || '',
+          staffId: form.staffId || '',
+          staffData: [{
+            designation: form.designation || '',
+            department: form.department || '',
+            staffContact: form.staffContact || '',
+            staffId: form.staffId || ''
+          }]
+        } as unknown as User;
+        break;
+      }
+
       default:
         userData = baseUserData;
     }
@@ -531,6 +564,10 @@ const UserManagement: React.FC = () => {
       studentGrade: "",
       teacherGrade: "",
       teacherGrades: [],
+      designation: "",
+      department: "",
+      staffContact: "",
+      staffId: "",
     });
     setTeacherAssignments([]);
     setParentEntries([]);
@@ -553,7 +590,11 @@ const UserManagement: React.FC = () => {
         profession: (userToEdit as any).profession || '',
         relation: (userToEdit as any).relation || '',
         parentContact: (userToEdit as any).parentContact || '',
-        studentAdmissionNo: (userToEdit as any).studentAdmissionNo || ''
+        studentAdmissionNo: (userToEdit as any).studentAdmissionNo || '',
+        designation: (userToEdit as any).designation || '',
+        department: (userToEdit as any).department || '',
+        staffContact: (userToEdit as any).staffContact || '',
+        staffId: (userToEdit as any).staffId || ''
       });
       setEditId(id);
 
@@ -659,7 +700,7 @@ const UserManagement: React.FC = () => {
           });
         }
       });
-    } else { // Parent
+    } else if (activeTab === 'Parent') {
       dataToExport.forEach(user => {
         const entries = getParentEntriesForExport(user);
         if (entries.length === 0) {
@@ -698,9 +739,46 @@ const UserManagement: React.FC = () => {
           });
         }
       });
+    } else if (activeTab === 'ManagementStaff') {
+      dataToExport.forEach(user => {
+        const entries = getStaffEntriesForExport(user);
+        if (entries.length === 0) {
+          tableData.push([
+            user.name || "-",
+            user.username || "-",
+            user.email || "-",
+            user.address || "-",
+            user.birthDay || "-",
+            user.contact || "-",
+            user.gender || "-",
+            user.designation || "-",
+            user.department || "-",
+            user.staffContact || user.contact || "-",
+            user.staffId || "-",
+            user.status ? "Active" : "Inactive"
+          ]);
+        } else {
+          entries.forEach(ent => {
+            tableData.push([
+              user.name || "-",
+              user.username || "-",
+              user.email || "-",
+              user.address || "-",
+              user.birthDay || "-",
+              user.contact || "-",
+              user.gender || "-",
+              ent.designation || "-",
+              ent.department || "-",
+              ent.staffContact || "-",
+              ent.staffId || "-",
+              user.status ? "Active" : "Inactive"
+            ]);
+          });
+        }
+      });
     }
 
-    const headers = {
+    const headers: any = {
       Student: [
         "Name","Username","Email","Address","Birthday","Phone No","Gender","Grade","Admission No","Class","Medium","Status"
       ],
@@ -709,6 +787,9 @@ const UserManagement: React.FC = () => {
       ],
       Parent: [
         "Name","Username","Email","Address","Birthday","Phone No","Gender","Relation","Profession","Parent Contact","Student Admission No","Status"
+      ],
+      ManagementStaff: [
+        "Name","Username","Email","Address","Birthday","Phone No","Gender","Designation","Department","Staff Contact","Staff ID","Status"
       ]
     };
 
@@ -718,7 +799,7 @@ const UserManagement: React.FC = () => {
     const margin = { left: 40, right: 40 };
     const pageWidth = (doc.internal.pageSize && (doc.internal.pageSize.getWidth ? doc.internal.pageSize.getWidth() : doc.internal.pageSize.width)) as number;
     const availableWidth = pageWidth - margin.left - margin.right;
-    const colCount = headers[activeTab].length;
+    const colCount = headers[activeTab as keyof typeof headers].length;
     const computedColWidth = Math.floor(availableWidth / colCount);
 
     const columnStyles: any = {};
@@ -728,7 +809,7 @@ const UserManagement: React.FC = () => {
 
     autoTable(doc, {
       startY: 60,
-      head: [headers[activeTab]],
+      head: [headers[activeTab as keyof typeof headers]],
       body: tableData,
       theme: "grid",
       margin,
@@ -814,7 +895,7 @@ const UserManagement: React.FC = () => {
             });
           });
         }
-      } else { // Parent
+      } else if (activeTab === 'Parent') {
         const entries = getParentEntriesForExport(user);
         if (entries.length === 0) {
           excelRows.push({
@@ -832,6 +913,27 @@ const UserManagement: React.FC = () => {
               'Profession': ent.profession || '-',
               'Parent Contact': ent.parentContact || '-',
               'Student Admission No': ent.studentAdmissionNo || '-'
+            });
+          });
+        }
+      } else if (activeTab === 'ManagementStaff') {
+        const entries = getStaffEntriesForExport(user);
+        if (entries.length === 0) {
+          excelRows.push({
+            ...base,
+            'Designation': user.designation || '-',
+            'Department': user.department || '-',
+            'Staff Contact': user.staffContact || user.contact || '-',
+            'Staff ID': user.staffId || '-'
+          });
+        } else {
+          entries.forEach(ent => {
+            excelRows.push({
+              ...base,
+              'Designation': ent.designation || '-',
+              'Department': ent.department || '-',
+              'Staff Contact': ent.staffContact || '-',
+              'Staff ID': ent.staffId || '-'
             });
           });
         }
@@ -1026,6 +1128,13 @@ const UserManagement: React.FC = () => {
               return vals.length ? vals.join(', ') : (params.row.relation || '-');
             }
           },
+          statusColumn,
+          actionColumn
+        ];
+      case 'ManagementStaff':
+        return [
+          ...commonColumns,
+          
           statusColumn,
           actionColumn
         ];
@@ -1604,6 +1713,14 @@ const UserManagement: React.FC = () => {
             )}
           </Box>
         );
+      case 'ManagementStaff':
+        return (
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+            {commonFields}
+
+            
+          </Box>
+        );
       default:
         return commonFields;
     }
@@ -1686,6 +1803,7 @@ const UserManagement: React.FC = () => {
                   <Tab label="Students" value="Student" />
                   <Tab label="Teachers" value="Teacher" />
                   <Tab label="Parents" value="Parent" />
+                  <Tab label="ManagementStaff" value="ManagementStaff" />
                 </Tabs>
               </Box>
 
@@ -1962,6 +2080,80 @@ const normalizeParentEntries = (rawUser: any): ParentEntry[] => {
   });
 
   return normalized;
+};
+
+// Helper: ensure we get staff entries as an array
+const normalizeStaffEntries = (rawUser: any): StaffEntry[] => {
+  const rawStaffArray =
+    rawUser?.staffEntries ??
+    rawUser?.staffData ??
+    rawUser?.staff ??
+    rawUser?.staff_data ??
+    rawUser?.staff_info ??
+    [];
+
+  const arr = Array.isArray(rawStaffArray) ? rawStaffArray : (rawStaffArray ? [rawStaffArray] : []);
+
+  const normalized: StaffEntry[] = arr.flatMap((item: any) => {
+    // shape: { designation, department, staffContact, staffId }
+    if (item?.designation || item?.department || item?.staffContact || item?.staffId) {
+      return {
+        id: item.id ? String(item.id) : Math.random().toString(36).substr(2, 9),
+        designation: item.designation || item.staff_info?.designation || '',
+        department: item.department || item.staff_info?.department || '',
+        staffContact: item.staffContact || item.staff_contact || item.staff_info?.staff_contact || '',
+        staffId: item.staffId || item.staff_id || item.staff_info?.staff_id || ''
+      };
+    }
+
+    // fallback single-level mapping
+    if (item?.staff_info) {
+      const si = item.staff_info;
+      return {
+        id: Math.random().toString(36).substr(2, 9),
+        designation: si.designation || '',
+        department: si.department || '',
+        staffContact: si.staff_contact || si.staffContact || '',
+        staffId: si.staff_id || si.staffId || ''
+      };
+    }
+
+    return {
+      id: Math.random().toString(36).substr(2, 9),
+      designation: '',
+      department: '',
+      staffContact: '',
+      staffId: ''
+    };
+  });
+
+  return normalized;
+};
+
+// Helper: ensure we get staff entries as an array for export (tries normalizeStaffEntries first,
+// falls back to splitting comma-joined fields if needed).
+const getStaffEntriesForExport = (user: any): StaffEntry[] => {
+  const normalized = normalizeStaffEntries(user);
+  if (normalized && normalized.length > 0) return normalized;
+
+  // fallback: attempt to split comma-joined grid strings
+  const designations = (user.designation || '').toString().split(',').map((s: string) => s.trim()).filter(Boolean);
+  const departments = (user.department || '').toString().split(',').map((s: string) => s.trim()).filter(Boolean);
+  const staffContacts = (user.staffContact || user.contact || '').toString().split(',').map((s: string) => s.trim()).filter(Boolean);
+  const staffIds = (user.staffId || '').toString().split(',').map((s: string) => s.trim()).filter(Boolean);
+
+  const max = Math.max(designations.length, departments.length, staffContacts.length, staffIds.length, 1);
+  const entries: StaffEntry[] = [];
+  for (let i = 0; i < max; i++) {
+    entries.push({
+      id: `${user.id || 'u'}-${i}`,
+      designation: designations[i] || '',
+      department: departments[i] || '',
+      staffContact: staffContacts[i] || '',
+      staffId: staffIds[i] || ''
+    });
+  }
+  return entries;
 };
 
 // Helper: ensure we get parent entries as an array for export (tries normalizeParentEntries first,

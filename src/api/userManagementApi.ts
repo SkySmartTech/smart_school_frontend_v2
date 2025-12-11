@@ -10,9 +10,9 @@ const safeString = (value: any): string | null => {
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
 
-type UserType = "Student" | "Teacher" | "Parent";
+type UserType = "Student" | "Teacher" | "Parent" | "ManagementStaff";
 // Define UserRole type
-export type UserRole = "user" | "admin" | "managementStaff" | "userStudent" | "userParent" | "userTeacher" | "userClassTeacher";
+export type UserRole = "user" | "admin" | "managementStaff" | "userStudent" | "userParent" | "userTeacher" | "userClassTeacher" | "userStaff";
 
 // The rest of the file remains the same as BaseUser already uses this union type
 
@@ -68,6 +68,8 @@ const endpointForUserType = (userType: UserType) => {
       return "/api/all-students";
     case "Parent":
       return "/api/all-parents";
+    case "ManagementStaff":
+      return "/api/all-principals";
     case "Teacher":
     default:
       return "/api/all-teachers";
@@ -80,6 +82,8 @@ const createEndpointForUserType = (userType: UserType) => {
       return "/api/add-new-student";
     case "Parent":
       return "/api/add-new-parent";
+    case "ManagementStaff":
+      return "/api/add-new-principal";
     case "Teacher":
     default:
       return "/api/add-new-teacher";
@@ -92,6 +96,8 @@ const updateEndpointForUserType = (userType: UserType, id: number) => {
       return `/api/user-student/${id}/update`;
     case "Parent":
       return `/api/user-parent/${id}/update`;
+    case "ManagementStaff":
+      return `/api/user-principal/${id}/update`;
     case "Teacher":
     default:
       return `/api/user-teacher/${id}/update`;
@@ -104,6 +110,8 @@ const deactivateEndpointForUserType = (userType: UserType, id: number) => {
       return `/api/user-student/${id}/status-update`;
     case "Parent":
       return `/api/user-parent/${id}/status-update`;
+    case "ManagementStaff":
+      return `/api/user-principal/${id}/status-update`;
     case "Teacher":
     default:
       return `/api/user-teacher/${id}/status-update`;
@@ -117,6 +125,8 @@ const deleteEndpointForUserType = (userType: UserType, id: number) => {
       return `/api/user-student/${id}/delete`;
     case "Parent":
       return `/api/user-parent/${id}/delete`;
+    case "ManagementStaff":
+      return `/api/user-principal/${id}/delete`;
     case "Teacher":
     default:
       return `/api/user-teacher/${id}/delete`;
@@ -129,6 +139,8 @@ const activateEndpointForUserType = (userType: UserType, id: number) => {
       return `/api/user-student/${id}/activate`;
     case "Parent":
       return `/api/user-parent/${id}/activate`;
+    case "ManagementStaff":
+      return `/api/user-principal/${id}/activate`;
     case "Teacher":
     default:
       return `/api/user-teacher/${id}/activate`;
@@ -294,6 +306,54 @@ const getTypeSpecificFields = (user: any, userType: UserType) => {
           studentAdmissionNo: p.studentAdmissionNo
         }))
       };
+    case "ManagementStaff":
+      const rawStaffArray = user.staffData ?? user.staff ?? [];
+      const staffArray = Array.isArray(rawStaffArray) ? rawStaffArray : (rawStaffArray ? [rawStaffArray] : []);
+
+      const normalizedStaff = staffArray.map((s: any) => ({
+        id: s?.id ?? null,
+        designation: s?.designation ?? '',
+        department: s?.department ?? '',
+        staffContact: s?.staffContact ?? '',
+        staffId: s?.staffId ?? '',
+        userId: s?.userId !== undefined ? String(s.userId) : (user?.id !== undefined ? String(user.id) : undefined),
+        userType: s?.userType ?? user?.userType ?? 'Staff',
+        modifiedBy: s?.modifiedBy ?? undefined,
+        created_at: s?.created_at ?? undefined,
+        updated_at: s?.updated_at ?? undefined
+      }));
+
+      // compute joined strings for grid display
+      const designations = normalizedStaff.map(s => s.designation).filter(Boolean);
+      const departments = normalizedStaff.map(s => s.department).filter(Boolean);
+      const staffContacts = normalizedStaff.map(s => s.staffContact).filter(Boolean);
+      const staffIds = normalizedStaff.map(s => s.staffId).filter(Boolean);
+
+      const joinUniqueStaff = (arr: string[]) => Array.from(new Set(arr)).join(', ');
+
+      const firstStaff = normalizedStaff[0] ?? null;
+
+      return {
+        // joined strings for the grid display
+        designation: joinUniqueStaff(designations) || (firstStaff?.designation ?? user.designation ?? ''),
+        department: joinUniqueStaff(departments) || (firstStaff?.department ?? user.department ?? ''),
+        staffContact: joinUniqueStaff(staffContacts) || (firstStaff?.staffContact ?? user.staffContact ?? ''),
+        staffId: joinUniqueStaff(staffIds) || (firstStaff?.staffId ?? user.staffId ?? ''),
+        // keep staffData as an array (to match User interface)
+        staffData: normalizedStaff.length > 0 ? normalizedStaff.map(s => ({
+          designation: s.designation,
+          department: s.department,
+          staffContact: s.staffContact,
+          staffId: s.staffId
+        })) : undefined,
+        // expose the full array for UI editing/loading
+        staffEntries: normalizedStaff.map(s => ({
+          designation: s.designation,
+          department: s.department,
+          staffContact: s.staffContact,
+          staffId: s.staffId
+        }))
+      };
     default:
       return {};
   }
@@ -446,11 +506,30 @@ const baseData = {
       }];
 
       break;
+
+    case "ManagementStaff":
+      // For Staff, we send root-level fields only
+      formattedData.designation = safeString(userData.designation) ?? null;
+      formattedData.department = safeString(userData.department) ?? null;
+      formattedData.staffContact = safeString(userData.staffContact) ?? null;
+      formattedData.staffId = safeString(userData.staffId) ?? null;
+
+      // Also send as array for backward compatibility
+      const staffData = [{
+        designation: formattedData.designation,
+        department: formattedData.department,
+        staffContact: formattedData.staffContact,
+        staffId: formattedData.staffId
+      }];
+
+      formattedData.staffData = staffData.filter(entry => Object.values(entry).some(v => v !== null && v !== ''));
+
+      break;
   }
 
   // Cleanup: remove undefined values but preserve keys the backend expects to exist
   // List of keys we must NOT remove (backend accesses them directly)
-  const requiredKeysToKeep = ['photo', 'teacherData', 'studentGrade', 'studentClass', 'studentData', 'studentAdmissionNo', 'relation', 'profession', 'parentContact', 'location'];
+  const requiredKeysToKeep = ['photo', 'teacherData', 'studentGrade', 'studentClass', 'studentData', 'studentAdmissionNo', 'relation', 'profession', 'parentContact', 'staffData', 'designation', 'department', 'staffContact', 'staffId', 'location'];
 
   Object.keys(formattedData).forEach(key => {
     if (
@@ -570,6 +649,9 @@ export const searchUsers = async (searchTerm: string, userType: UserType): Promi
       break;
     case 'Parent':
       endpoint = '/api/parent/search';
+      break;
+    case 'ManagementStaff':
+      endpoint = '/api/principal/search';
       break;
     default:
       throw new Error('Invalid user type for search');

@@ -90,7 +90,7 @@ const RegisterForm = ({ onSuccess = () => { }, onError = () => { } }: RegisterFo
   }, [subjects]);
 
   const gender = ["Male", "Female"];
-  const roles = ["Teacher", "Student", "Parent", "Principal"];
+  const roles = ["Teacher", "Student", "Parent", "ManagementStaff"];
   const mediumOptions = ["Sinhala", "English", "Tamil"];
 
   const steps: string[] = ['Basic Information', 'Role Details'];
@@ -300,7 +300,7 @@ const RegisterForm = ({ onSuccess = () => { }, onError = () => { } }: RegisterFo
     onSuccess: (data) => {
       setRegisteredUser({ userId: data.userId, userType: data.userType });
       // If the selected role is Principal, there is no role-details step. Complete registration.
-      if (selectedRole === "Principal" || (data?.userType && String(data.userType).toLowerCase() === "principal")) {
+      if (selectedRole === "ManagementStaff" || (data?.userType && String(data.userType).toLowerCase() === "managementStaff")) {
         showSuccess("Registration successful! Please contact the Admin to get access to Login.");
         setTimeout(() => {
           navigate("/login");
@@ -1488,7 +1488,7 @@ const RegisterForm = ({ onSuccess = () => { }, onError = () => { } }: RegisterFo
             </Button>
           ) : (
             // If on the basic step and Principal is selected, show a Submit button
-            activeStep === 0 && selectedRole === "Principal" ? (
+            activeStep === 0 && selectedRole === "ManagementStaff" ? (
               <Button
                 onClick={handleNext}
                 variant="contained"

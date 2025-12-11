@@ -62,6 +62,7 @@ import CalendarMonthIcon from "@mui/icons-material/CalendarMonth";
 import SearchIcon from "@mui/icons-material/Search";
 import ClearIcon from "@mui/icons-material/Clear";
 import SaveIcon from "@mui/icons-material/Save";
+import FileDownloadIcon from "@mui/icons-material/FileDownload";
 
 import useTeacherProfile from "../../hooks/useTeacherProfile";
 import Footer from "../../components/Footer";
@@ -767,27 +768,48 @@ const TeacherDashboard: React.FC = () => {
     }
   };
 
-  const downloadTemplate = () => {
-    const template: ExcelRow[] = [
-      {
-        "Admission No": "12345",
-        "Student Name": "Surith Sunanda",
-        Grade: "Grade 8",
-        Class: "Araliya",
-        Subject: "Mathematics",
-        Term: "First Term",
-        Month: "January",
-        Year: "2025",
-        Marks: "85",
-        Attendance: "present",
-      },
-    ];
+  const exportGridData = useCallback(() => {
+    if (filteredStudents.length === 0) {
+      showSnackbar("No data to export", "warning");
+      return;
+    }
 
-    const ws = XLSX.utils.json_to_sheet(template);
+    // Create export data with all filter details
+    const exportData: ExcelRow[] = filteredStudents.map((student) => ({
+      "Admission No": student.student_admission,
+      "Student Name": student.student_name,
+      Grade: student.student_grade,
+      Class: student.student_class,
+      Subject: student.subject,
+      Term: student.term,
+      Month: student.month || "",
+      Year: student.year || "",
+      Marks: student.marks,
+      Attendance: student.attendance || "present",
+    }));
+
+    const ws = XLSX.utils.json_to_sheet(exportData);
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Template");
-    XLSX.writeFile(wb, "marks_template.xlsx");
-  };
+    XLSX.utils.book_append_sheet(wb, ws, "Marks");
+
+    // Generate filename with filter details
+    const grade = selectedGrade || "All";
+    const classVal = selectedClass || "All";
+    const year = selectedYear || "All";
+    const filename = `marks_${grade}_${classVal}_${year}.xlsx`;
+
+    XLSX.writeFile(wb, filename);
+    showSnackbar(
+      `Exported ${exportData.length} records successfully`,
+      "success"
+    );
+  }, [
+    filteredStudents,
+    selectedGrade,
+    selectedClass,
+    selectedYear,
+    showSnackbar,
+  ]);
   useEffect(() => {
     if (!profileLoading && gradeOptions.length === 0) {
       fetchGrades();
@@ -1139,14 +1161,26 @@ const TeacherDashboard: React.FC = () => {
                     onChange={handleExcelUpload}
                   />
                 </Button>
+
                 <Button
-                  variant="outlined"
-                  onClick={downloadTemplate}
-                  sx={{ height: 45, width: { xs: "100%", sm: "auto" } }}
+                  variant="contained"
+                  onClick={exportGridData}
+                  disabled={loading || filteredStudents.length === 0}
+                  startIcon={<FileDownloadIcon />}
                   fullWidth={isMobile}
+                  sx={{
+                    bgcolor: theme.palette.success.main,
+                    "&:hover": { bgcolor: theme.palette.success.dark },
+                    color: theme.palette.success.contrastText,
+                    px: 4,
+                    py: 1.2,
+                    borderRadius: theme.shape.borderRadius,
+                    minWidth: { sm: 180 },
+                  }}
                 >
-                  Download Template
+                  {isMobile ? "Export Students" : `Export Students (${filteredStudents.length})`}
                 </Button>
+
                 <Button
                   variant="outlined"
                   onClick={handleClearExcel}
