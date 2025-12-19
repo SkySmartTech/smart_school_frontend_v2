@@ -198,8 +198,8 @@ const LoginForm = ({ onForgotPasswordClick }: LoginFormProps) => {
       // Navigate based on permissions (teacher -> student -> default dashboard)
       if (allowedPermissions.includes("managementStaffReport")) {
         navigate("/managementStaffReport");
-      } else if (allowedPermissions.includes("classTeacherReport")) {
-        navigate("/classTeacherReport");
+      } else if (allowedPermissions.includes("parentTeacherReport")) {
+        navigate("/parentTeacherReport");
       } else {
         navigate("/parentReport");
       }

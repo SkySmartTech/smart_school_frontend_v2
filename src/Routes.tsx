@@ -226,10 +226,10 @@ function AppRoutes() {
       <Route
         path="/"
         element={
-          <Navigate to="/dashboard" replace />
+          <Navigate to="/userProfile" replace />
         }
       />
-      <Route path="*" element={<Navigate to="/login" replace />} />
+      <Route path="*" element={<Navigate to="/userProfile" replace />} />
     </Routes>
   );
 }
