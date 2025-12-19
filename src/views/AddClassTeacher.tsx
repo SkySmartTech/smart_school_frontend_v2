@@ -85,6 +85,21 @@ const AddClassTeacher = () => {
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
   useCustomTheme();
 
+  const extractGradeNumber = (s: string) => {
+    if (!s) return NaN;
+    const m = String(s).match(/\d+/);
+    return m ? parseInt(m[0], 10) : NaN;
+  };
+
+  const gradeComparator = (a: string, b: string) => {
+    const sa = a ?? "";
+    const sb = b ?? "";
+    const na = extractGradeNumber(sa);
+    const nb = extractGradeNumber(sb);
+    if (!isNaN(na) && !isNaN(nb)) return na - nb;
+    return sa.localeCompare(sb, undefined, { numeric: true, sensitivity: "base" });
+  };
+
   const refreshClassTeachers = async () => {
     try {
       setLoading(true);
@@ -108,6 +123,7 @@ const AddClassTeacher = () => {
         classes: grouped[grade]
       }));
 
+      initialData.sort((x, y) => gradeComparator(x.grade, y.grade));
       setClassTeachers(initialData);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load class teachers");
@@ -169,7 +185,8 @@ const AddClassTeacher = () => {
         fetchGrades(),
         fetchGradeClasses()
       ]);
-      setAllGrades(grades);
+      const sortedGrades = Array.isArray(grades) ? [...grades].sort(gradeComparator) : grades;
+      setAllGrades(sortedGrades as string[]);
       setAllClasses(classes);
     } catch (err) {
       setPopupError(err instanceof Error ? err.message : "Failed to load grades and classes");

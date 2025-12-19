@@ -13,7 +13,7 @@ import {
   Avatar,
 } from "@mui/material";
 import {
-  Layers,
+  // Layers,
   Settings,
   ExitToApp,
   ExpandLess,
@@ -67,32 +67,32 @@ const Sidebar = ({ open, setOpen }: SidebarProps) => {
   const sidebarItems = [
     { type: "headline", text: "Main" },
     { type: "headline", text: "Administration" },
-    {
-      type: "nested",
-      title: "Dashboard",
-      icon: <Layers fontSize="small" />,
-      permission: "dashboard",
-      children: [
-        {
-          title: "Student Dashboard",
-          icon: <SubdirectoryArrowRight fontSize="small" />,
-          href: "/studentdashboard",
-          permission: "studentDashboard"
-        },
-        {
-          title: "Teacher Dashboard",
-          icon: <SubdirectoryArrowRight fontSize="small" />,
-          href: "/teacherdashboard",
-          permission: "teacherDashboard"
-        },
-        {
-          title: "Common Dashboard",
-          icon: <SubdirectoryArrowRight fontSize="small" />,
-          href: "/dashboard",
-          permission: "commonDashboard"
-        },
-      ],
-    },
+    // {
+    //   type: "nested",
+    //   title: "Dashboard",
+    //   icon: <Layers fontSize="small" />,
+    //   permission: "dashboard",
+    //   children: [
+    //     {
+    //       title: "Student Dashboard",
+    //       icon: <SubdirectoryArrowRight fontSize="small" />,
+    //       href: "/studentdashboard",
+    //       permission: "studentDashboard"
+    //     },
+    //     {
+    //       title: "Teacher Dashboard",
+    //       icon: <SubdirectoryArrowRight fontSize="small" />,
+    //       href: "/teacherdashboard",
+    //       permission: "teacherDashboard"
+    //     },
+    //     {
+    //       title: "Common Dashboard",
+    //       icon: <SubdirectoryArrowRight fontSize="small" />,
+    //       href: "/dashboard",
+    //       permission: "commonDashboard"
+    //     },
+    //   ],
+    // },
     {
       type: "nested",
       title: "Academic ",

@@ -221,7 +221,7 @@ const ParentReport: React.FC = () => {
 
         // Build AOAs: header metadata + table header + table rows
         const headerAoA: Array<Array<string>> = [
-            ['Student', studentName],
+           
             ['Grade', studentGrade],
             ['Class', studentClass],
             ['Admission No', admissionNo],

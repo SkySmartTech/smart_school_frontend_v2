@@ -16,7 +16,7 @@ import { fetchClassTeacherReport, fetchGradesFromApi, fetchClassesFromApi, fetch
 import Footer from "../../components/Footer";
 import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
-import 'jspdf-autotable';
+import autoTable from 'jspdf-autotable';
 
 const exams = [
     { label: 'First Term', value: 'First Term' },
@@ -74,11 +74,21 @@ interface ClassTeacherReportData {
 }
 
 // Export functions for table data
-const exportToExcel = (data: StudentMark[], subjects: SubjectMark[], endYear?: number, endTerm?: string) => {
+const exportToExcel = (
+    data: StudentMark[],
+    subjects: SubjectMark[],
+    endYear?: number,
+    endTerm?: string,
+    grade?: string,
+    className?: string
+) => {
     const tableData: any[] = [];
     
     // Add header row with title
     tableData.push([`Student Performance Report - ${endYear || 'N/A'} ${endTerm || ''}`]);
+    // Include Grade and Class info (remove duplicate "Grade" word if present)
+    const displayGrade = grade ? grade.replace(/^Grade\s*/i, '') : undefined;
+    tableData.push([`Grade: ${displayGrade || 'All'}`, `Class: ${className || 'All'}`]);
     tableData.push([]);
     
     // Create header row
@@ -105,58 +115,78 @@ const exportToExcel = (data: StudentMark[], subjects: SubjectMark[], endYear?: n
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, 'Students');
     
-    // Download the file
-    XLSX.writeFile(workbook, `Student_Performance_${endYear || 'Report'}.xlsx`);
+    // Download the file (include grade & class in filename)
+    const safeGrade = ((grade ? grade.replace(/^Grade\s*/i, '') : 'AllGrades') || 'AllGrades').replace(/\s+/g, '_');
+    const safeClass = (className || 'AllClasses').replace(/\s+/g, '_');
+    XLSX.writeFile(workbook, `Student_Performance_${safeGrade}_${safeClass}_${endYear || 'Report'}.xlsx`);
 };
 
-const exportToPDF = (data: StudentMark[], subjects: SubjectMark[], endYear?: number, endTerm?: string) => {
-    const doc = new jsPDF({
-        orientation: 'landscape',
-        unit: 'mm',
-        format: 'a4'
-    });
+const exportToPDF = (
+    data: StudentMark[],
+    subjects: SubjectMark[],
+    endYear?: number,
+    endTerm?: string,
+    grade?: string,
+    className?: string
+) => {
+    try {
+        const doc = new jsPDF({
+            orientation: 'landscape',
+            unit: 'mm',
+            format: 'a4'
+        });
 
-    // Add title
-    doc.setFontSize(16);
-    doc.text(`Student Performance Report - ${endYear || 'N/A'} ${endTerm || ''}`, 15, 15);
+        // Add title
+        doc.setFontSize(16);
+        doc.text(`Student Performance Report - ${endYear || 'N/A'} ${endTerm || ''}`, 15, 15);
+        // Add Grade and Class below title (remove duplicate "Grade" word if present)
+        const displayGradePdf = grade ? grade.replace(/^Grade\s*/i, '') : undefined;
+        doc.setFontSize(11);
+        doc.text(`Grade: ${displayGradePdf || 'All'}    Class: ${className || 'All'}`, 15, 22);
 
-    // Prepare table data
-    const tableData: any[] = [];
-    const headers = ['Student Name', ...subjects.map(s => s.subject), 'Total', 'Average', 'Rank'];
-    
-    data.forEach((student) => {
-        const row = [
-            student.studentName,
-            ...subjects.map(subject => {
-                const subjectMark = student.subjects.find(s => s.subject === subject.subject);
-                return subjectMark ? subjectMark.marks : 0;
-            }),
-            student.total_marks.toFixed(2),
-            student.average_marks.toFixed(2),
-            student.rank
-        ];
-        tableData.push(row);
-    });
+        // Prepare table data
+        const tableData: any[] = [];
+        const headers = ['Student Name', ...subjects.map(s => s.subject), 'Total', 'Average', 'Rank'];
+        
+        data.forEach((student) => {
+            const row = [
+                student.studentName,
+                ...subjects.map(subject => {
+                    const subjectMark = student.subjects.find(s => s.subject === subject.subject);
+                    return subjectMark ? subjectMark.marks : 0;
+                }),
+                student.total_marks.toFixed(2),
+                student.average_marks.toFixed(2),
+                student.rank
+            ];
+            tableData.push(row);
+        });
 
-    // @ts-ignore
-    doc.autoTable({
-        head: [headers],
-        body: tableData,
-        startY: 25,
-        margin: { top: 25 },
-        styles: {
-            fontSize: 10,
-            cellPadding: 3
-        },
-        headerStyles: {
-            fillColor: [100, 150, 200],
-            textColor: 255,
-            fontStyle: 'bold'
-        }
-    });
+        // Use autoTable to create the table (start below the title + grade/class)
+        autoTable(doc, {
+            head: [headers],
+            body: tableData,
+            startY: 28,
+            margin: { top: 28 },
+            styles: {
+                fontSize: 10,
+                cellPadding: 3
+            },
+            headStyles: {
+                fillColor: [100, 150, 200],
+                textColor: 255,
+                fontStyle: 'bold'
+            }
+        });
 
-    // Save the PDF
-    doc.save(`Student_Performance_${endYear || 'Report'}.pdf`);
+        const safeGrade = ((grade ? grade.replace(/^Grade\s*/i, '') : 'AllGrades') || 'AllGrades').replace(/\s+/g, '_');
+        const safeClass = (className || 'AllClasses').replace(/\s+/g, '_');
+        // Save the PDF (include grade & class in filename)
+        doc.save(`Student_Performance_${safeGrade}_${safeClass}_${endYear || 'Report'}.pdf`);
+    } catch (error) {
+        console.error('Error generating PDF:', error);
+        alert('Error generating PDF. Please try again.');
+    }
 };
 
 const ClassTeacherReport: React.FC = () => {
@@ -739,7 +769,7 @@ const ClassTeacherReport: React.FC = () => {
                                             <Button
                                                 variant="outlined"
                                                 size={isMobile ? "small" : "medium"}
-                                                onClick={() => exportToExcel(data?.student_marks || [], data?.subject_marks || [], data?.end_year, data?.end_term)}
+                                                onClick={() => exportToExcel(data?.student_marks || [], data?.subject_marks || [], data?.end_year, data?.end_term, grade, className)}
                                                 sx={{ 
                                                     display: 'flex',
                                                     alignItems: 'center',
@@ -753,7 +783,7 @@ const ClassTeacherReport: React.FC = () => {
                                             <Button
                                                 variant="outlined"
                                                 size={isMobile ? "small" : "medium"}
-                                                onClick={() => exportToPDF(data?.student_marks || [], data?.subject_marks || [], data?.end_year, data?.end_term)}
+                                                onClick={() => exportToPDF(data?.student_marks || [], data?.subject_marks || [], data?.end_year, data?.end_term, grade, className)}
                                                 sx={{ 
                                                     display: 'flex',
                                                     alignItems: 'center',

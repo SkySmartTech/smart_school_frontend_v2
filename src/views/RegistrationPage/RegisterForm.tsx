@@ -170,6 +170,7 @@ const RegisterForm = ({ onSuccess = () => { }, onError = () => { } }: RegisterFo
     setValue,
     trigger,
     setError,
+    resetField,
   } = useForm<RegisterFormValues>({
     defaultValues: {
       teacherGrades: [],
@@ -178,6 +179,10 @@ const RegisterForm = ({ onSuccess = () => { }, onError = () => { } }: RegisterFo
       medium: [],
       location: "",
       userRole: "user",
+      studentAdmissionNo: "",
+      profession: "",
+      relation: "",
+      parentContact: "",
     }
   });
 
@@ -614,10 +619,11 @@ const RegisterForm = ({ onSuccess = () => { }, onError = () => { } }: RegisterFo
     // Add new entry to the top of the list (prepend)
     setParentEntries(prev => [newEntry, ...prev]);
 
-    setValue("studentAdmissionNo", "");
-    setValue("profession", "");
-    setValue("relation", "");
-    setValue("parentContact", "");
+    // Properly reset form fields
+    resetField("studentAdmissionNo");
+    resetField("profession");
+    resetField("relation");
+    resetField("parentContact");
   };
 
   const handleCloseSuccessSnackbar = () => {
@@ -1353,6 +1359,7 @@ const RegisterForm = ({ onSuccess = () => { }, onError = () => { } }: RegisterFo
                     label="Student Admission Number"
                     fullWidth
                     variant="outlined"
+                    value={watch("studentAdmissionNo") || ""}
                     {...register("studentAdmissionNo")}
                     error={!!errors.studentAdmissionNo}
                     helperText={errors.studentAdmissionNo?.message}
@@ -1362,6 +1369,7 @@ const RegisterForm = ({ onSuccess = () => { }, onError = () => { } }: RegisterFo
                     label="Contact Number"
                     fullWidth
                     variant="outlined"
+                    value={watch("parentContact") || ""}
                     {...register("parentContact")}
                     error={!!errors.parentContact}
                     helperText={errors.parentContact?.message}
@@ -1375,6 +1383,7 @@ const RegisterForm = ({ onSuccess = () => { }, onError = () => { } }: RegisterFo
                     fullWidth
                     variant="outlined"
                     {...register("profession")}
+                    value={watch("profession") || ""}
                     error={!!errors.profession}
                     helperText={errors.profession?.message}
                     sx={{ "& .MuiOutlinedInput-root": { borderRadius: "10px", height: "40px" } }}
@@ -1384,11 +1393,13 @@ const RegisterForm = ({ onSuccess = () => { }, onError = () => { } }: RegisterFo
                     label="Relation"
                     fullWidth
                     variant="outlined"
+                    value={watch("relation") || ""}
                     {...register("relation")}
                     error={!!errors.relation}
                     helperText={errors.relation?.message}
                     sx={{ "& .MuiOutlinedInput-root": { borderRadius: "10px", height: "40px" } }}
                   >
+                    <MenuItem value=""></MenuItem>
                     <MenuItem value="Mother">Mother</MenuItem>
                     <MenuItem value="Father">Father</MenuItem>
                     <MenuItem value="Guardian">Guardian</MenuItem>

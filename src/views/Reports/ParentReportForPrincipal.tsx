@@ -486,6 +486,7 @@ const ParentReport: React.FC = () => {
 
         // append total/average row into summary if available
         if (avgMarksVal !== null) {
+            summaryData.push([]);  // Add blank row for spacing
             summaryData.push(['TOTAL/AVERAGE', '', '', totalMarksVal, avgMarksVal]);
         }
 
@@ -600,6 +601,7 @@ const ParentReport: React.FC = () => {
 
         // Calculate totals if there are marks (use previously computed totals)
         if (avgMarksVal !== null && totalMarksVal !== null) {
+            marksData.push([]);  // Add blank row for spacing
             marksData.push(['TOTAL/AVERAGE', '', '', totalMarksVal, avgMarksVal]);
         }
 
