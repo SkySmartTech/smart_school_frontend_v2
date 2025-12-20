@@ -23,6 +23,7 @@ import {
     Collapse,
     IconButton,
     Divider,
+    MenuItem,
 } from "@mui/material";
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import ExpandLessIcon from '@mui/icons-material/ExpandLess';
@@ -56,7 +57,11 @@ import {
     type ParentReportData,
     type DetailedMarksTableRow,
     fetchClassStudents,
-    getAvailableYears
+    getAvailableYears,
+    fetchGrades,
+    fetchClasses,
+    type GradeOption,
+    type ClassOption
 } from "../../api/parentReportForTeacherApi";
 
 interface Student {
@@ -99,8 +104,14 @@ const ParentReport: React.FC = () => {
     const [month, setMonth] = useState("");
     const [startYear, setStartYear] = useState<string | null>(null);
     const [endYear, setEndYear] = useState<string | null>(null);
+    const [selectedGrade, setSelectedGrade] = useState("");
+    const [selectedClass, setSelectedClass] = useState("");
     const [availableYears, setAvailableYears] = useState<string[]>([]);
+    const [gradeOptions, setGradeOptions] = useState<GradeOption[]>([]);
+    const [classOptions, setClassOptions] = useState<ClassOption[]>([]);
     const [isLoadingYears, setIsLoadingYears] = useState(false);
+    const [gradeOptionsLoading, setGradeOptionsLoading] = useState(false);
+    const [classOptionsLoading, setClassOptionsLoading] = useState(false);
     const [filtersExpanded, setFiltersExpanded] = useState(true);
 
     // Student related state
@@ -149,10 +160,62 @@ const ParentReport: React.FC = () => {
         }
     }, [exam]);
 
+    // Fetch grades on component mount
+    useEffect(() => {
+        let mounted = true;
+        const loadGrades = async () => {
+            setGradeOptionsLoading(true);
+            try {
+                const grades = await fetchGrades();
+                if (mounted) {
+                    setGradeOptions(grades);
+                }
+            } catch (error) {
+                if (mounted) {
+                    setSnackbar({
+                        open: true,
+                        message: `Failed to load grades: ${error instanceof Error ? error.message : 'Unknown error'}`,
+                        severity: "error"
+                    });
+                }
+            } finally {
+                if (mounted) setGradeOptionsLoading(false);
+            }
+        };
+        loadGrades();
+        return () => { mounted = false; };
+    }, []);
+
+    // Fetch classes on component mount
+    useEffect(() => {
+        let mounted = true;
+        const loadClasses = async () => {
+            setClassOptionsLoading(true);
+            try {
+                const classes = await fetchClasses();
+                if (mounted) {
+                    setClassOptions(classes);
+                }
+            } catch (error) {
+                if (mounted) {
+                    setSnackbar({
+                        open: true,
+                        message: `Failed to load classes: ${error instanceof Error ? error.message : 'Unknown error'}`,
+                        severity: "error"
+                    });
+                }
+            } finally {
+                if (mounted) setClassOptionsLoading(false);
+            }
+        };
+        loadClasses();
+        return () => { mounted = false; };
+    }, []);
+
     const hasValidFilters = (): boolean => {
         const hasExamFilter = Boolean(exam);
         const hasYearFilter = Boolean(startYear && endYear);
-        return hasExamFilter || hasYearFilter;
+        return (hasExamFilter || hasYearFilter) && Boolean(selectedGrade && selectedClass);
     };
 
     // Load students on mount
@@ -198,14 +261,14 @@ const ParentReport: React.FC = () => {
             startYear || '',
             endYear || '',
             exam,
-            month
+            month,
+            selectedGrade,
+            selectedClass
         ],
         queryFn: () => {
             const admissionNo = selectedStudent?.student.studentAdmissionNo;
-            const studentGrade = selectedStudent?.student.studentGrade;
-            const studentClass = selectedStudent?.student.studentClass;
 
-            if (!admissionNo || !studentGrade || !studentClass) {
+            if (!admissionNo) {
                 throw new Error("Student information not available");
             }
 
@@ -220,8 +283,8 @@ const ParentReport: React.FC = () => {
                 endYearValue,
                 examValue,
                 monthValue,
-                studentGrade,
-                studentClass
+                selectedGrade,
+                selectedClass
             );
         },
         enabled: Boolean(selectedStudent?.student.studentAdmissionNo) && hasValidFilters(),
@@ -240,6 +303,15 @@ const ParentReport: React.FC = () => {
     }, [isErrorReport, errorReport]);
 
     const handleCloseSnackbar = () => setSnackbar(prev => ({ ...prev, open: false }));
+
+    const clearFilters = () => {
+        setStartYear(null);
+        setEndYear(null);
+        setExam("");
+        setMonth("");
+        setSelectedGrade("");
+        setSelectedClass("");
+    };
 
     const handleStudentSelect = (value: Student | null) => {
         if (!value) {
@@ -845,6 +917,54 @@ const ParentReport: React.FC = () => {
                                             />
                                         )}
                                     </Stack>
+
+                                    {/* Grade and Class Filters */}
+                                    <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
+                                        <TextField
+                                            select
+                                            fullWidth
+                                            label="Grade"
+                                            value={selectedGrade}
+                                            onChange={(e) => setSelectedGrade(e.target.value)}
+                                            disabled={gradeOptionsLoading}
+                                            size="small"
+                                        >
+                                            {gradeOptions.map((gradeOption) => (
+                                                <MenuItem key={gradeOption.id} value={gradeOption.grade}>
+                                                    {gradeOption.grade}
+                                                </MenuItem>
+                                            ))}
+                                        </TextField>
+
+                                        <TextField
+                                            select
+                                            fullWidth
+                                            label="Class"
+                                            value={selectedClass}
+                                            onChange={(e) => setSelectedClass(e.target.value)}
+                                            disabled={classOptionsLoading}
+                                            size="small"
+                                        >
+                                            {classOptions.map((classOption) => (
+                                                <MenuItem key={classOption.id} value={classOption.class}>
+                                                    {classOption.class}
+                                                </MenuItem>
+                                            ))}
+                                        </TextField>
+                                    </Stack>
+
+                                    {/* Clear Filters Button */}
+                                    <Box sx={{ mt: 1 }}>
+                                        <Button 
+                                            variant="outlined" 
+                                            color="primary"
+                                            onClick={clearFilters}
+                                            sx={{ textTransform: 'none', fontWeight: 600 }}
+                                            size="small"
+                                        >
+                                            Clear Filters
+                                        </Button>
+                                    </Box>
 
                                     <Divider sx={{ my: 2 }} />
 

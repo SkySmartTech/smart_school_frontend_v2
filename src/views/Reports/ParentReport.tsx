@@ -47,10 +47,14 @@ import {
     fetchParentReport,
     fetchChildrenList,
     fetchYears,
+    fetchGrades,
+    fetchClasses,
     type ParentReportData,
     type ChildDetails,
     type DetailedMarksTableRow,
-    type YearOption
+    type YearOption,
+    type GradeOption,
+    type ClassOption
 } from "../../api/parentApi.ts";
 
 // Standardize the Monthly Exam value to 'Monthly'
@@ -75,8 +79,14 @@ const ParentReport: React.FC = () => {
     const [month, setMonth] = useState("");
     const [startYear, setStartYear] = useState("");
     const [endYear, setEndYear] = useState("");
+    const [selectedGrade, setSelectedGrade] = useState("");
+    const [selectedClass, setSelectedClass] = useState("");
     const [yearOptions, setYearOptions] = useState<YearOption[]>([]);
+    const [gradeOptions, setGradeOptions] = useState<GradeOption[]>([]);
+    const [classOptions, setClassOptions] = useState<ClassOption[]>([]);
     const [yearOptionsLoading, setYearOptionsLoading] = useState(false);
+    const [gradeOptionsLoading, setGradeOptionsLoading] = useState(false);
+    const [classOptionsLoading, setClassOptionsLoading] = useState(false);
     const [selectedChildIndex, setSelectedChildIndex] = useState<number>(0);
 
     type SnackbarState = {
@@ -113,8 +123,48 @@ const ParentReport: React.FC = () => {
         loadYears();
     }, []);
 
+    // Fetch grades on component mount
+    useEffect(() => {
+        const loadGrades = async () => {
+            setGradeOptionsLoading(true);
+            try {
+                const grades = await fetchGrades();
+                setGradeOptions(grades);
+            } catch (error) {
+                setSnackbar({
+                    open: true,
+                    message: `Failed to load grades: ${error instanceof Error ? error.message : 'Unknown error'}`,
+                    severity: "error"
+                });
+            } finally {
+                setGradeOptionsLoading(false);
+            }
+        };
+        loadGrades();
+    }, []);
+
+    // Fetch classes on component mount
+    useEffect(() => {
+        const loadClasses = async () => {
+            setClassOptionsLoading(true);
+            try {
+                const classes = await fetchClasses();
+                setClassOptions(classes);
+            } catch (error) {
+                setSnackbar({
+                    open: true,
+                    message: `Failed to load classes: ${error instanceof Error ? error.message : 'Unknown error'}`,
+                    severity: "error"
+                });
+            } finally {
+                setClassOptionsLoading(false);
+            }
+        };
+        loadClasses();
+    }, []);
+
     const hasValidFilters = (): boolean => {
-        return Boolean(exam && startYear && endYear);
+        return Boolean(exam && startYear && endYear && selectedGrade && selectedClass);
     };
 
     // Fetch list of all children for this parent
@@ -152,14 +202,14 @@ const ParentReport: React.FC = () => {
             endYear,
             exam,
             month,
-            selectedChild?.admissionNo || ''
+            selectedChild?.admissionNo || '',
+            selectedGrade,
+            selectedClass
         ],
         queryFn: () => {
             const admissionNo = selectedChild?.admissionNo;
-            const studentGrade = selectedChild?.grade;
-            const studentClass = selectedChild?.className;
 
-            if (!admissionNo || !studentGrade || !studentClass) {
+            if (!admissionNo) {
                 throw new Error("Student information not available");
             }
 
@@ -172,8 +222,8 @@ const ParentReport: React.FC = () => {
                 endYear,
                 examValue,
                 monthValue,
-                studentGrade,
-                studentClass
+                selectedGrade,
+                selectedClass
             );
         },
         enabled: Boolean(selectedChild?.admissionNo) && hasValidFilters(),
@@ -199,6 +249,15 @@ const ParentReport: React.FC = () => {
     }, [isErrorChildren, errorChildren, isErrorReport, errorReport]);
 
     const handleCloseSnackbar = () => setSnackbar(prev => ({ ...prev, open: false }));
+
+    const clearFilters = () => {
+        setStartYear("");
+        setEndYear("");
+        setExam("");
+        setMonth("");
+        setSelectedGrade("");
+        setSelectedClass("");
+    };
 
     const exportToExcel = () => {
         if (!reportData || !reportData.studentMarksDetailedTable) return;
@@ -541,7 +600,62 @@ const ParentReport: React.FC = () => {
                                         <MenuItem key={m} value={m}>{m}</MenuItem>
                                     ))}
                                 </TextField>
+                                {/* Grade */}
+                                <TextField
+                                    select
+                                    label="Grade"
+                                    value={selectedGrade}
+                                    onChange={(e) => setSelectedGrade(e.target.value)}
+                                    disabled={gradeOptionsLoading}
+                                    sx={{ 
+                                        width: { xs: '100%', sm: 'auto' },
+                                        minWidth: { sm: 150 },
+                                        flex: { sm: 1 },
+                                        maxWidth: { sm: 250 }
+                                    }}
+                                >
+                                    {gradeOptions.map((gradeOption) => (
+                                        <MenuItem key={gradeOption.id} value={gradeOption.grade}>
+                                            {gradeOption.grade}
+                                        </MenuItem>
+                                    ))}
+                                </TextField>
+                                {/* Class */}
+                                <TextField
+                                    select
+                                    label="Class"
+                                    value={selectedClass}
+                                    onChange={(e) => setSelectedClass(e.target.value)}
+                                    disabled={classOptionsLoading}
+                                    sx={{ 
+                                        width: { xs: '100%', sm: 'auto' },
+                                        minWidth: { sm: 150 },
+                                        flex: { sm: 1 },
+                                        maxWidth: { sm: 250 }
+                                    }}
+                                >
+                                    {classOptions.map((classOption) => (
+                                        <MenuItem key={classOption.id} value={classOption.class}>
+                                            {classOption.class}
+                                        </MenuItem>
+                                    ))}
+                                </TextField>
                             </Stack>
+
+                            {/* Clear Filters Button */}
+                            <Box sx={{ mb: 3 }}>
+                                <Button 
+                                    variant="outlined" 
+                                    color="primary"
+                                    onClick={clearFilters}
+                                    sx={{ textTransform: 'none', fontWeight: 600, width: { xs: '100%', sm: 'auto' },
+                                        minWidth: { sm: 150 },
+                                        flex: { sm: 1 },
+                                        maxWidth: { sm: 250 } }}
+                                >
+                                    Clear Filters
+                                </Button>
+                            </Box>
 
                             <Typography variant="h6" sx={{ mb: 2, fontWeight: 600 }}>
                                 Student Details

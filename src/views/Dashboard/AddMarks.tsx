@@ -96,6 +96,7 @@ interface FilterFormData {
   selectedExam: string;
   selectedMonth: string;
   selectedYear: string;
+  selectedAcademicYear: string;
   searchQuery: string;
 }
 
@@ -167,6 +168,7 @@ const TeacherDashboard: React.FC = () => {
       selectedExam: "",
       selectedMonth: "",
       selectedYear: "",
+      selectedAcademicYear: "",
       searchQuery: "",
     },
   });
@@ -179,6 +181,7 @@ const TeacherDashboard: React.FC = () => {
     selectedExam,
     selectedMonth,
     selectedYear,
+    selectedAcademicYear,
     searchQuery,
   } = formValues;
   const isMonthFilterEnabled = selectedExam === "Monthly";
@@ -251,6 +254,7 @@ const TeacherDashboard: React.FC = () => {
       selectedSubject &&
       selectedExam &&
       selectedYear &&
+      selectedAcademicYear &&
       (selectedExam !== "Monthly" || selectedMonth)
     );
   }, [
@@ -259,6 +263,7 @@ const TeacherDashboard: React.FC = () => {
     selectedSubject,
     selectedExam,
     selectedYear,
+    selectedAcademicYear,
     selectedMonth,
   ]);
 
@@ -358,21 +363,21 @@ const TeacherDashboard: React.FC = () => {
   }, [showSnackbar]);
 
   const fetchAdmissionDataHandler = useCallback(
-    async (grade: string, classValue: string, year: string) => {
+    async (grade: string, classValue: string, year: string, academicYear: string) => {
       if (!grade || !classValue || !year) {
         setAdmissionData([]);
         setStudents([]);
         return;
       }
 
-      const cacheKey = `${grade}-${classValue}-${year}`;
+      const cacheKey = `${grade}-${classValue}-${year}-${academicYear}`;
       if (lastFetchParamsRef.current === cacheKey) {
         return;
       }
 
       try {
         setLoading(true);
-        const data = await fetchAdmissionData(grade, classValue, "");
+        const data = await fetchAdmissionData(grade, classValue, academicYear, "");
         setAdmissionData(data);
         lastFetchParamsRef.current = cacheKey;
 
@@ -845,7 +850,7 @@ const TeacherDashboard: React.FC = () => {
 
     if (selectedGrade && selectedClass && selectedYear) {
       admissionDataTimeoutRef.current = setTimeout(() => {
-        fetchAdmissionDataHandler(selectedGrade, selectedClass, selectedYear);
+        fetchAdmissionDataHandler(selectedGrade, selectedClass, selectedYear, selectedAcademicYear);
       }, 300);
     } else {
       setAdmissionData([]);
@@ -858,7 +863,7 @@ const TeacherDashboard: React.FC = () => {
         clearTimeout(admissionDataTimeoutRef.current);
       }
     };
-  }, [selectedGrade, selectedClass, selectedYear]);
+  }, [selectedGrade, selectedClass, selectedYear, selectedAcademicYear]);
 
   useEffect(() => {
     if (admissionData.length > 0) {
@@ -1271,6 +1276,47 @@ const TeacherDashboard: React.FC = () => {
                 spacing={{ xs: 1.5, sm: 2 }}
                 flexWrap="wrap"
               >
+                 <Controller
+                  control={control}
+                  name="selectedAcademicYear"
+                  render={({ field }) => (
+                    <TextField
+                      {...field}
+                      select
+                      label="Student Academic Year"
+                      variant="outlined"
+                      sx={{
+                        flex: {
+                          xs: "1 1 100%",
+                          sm: "1 1 calc(50% - 8px)",
+                          md: "1 1 auto",
+                        },
+                        minWidth: { xs: "100%", sm: 150 },
+                        maxWidth: { md: 250 },
+                        "& .MuiOutlinedInput-root": {
+                          borderRadius: "10px",
+                          height: "45px",
+                          bgcolor: theme.palette.background.paper,
+                          "& .MuiOutlinedInput-notchedOutline": {
+                            borderColor: theme.palette.divider,
+                          },
+                          "&.Mui-focused .MuiOutlinedInput-notchedOutline": {
+                            borderColor: theme.palette.primary.main,
+                          },
+                          "&:hover .MuiOutlinedInput-notchedOutline": {
+                            borderColor: theme.palette.primary.main,
+                          },
+                        },
+                      }}
+                    >
+                      {yearOptions.map((option) => (
+                        <MenuItem key={option.value} value={option.value}>
+                          {option.label}
+                        </MenuItem>
+                      ))}
+                    </TextField>
+                  )}
+                />
                 <Controller
                   control={control}
                   name="selectedGrade"
@@ -1518,6 +1564,8 @@ const TeacherDashboard: React.FC = () => {
                     </TextField>
                   )}
                 />
+
+               
 
                 <Controller
                   control={control}

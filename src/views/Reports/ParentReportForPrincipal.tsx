@@ -320,6 +320,13 @@ const ParentReport: React.FC = () => {
 
     const handleCloseSnackbar = () => setSnackbar(prev => ({ ...prev, open: false }));
 
+    const clearFilters = () => {
+        setStartYear("");
+        setEndYear("");
+        setExam("");
+        setMonth("");
+    };
+
     const handleStudentSelect = (value: Student | string | null) => {
         if (!value) {
             setSelectedStudent(null);
@@ -903,6 +910,18 @@ const ParentReport: React.FC = () => {
 
 
                                     </Stack>
+
+                                    {/* Clear Filters Button */}
+                                    <Box sx={{ mt: 2 }}>
+                                        <Button 
+                                            variant="outlined" 
+                                            color="primary"
+                                            onClick={clearFilters}
+                                            sx={{ textTransform: 'none', fontWeight: 600 }}
+                                        >
+                                            Clear Filters
+                                        </Button>
+                                    </Box>
 
                                     <Typography variant="h6" sx={{ mb: 3, mt: 5, fontWeight: 600 }}>
                                         Student Details

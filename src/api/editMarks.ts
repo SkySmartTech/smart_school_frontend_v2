@@ -290,15 +290,16 @@ export async function fetchYearsFromApi(): Promise<DropdownOption[]> {
 }
 
 // New function to fetch admission data
-export async function fetchAdmissionData(grade: string, classValue: string, keyword?: string): Promise<AdmissionData[]> {
+export async function fetchAdmissionData(grade: string, classValue: string, year?: string, keyword?: string): Promise<AdmissionData[]> {
   try {
     const params: Record<string, string> = {};
     if (keyword) {
       params.keyword = keyword;
     }
     
+    const yearParam = year || '';
     const res = await axios.get(
-      `${API_BASE_URL}/api/search-admission-data/${encodeURIComponent(grade)}/${encodeURIComponent(classValue)}`, 
+      `${API_BASE_URL}/api/search-admission-data/${encodeURIComponent(grade)}/${encodeURIComponent(classValue)}/${encodeURIComponent(yearParam)}`, 
       {
         ...getAuthHeader(),
         params

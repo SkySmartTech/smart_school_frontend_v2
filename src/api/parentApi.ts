@@ -53,6 +53,26 @@ export interface ChildDetails {
     className: string;
 }
 
+export interface GradeOption {
+    id: number;
+    gradeId: string;
+    grade: string;
+    description: string | null;
+    schoolId: string | null;
+    created_at: string;
+    updated_at: string;
+}
+
+export interface ClassOption {
+    id: number;
+    classId: string | null;
+    class: string;
+    description: string;
+    gradeId: string | null;
+    created_at: string;
+    updated_at: string;
+}
+
 // Helper function to transform backend data to detailed marks table
 const transformToDetailedMarksTable = (
     highestMarksData: any[],
@@ -356,6 +376,72 @@ export const fetchYears = async (): Promise<YearOption[]> => {
                 throw new Error('Session expired. Please login again.');
             }
             throw new Error(error.response?.data?.message || 'Failed to fetch years');
+        }
+        throw new Error("Network error occurred");
+    }
+};
+
+/**
+ * Fetch list of all available grades from the backend
+ * Route: /api/grades
+ */
+export const fetchGrades = async (): Promise<GradeOption[]> => {
+    try {
+        const authHeader = getAuthHeader();
+        const response = await axios.get(`${API_BASE_URL}/api/grades`, {
+            headers: authHeader.headers,
+        });
+
+        const gradesData = response.data;
+
+        if (!Array.isArray(gradesData)) {
+            throw new Error("Grades data is not an array");
+        }
+
+        return gradesData;
+
+    } catch (error) {
+        if (axios.isAxiosError(error)) {
+            if (error.response?.status === 401) {
+                localStorage.removeItem('authToken');
+                localStorage.removeItem('token');
+                localStorage.removeItem('access_token');
+                throw new Error('Session expired. Please login again.');
+            }
+            throw new Error(error.response?.data?.message || 'Failed to fetch grades');
+        }
+        throw new Error("Network error occurred");
+    }
+};
+
+/**
+ * Fetch list of all available classes from the backend
+ * Route: /api/grade-classes
+ */
+export const fetchClasses = async (): Promise<ClassOption[]> => {
+    try {
+        const authHeader = getAuthHeader();
+        const response = await axios.get(`${API_BASE_URL}/api/grade-classes`, {
+            headers: authHeader.headers,
+        });
+
+        const classesData = response.data;
+
+        if (!Array.isArray(classesData)) {
+            throw new Error("Classes data is not an array");
+        }
+
+        return classesData;
+
+    } catch (error) {
+        if (axios.isAxiosError(error)) {
+            if (error.response?.status === 401) {
+                localStorage.removeItem('authToken');
+                localStorage.removeItem('token');
+                localStorage.removeItem('access_token');
+                throw new Error('Session expired. Please login again.');
+            }
+            throw new Error(error.response?.data?.message || 'Failed to fetch classes');
         }
         throw new Error("Network error occurred");
     }
