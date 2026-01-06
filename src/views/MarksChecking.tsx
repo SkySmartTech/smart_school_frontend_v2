@@ -21,12 +21,12 @@ import CalendarMonth from "@mui/icons-material/CalendarMonth";
 import Sidebar from "../components/Sidebar";
 import { useCustomTheme } from "../context/ThemeContext";
 import Navbar from "../components/Navbar";
-import { fetchGradesFromApi, fetchMarksStatus, type DropdownOption, type MarksStatusItem } from "../api/marksCheckingApi";
+import { fetchGradesFromApi, fetchMarksStatus, fetchYearsFromApi, type DropdownOption, type MarksStatusItem } from "../api/marksCheckingApi";
 
 const exams = [
-    { label: "First Term", value: "First" },
-    { label: "Second Term", value: "Mid" },
-    { label: "Third Term", value: "End" },
+    { label: "First Term", value: "First Term" },
+    { label: "Second Term", value: "Second Term" },
+    { label: "Third Term", value: "Third Term" },
     { label: "Monthly Test", value: "Monthly" },
 ];
 
@@ -46,16 +46,6 @@ const months = [
     { label: "December", value: "12" },
 ];
 
-const hardcodedYears = (() => {
-    const thisYear = new Date().getFullYear();
-    const startYear = thisYear - 5;
-    const endYear = thisYear + 5;
-    return Array.from({ length: endYear - startYear + 1 }, (_, i) =>
-        String(startYear + i)
-    );
-})();
-
-
 const MarksChecking = () => {
     const [sidebarOpen, setSidebarOpen] = useState(false);
     const [hovered] = useState(false);
@@ -66,8 +56,9 @@ const MarksChecking = () => {
     const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
 
     // dropdown states
-    const [year, setYear] = useState<string>(hardcodedYears[0]);
-    const [examYear, setExamYear] = useState<string>(hardcodedYears[0]);
+    const [years, setYears] = useState<string[]>([]);
+    const [year, setYear] = useState<string>("");
+    const [examYear, setExamYear] = useState<string>("");
     const [gradeOptions, setGradeOptions] = useState<DropdownOption[]>([]);
     const [grade, setGrade] = useState<string>("");
     const [exam, setExam] = useState<string>("");
@@ -77,15 +68,15 @@ const MarksChecking = () => {
     const [rows, setRows] = useState<MarksStatusItem[]>([]);
     const [loading, setLoading] = useState(false);
     const [loadingGrades, setLoadingGrades] = useState(false);
+    const [loadingYears, setLoadingYears] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
-    const isLoading = loading || loadingGrades;
-    const years = hardcodedYears;
+    const isLoading = loading || loadingGrades || loadingYears;
 
-    // fetch grades on mount
+    // fetch grades and years on mount
     useEffect(() => {
         let mounted = true;
-        const load = async () => {
+        const loadGrades = async () => {
             setLoadingGrades(true);
             try {
                 const grades = await fetchGradesFromApi();
@@ -100,7 +91,26 @@ const MarksChecking = () => {
                 if (mounted) setLoadingGrades(false);
             }
         };
-        load();
+
+        const loadYears = async () => {
+            setLoadingYears(true);
+            try {
+                const yearsData = await fetchYearsFromApi();
+                if (!mounted) return;
+                setYears(yearsData);
+                if (yearsData.length > 0) {
+                    setYear(yearsData[0]);
+                    setExamYear(yearsData[0]);
+                }
+            } catch (err: any) {
+                setError(err?.message || "Failed to load years");
+            } finally {
+                if (mounted) setLoadingYears(false);
+            }
+        };
+
+        loadGrades();
+        loadYears();
         return () => {
             mounted = false;
         };

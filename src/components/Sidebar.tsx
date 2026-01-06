@@ -13,7 +13,7 @@ import {
   Avatar,
 } from "@mui/material";
 import {
-  Layers,
+  // Layers,
   Settings,
   ExitToApp,
   ExpandLess,
@@ -67,32 +67,32 @@ const Sidebar = ({ open, setOpen }: SidebarProps) => {
   const sidebarItems = [
     { type: "headline", text: "Main" },
     { type: "headline", text: "Administration" },
-    {
-      type: "nested",
-      title: "Dashboard",
-      icon: <Layers fontSize="small" />,
-      permission: "dashboard",
-      children: [
-        {
-          title: "Student Dashboard",
-          icon: <SubdirectoryArrowRight fontSize="small" />,
-          href: "/studentdashboard",
-          permission: "studentDashboard"
-        },
-        {
-          title: "Teacher Dashboard",
-          icon: <SubdirectoryArrowRight fontSize="small" />,
-          href: "/teacherdashboard",
-          permission: "teacherDashboard"
-        },
-        {
-          title: "Common Dashboard",
-          icon: <SubdirectoryArrowRight fontSize="small" />,
-          href: "/dashboard",
-          permission: "commonDashboard"
-        },
-      ],
-    },
+    // {
+    //   type: "nested",
+    //   title: "Dashboard",
+    //   icon: <Layers fontSize="small" />,
+    //   permission: "dashboard",
+    //   children: [
+    //     {
+    //       title: "Student Dashboard",
+    //       icon: <SubdirectoryArrowRight fontSize="small" />,
+    //       href: "/studentdashboard",
+    //       permission: "studentDashboard"
+    //     },
+    //     {
+    //       title: "Teacher Dashboard",
+    //       icon: <SubdirectoryArrowRight fontSize="small" />,
+    //       href: "/teacherdashboard",
+    //       permission: "teacherDashboard"
+    //     },
+    //     {
+    //       title: "Common Dashboard",
+    //       icon: <SubdirectoryArrowRight fontSize="small" />,
+    //       href: "/dashboard",
+    //       permission: "commonDashboard"
+    //     },
+    //   ],
+    // },
     {
       type: "nested",
       title: "Academic ",
@@ -103,6 +103,12 @@ const Sidebar = ({ open, setOpen }: SidebarProps) => {
           icon: <SubdirectoryArrowRight fontSize="small" />,
           href: "/addmarks",
           permission: "addMarks"
+        },
+        {
+          title: "Edit Marks",
+          icon: <SubdirectoryArrowRight fontSize="small" />,
+          href: "/editMarks",
+          permission: "editMarks"
         },
         {
           title: "Add Class Teacher",
@@ -161,11 +167,11 @@ const Sidebar = ({ open, setOpen }: SidebarProps) => {
           href: "/parentReport", permission: "parentReport"
         },
         {
-          title: "Parent Teacher Report", icon: <SubdirectoryArrowRight fontSize="small" />,
+          title: "Student Report For Teacher", icon: <SubdirectoryArrowRight fontSize="small" />,
           href: "/parentTeacherReport", permission: "parentTeacherReport"
         },
         {
-          title: "Parent Principal Report", icon: <SubdirectoryArrowRight fontSize="small" />,
+          title: "Student Report For Principal", icon: <SubdirectoryArrowRight fontSize="small" />,
           href: "/parentPrincipalReport", permission: "parentPrincipalReport"
         },
       ],

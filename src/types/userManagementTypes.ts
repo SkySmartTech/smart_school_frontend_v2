@@ -1,4 +1,4 @@
-export type UserRole = "user" | "admin" | "managementStaff" | "userStudent" | "userParent" | "userTeacher" | "userClassTeacher";
+export type UserRole = "user" | "admin" | "managementStaff" | "userStudent" | "userParent" | "userTeacher" | "userClassTeacher" | "userStaff";
 
 export interface TeacherAssignment {
   id?: string;
@@ -27,7 +27,7 @@ export interface BaseUser {
   name: string;
   username: string;
   email: string;
-  userType: "Student" | "Teacher" | "Parent";
+  userType: "Student" | "Teacher" | "Parent" | "ManagementStaff";
   status: boolean;
   userRole?: UserRole;
   password?: string;
@@ -78,6 +78,24 @@ export interface User extends BaseUser {
     parentContact: string;
     studentAdmissionNo: string;
   }>;
+  
+  // Staff specific fields
+  staffData?: Array<{
+    designation?: string;
+    department?: string;
+    staffContact?: string;
+    staffId?: string;
+  }>;
+  staffEntries?: Array<{
+    designation: string;
+    department: string;
+    staffContact: string;
+    staffId: string;
+  }>;
+  designation?: string;
+  department?: string;
+  staffContact?: string;
+  staffId?: string;
 }
 
 export interface UserListResponse {
@@ -146,7 +164,8 @@ export const userRoleOptions: UserRole[] = [
 export const userTypeOptions: string[] = [
   'Student',
   'Teacher',
-  'Parent'
+  'Parent',
+  'ManagementStaff'
 ];
 
 

@@ -43,7 +43,7 @@ import { motion } from "framer-motion";
 import { Link, useNavigate } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import { useMutation } from "@tanstack/react-query";
-import { registerUser, registerStudent, registerTeacher, registerParent } from "../../api/userApi";
+import { registerUser, registerStudent, registerTeacher, registerParent, fetchGrades, fetchClasses } from "../../api/userApi";
 import { useState, useEffect, useMemo } from "react";
 import { useQuery } from '@tanstack/react-query';
 import axios from 'axios';
@@ -66,23 +66,31 @@ interface RegisterFormProps {
 }
 
 const RegisterForm = ({ onSuccess = () => { }, onError = () => { } }: RegisterFormProps) => {
-  const { data: subjects = [], isLoading: isLoadingSubjects } = useQuery<Subject[]>({
+  const { data: subjects = [], isLoading: isLoadingSubjects } = useQuery({
     queryKey: ['subjects'],
     queryFn: async () => {
-      const response = await axios.get<Subject[]>(`${import.meta.env.VITE_API_BASE_URL}/api/subjects`);
+      const response = await axios.get(`${import.meta.env.VITE_API_BASE_URL}/api/subjects`);
       return response.data;
     }
   });
 
+  const { data: grades = [] } = useQuery({
+    queryKey: ['grades'],
+    queryFn: fetchGrades
+  });
+
+  const { data: classes = [] } = useQuery({
+    queryKey: ['classes'],
+    queryFn: fetchClasses
+  });
+
   const uniqueMainSubjects = useMemo(() => {
-    const mainSubjects = subjects.map(subject => subject.mainSubject);
+    const mainSubjects = subjects.map((subject: any) => subject.mainSubject);
     return [...new Set(mainSubjects)];
   }, [subjects]);
 
   const gender = ["Male", "Female"];
-  const roles = ["Teacher", "Student", "Parent"];
-  const grades = ["Grade 1", "Grade 2", "Grade 3", "Grade 4", "Grade 5", "Grade 6", "Grade 7", "Grade 8", "Grade 9", "Grade 10", "Grade 11", "Grade 12"];
-  const classes = ["Araliya", "Olu", "Nelum", "Rosa", "Manel", "Sooriya", "Kumudu"];
+  const roles = ["Teacher", "Student", "Parent", "ManagementStaff"];
   const mediumOptions = ["Sinhala", "English", "Tamil"];
 
   const steps: string[] = ['Basic Information', 'Role Details'];
@@ -161,6 +169,8 @@ const RegisterForm = ({ onSuccess = () => { }, onError = () => { } }: RegisterFo
     formState: { errors },
     setValue,
     trigger,
+    setError,
+    resetField,
   } = useForm<RegisterFormValues>({
     defaultValues: {
       teacherGrades: [],
@@ -169,6 +179,10 @@ const RegisterForm = ({ onSuccess = () => { }, onError = () => { } }: RegisterFo
       medium: [],
       location: "",
       userRole: "user",
+      studentAdmissionNo: "",
+      profession: "",
+      relation: "",
+      parentContact: "",
     }
   });
 
@@ -178,6 +192,88 @@ const RegisterForm = ({ onSuccess = () => { }, onError = () => { } }: RegisterFo
   useEffect(() => {
     setSelectedRole(userType);
   }, [userType]);
+
+  // Delete user data function
+  const deleteUserData = async (userId: number, userType: string) => {
+    try {
+      await axios.delete(`${import.meta.env.VITE_API_BASE_URL}/api/delete-register`, {
+        data: {
+          userId: userId
+        },
+        headers: {
+          'Content-Type': 'application/json',
+          'userId': String(userId),
+          'userType': userType
+        }
+      });
+      return true;
+    } catch (error: any) {
+      console.error('Delete error:', error);
+      return false;
+    }
+  };
+
+  // Clear registration state
+  const clearRegistrationState = () => {
+    setRegisteredUser(null);
+    setActiveStep(0);
+    setTeacherAssignments([]);
+    setParentEntries([]);
+    setValue("teacherGrades", []);
+    setValue("subjects", []);
+    setValue("teacherClass", []);
+    setValue("medium", []);
+    setValue("staffNo", "");
+    setValue("studentGrade", "");
+    setValue("studentClass", "");
+    setValue("studentAdmissionNo", "");
+    setValue("profession", "");
+    setValue("relation", "");
+    setValue("parentContact", "");
+  };
+
+  // Handle browser back button (popstate event) and page/tab close (beforeunload event)
+  useEffect(() => {
+    // Prevent going back with browser/phone back button if on step 1
+    const handlePopstate = async (event: PopStateEvent) => {
+      event.preventDefault();
+
+      if (activeStep === 1 && registeredUser) {
+        // Delete the registered user data
+        await deleteUserData(registeredUser.userId, registeredUser.userType);
+        clearRegistrationState();
+        // Push a new state to prevent browser going back
+        window.history.pushState(null, '', window.location.href);
+      }
+    };
+
+    // Show confirmation when trying to close tab/browser/page while on step 1
+    const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+      if (activeStep === 1 && registeredUser) {
+        event.preventDefault();
+        event.returnValue = '';
+
+        // Delete the registered user data in the background
+        deleteUserData(registeredUser.userId, registeredUser.userType);
+
+        return '';
+      }
+    };
+
+    // Add event listeners only when on step 1 with registered user
+    if (activeStep === 1 && registeredUser) {
+      window.addEventListener('popstate', handlePopstate);
+      window.addEventListener('beforeunload', handleBeforeUnload);
+
+      // Push a new state to enable popstate handling
+      window.history.pushState(null, '', window.location.href);
+
+      return () => {
+        window.removeEventListener('popstate', handlePopstate);
+        window.removeEventListener('beforeunload', handleBeforeUnload);
+      };
+    }
+  }, [activeStep, registeredUser]);
 
   const extractErrorMessage = (error: any): string => {
     if (error?.response?.data?.message) {
@@ -208,6 +304,15 @@ const RegisterForm = ({ onSuccess = () => { }, onError = () => { } }: RegisterFo
     mutationFn: registerUser,
     onSuccess: (data) => {
       setRegisteredUser({ userId: data.userId, userType: data.userType });
+      // If the selected role is Principal, there is no role-details step. Complete registration.
+      if (selectedRole === "ManagementStaff" || (data?.userType && String(data.userType).toLowerCase() === "managementStaff")) {
+        showSuccess("Registration successful! Please contact the Admin to get access to Login.");
+        setTimeout(() => {
+          navigate("/login");
+        }, 1000);
+        return;
+      }
+
       setActiveStep(1);
     },
     onError: (error: any) => {
@@ -222,7 +327,7 @@ const RegisterForm = ({ onSuccess = () => { }, onError = () => { } }: RegisterFo
       showSuccess("Registration successful! Please contact the Admin to get access to Login.");
       setTimeout(() => {
         navigate("/login");
-      }, 2000);
+      }, 1000);
     },
     onError: (error: any) => {
       const errorMsg = extractErrorMessage(error);
@@ -236,7 +341,7 @@ const RegisterForm = ({ onSuccess = () => { }, onError = () => { } }: RegisterFo
       showSuccess("Registration successful! Please contact the Admin to get access to Login.");
       setTimeout(() => {
         navigate("/login");
-      }, 2000);
+      }, 1000);
     },
     onError: (error: any) => {
       const errorMsg = extractErrorMessage(error);
@@ -250,7 +355,7 @@ const RegisterForm = ({ onSuccess = () => { }, onError = () => { } }: RegisterFo
       showSuccess("Registration successful! Please contact the Admin to get access to Login.");
       setTimeout(() => {
         navigate("/login");
-      }, 2000);
+      }, 1000);
     },
     onError: (error: any) => {
       const errorMsg = extractErrorMessage(error);
@@ -312,7 +417,8 @@ const RegisterForm = ({ onSuccess = () => { }, onError = () => { } }: RegisterFo
         }
       });
 
-      formData.append('userRole', 'user');
+      // Append the actual selected role (falls back to 'user')
+      formData.append('userRole', selectedRole || 'user');
 
       registerBasicUser(formData);
     } else {
@@ -323,35 +429,11 @@ const RegisterForm = ({ onSuccess = () => { }, onError = () => { } }: RegisterFo
   const handleBack = async () => {
     if (activeStep === 1 && registeredUser && registeredUser.userId) {
       try {
-        await axios.delete(`${import.meta.env.VITE_API_BASE_URL}/api/delete-register`, {
-          data: {
-            userId: registeredUser.userId
-          },
-          headers: {
-            'Content-Type': 'application/json',
-            'userId': String(registeredUser.userId),
-            'userType': registeredUser.userType
-          }
-        });
+        // Delete the registered user
+        await deleteUserData(registeredUser.userId, registeredUser.userType);
 
         // Clear local registration state without showing success snackbar
-        setRegisteredUser(null);
-        setActiveStep((prevActiveStep) => prevActiveStep - 1);
-
-        setTeacherAssignments([]);
-        setParentEntries([]);
-
-        setValue("teacherGrades", []);
-        setValue("subjects", []);
-        setValue("teacherClass", []);
-        setValue("medium", []);
-        setValue("staffNo", "");
-        setValue("studentGrade", "");
-        setValue("studentClass", "");
-        setValue("studentAdmissionNo", "");
-        setValue("profession", "");
-        setValue("relation", "");
-        setValue("parentContact", "");
+        clearRegistrationState();
       } catch (error: any) {
         console.error('Delete error:', error);
         const errorMessage = error?.response?.data?.message || "Failed to clear user data";
@@ -461,6 +543,21 @@ const RegisterForm = ({ onSuccess = () => { }, onError = () => { } }: RegisterFo
     const currentMedium = watch("medium") || [];
 
     if (currentGrades.length && currentSubjects.length && currentClasses.length && currentMedium.length) {
+      // Check for duplicates in existing assignments
+      const isDuplicate = teacherAssignments.some(assignment => {
+        const gradeMatch = assignment.grades[0] === currentGrades[0];
+        const subjectMatch = assignment.subjects[0] === currentSubjects[0];
+        const classMatch = assignment.classes[0] === currentClasses[0];
+        const mediumMatch = assignment.medium[0] === currentMedium[0];
+        
+        return gradeMatch && subjectMatch && classMatch && mediumMatch;
+      });
+
+      if (isDuplicate) {
+        showError("This combination of Grade, Subject, Class, and Medium already exists");
+        return;
+      }
+
       const newAssignment: TeacherAssignment = {
         grades: currentGrades,
         subjects: currentSubjects,
@@ -469,7 +566,8 @@ const RegisterForm = ({ onSuccess = () => { }, onError = () => { } }: RegisterFo
         id: crypto.randomUUID()
       };
 
-      setTeacherAssignments(prev => [...prev, newAssignment]);
+      // Add new assignment to the top of the list (prepend)
+      setTeacherAssignments(prev => [newAssignment, ...prev]);
 
       setValue("teacherGrades", []);
       setValue("subjects", []);
@@ -479,13 +577,31 @@ const RegisterForm = ({ onSuccess = () => { }, onError = () => { } }: RegisterFo
   };
 
   const handleAddParent = () => {
-    const studentAdmissionNo = watch("studentAdmissionNo") || "";
-    const profession = watch("profession") || "";
-    const relation = watch("relation") || "";
-    const parentContact = watch("parentContact") || "";
+    const studentAdmissionNo = (watch("studentAdmissionNo") || "").toString().trim();
+    const profession = (watch("profession") || "").toString().trim();
+    const relation = (watch("relation") || "").toString().trim();
+    const parentContact = (watch("parentContact") || "").toString().trim();
 
-    if (!studentAdmissionNo && !profession && !relation && !parentContact) {
-      alert("Please fill at least one parent field before adding");
+    // clear previous manual errors
+    // (react-hook-form doesn't provide clearError, so reset by setting empty value or triggering validation)
+    // We'll clear by triggering validation for these fields
+    trigger(["studentAdmissionNo", "profession", "relation", "parentContact"]);
+
+    const missingFields: { name: keyof RegisterFormValues; label: string }[] = [];
+    if (!studentAdmissionNo) missingFields.push({ name: "studentAdmissionNo", label: "Student Admission Number" });
+    if (!profession) missingFields.push({ name: "profession", label: "Profession" });
+    if (!relation) missingFields.push({ name: "relation", label: "Relation" });
+    if (!parentContact) missingFields.push({ name: "parentContact", label: "Contact Number" });
+
+    if (missingFields.length > 0) {
+      // set field-level errors so helperText / error states show
+      missingFields.forEach(f => {
+        setError(f.name as any, { type: "manual", message: `${f.label} is required` });
+      });
+
+      // optional: focus first missing field (not required)
+      // alert to inform user (keeps behavior similar to before)
+      alert("Please fill all parent fields: Admission No, Profession, Relation and Contact before adding.");
       return;
     }
 
@@ -500,12 +616,14 @@ const RegisterForm = ({ onSuccess = () => { }, onError = () => { } }: RegisterFo
       status: true
     };
 
-    setParentEntries(prev => [...prev, newEntry]);
+    // Add new entry to the top of the list (prepend)
+    setParentEntries(prev => [newEntry, ...prev]);
 
-    setValue("studentAdmissionNo", "");
-    setValue("profession", "");
-    setValue("relation", "");
-    setValue("parentContact", "");
+    // Properly reset form fields
+    resetField("studentAdmissionNo");
+    resetField("profession");
+    resetField("relation");
+    resetField("parentContact");
   };
 
   const handleCloseSuccessSnackbar = () => {
@@ -981,8 +1099,8 @@ const RegisterForm = ({ onSuccess = () => { }, onError = () => { } }: RegisterFo
                       <MenuItem disabled>Loading subjects...</MenuItem>
                     ) : (
                       [...uniqueMainSubjects]
-                        .sort((a, b) => a.localeCompare(b))
-                        .map((subject) => (
+                        .sort((a: any, b: any) => String(a).localeCompare(String(b)))
+                        .map((subject: any) => (
                           <MenuItem key={subject} value={subject}>
                             {subject}
                           </MenuItem>
@@ -1022,12 +1140,16 @@ const RegisterForm = ({ onSuccess = () => { }, onError = () => { } }: RegisterFo
                       }
                     }}
                   >
-                    {classes.map((classItem) => (
-                      <MenuItem key={classItem} value={classItem}>
-                        {classItem}
-                      </MenuItem>
-                    ))}
+                    {classes
+                      .slice()
+                      .sort((a: any, b: any) => a.class.localeCompare(b.class)) 
+                      .map((classItem: any) => (
+                        <MenuItem key={classItem.id} value={classItem.class}>
+                          {classItem.class}
+                        </MenuItem>
+                      ))}
                   </TextField>
+
                   <TextField
                     select
                     label="Grades"
@@ -1057,9 +1179,9 @@ const RegisterForm = ({ onSuccess = () => { }, onError = () => { } }: RegisterFo
                       }
                     }}
                   >
-                    {grades.map((grade) => (
-                      <MenuItem key={grade} value={grade}>
-                        {grade}
+                    {grades.map((grade: any) => (
+                      <MenuItem key={grade.id} value={grade.grade}>
+                        {grade.grade}
                       </MenuItem>
                     ))}
                   </TextField>
@@ -1176,7 +1298,14 @@ const RegisterForm = ({ onSuccess = () => { }, onError = () => { } }: RegisterFo
                     helperText={errors.studentGrade?.message}
                     sx={{ "& .MuiOutlinedInput-root": { borderRadius: "10px", height: "40px" } }}
                   >
-                    {grades.map((g) => <MenuItem key={g} value={g}>{g}</MenuItem>)}
+                    {grades
+                      .slice()
+                      .sort((a: any, b: any) => {
+                        const gradeNumA = parseInt(a.grade?.replace(/[^\d]/g, '') || '0', 10);
+                        const gradeNumB = parseInt(b.grade?.replace(/[^\d]/g, '') || '0', 10);
+                        return gradeNumA - gradeNumB;
+                      })
+                      .map((g: any) => <MenuItem key={g.id} value={g.grade}>{g.grade}</MenuItem>)}
                   </TextField>
 
                   <TextField
@@ -1189,7 +1318,10 @@ const RegisterForm = ({ onSuccess = () => { }, onError = () => { } }: RegisterFo
                     helperText={errors.studentClass?.message}
                     sx={{ "& .MuiOutlinedInput-root": { borderRadius: "10px", height: "40px" } }}
                   >
-                    {classes.map((c) => <MenuItem key={c} value={c}>{c}</MenuItem>)}
+                    {classes
+                      .slice()
+                      .sort((a: any, b: any) => a.class.localeCompare(b.class))
+                      .map((c: any) => <MenuItem key={c.id} value={c.class}>{c.class}</MenuItem>)}
                   </TextField>
                 </Stack>
 
@@ -1227,6 +1359,7 @@ const RegisterForm = ({ onSuccess = () => { }, onError = () => { } }: RegisterFo
                     label="Student Admission Number"
                     fullWidth
                     variant="outlined"
+                    value={watch("studentAdmissionNo") || ""}
                     {...register("studentAdmissionNo")}
                     error={!!errors.studentAdmissionNo}
                     helperText={errors.studentAdmissionNo?.message}
@@ -1236,6 +1369,7 @@ const RegisterForm = ({ onSuccess = () => { }, onError = () => { } }: RegisterFo
                     label="Contact Number"
                     fullWidth
                     variant="outlined"
+                    value={watch("parentContact") || ""}
                     {...register("parentContact")}
                     error={!!errors.parentContact}
                     helperText={errors.parentContact?.message}
@@ -1249,6 +1383,7 @@ const RegisterForm = ({ onSuccess = () => { }, onError = () => { } }: RegisterFo
                     fullWidth
                     variant="outlined"
                     {...register("profession")}
+                    value={watch("profession") || ""}
                     error={!!errors.profession}
                     helperText={errors.profession?.message}
                     sx={{ "& .MuiOutlinedInput-root": { borderRadius: "10px", height: "40px" } }}
@@ -1258,11 +1393,13 @@ const RegisterForm = ({ onSuccess = () => { }, onError = () => { } }: RegisterFo
                     label="Relation"
                     fullWidth
                     variant="outlined"
+                    value={watch("relation") || ""}
                     {...register("relation")}
                     error={!!errors.relation}
                     helperText={errors.relation?.message}
                     sx={{ "& .MuiOutlinedInput-root": { borderRadius: "10px", height: "40px" } }}
                   >
+                    <MenuItem value=""></MenuItem>
                     <MenuItem value="Mother">Mother</MenuItem>
                     <MenuItem value="Father">Father</MenuItem>
                     <MenuItem value="Guardian">Guardian</MenuItem>
@@ -1361,15 +1498,28 @@ const RegisterForm = ({ onSuccess = () => { }, onError = () => { } }: RegisterFo
               {isPending ? <CircularProgress size={24} /> : 'Sign Up'}
             </Button>
           ) : (
-            <Button
-              onClick={handleNext}
-              variant="contained"
-              disabled={isPending}
-              fullWidth={true}
-              sx={{ order: { xs: 1, sm: 2 }, width: { sm: 'auto' } }}
-            >
-              {isPending ? <CircularProgress size={24} /> : 'Next'}
-            </Button>
+            // If on the basic step and Principal is selected, show a Submit button
+            activeStep === 0 && selectedRole === "ManagementStaff" ? (
+              <Button
+                onClick={handleNext}
+                variant="contained"
+                disabled={isPending}
+                fullWidth={true}
+                sx={{ order: { xs: 1, sm: 2 }, width: { sm: 'auto' } }}
+              >
+                {isPending ? <CircularProgress size={24} /> : 'Submit'}
+              </Button>
+            ) : (
+              <Button
+                onClick={handleNext}
+                variant="contained"
+                disabled={isPending}
+                fullWidth={true}
+                sx={{ order: { xs: 1, sm: 2 }, width: { sm: 'auto' } }}
+              >
+                {isPending ? <CircularProgress size={24} /> : 'Next'}
+              </Button>
+            )
           )}
         </Box>
 

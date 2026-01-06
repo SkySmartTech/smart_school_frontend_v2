@@ -37,7 +37,6 @@ import {
   GridToolbarContainer,
   GridToolbarColumnsButton,
   GridToolbarFilterButton,
-  GridToolbarDensitySelector,
   GridToolbarExport,
   type GridColDef,
   GridActionsCellItem,
@@ -54,7 +53,7 @@ import {
   Delete as DeleteRowIcon,
   CloudUpload as CloudUploadIcon,
   DeleteForever as DeleteForeverIcon,
-  CheckCircle as ActivateIcon // added activate icon
+  CheckCircle as ActivateIcon 
 } from "@mui/icons-material";
 import Sidebar from "../../components/Sidebar";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -68,9 +67,7 @@ import {
   relationOptions,
   userRoleOptions,
   userTypeOptions,
-  gradeOptions,
   mediumOptions,
-  classOptions,
   type TeacherAssignment
 } from "../../types/userManagementTypes";
 import {
@@ -83,12 +80,16 @@ import {
   fetchSubjects,
   updateUser,
   deleteUser,
-  activateUser 
+  activateUser,
+  fetchGrades,
+  fetchClasses,
+  type Grade,
+  type Class
 } from "../../api/userManagementApi";
 import Navbar from "../../components/Navbar";
 import { debounce } from 'lodash';
 
-type UserCategory = 'Student' | 'Teacher' | 'Parent';
+type UserCategory = 'Student' | 'Teacher' | 'Parent' | 'ManagementStaff';
 
 interface FormState extends Omit<User, 'id'> {
   id?: number;
@@ -106,6 +107,14 @@ type ParentEntry = {
   profession: string;
   parentContact: string;
   studentAdmissionNo: string;
+};
+
+type StaffEntry = {
+  id: string;
+  designation: string;
+  department: string;
+  staffContact: string;
+  staffId: string;
 };
 
 const UserManagement: React.FC = () => {
@@ -136,6 +145,10 @@ const UserManagement: React.FC = () => {
     studentGrade: "",
     teacherGrade: "",
     teacherGrades: [],
+    designation: "",
+    department: "",
+    staffContact: "",
+    staffId: "",
   });
   const [editId, setEditId] = useState<number | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -182,6 +195,16 @@ const UserManagement: React.FC = () => {
   const { data: subjects = [], isLoading: isLoadingSubjects } = useQuery<Subject[]>({
     queryKey: ['subjects'],
     queryFn: fetchSubjects
+  });
+
+  const { data: grades = [], isLoading: isLoadingGrades } = useQuery<Grade[]>({
+    queryKey: ['grades'],
+    queryFn: fetchGrades
+  });
+
+  const { data: classes = [], isLoading: isLoadingClasses } = useQuery<Class[]>({
+    queryKey: ['classes'],
+    queryFn: fetchClasses
   });
 
   const createUserMutation = useMutation({
@@ -298,12 +321,6 @@ const UserManagement: React.FC = () => {
     const { name, value } = e.target;
     setForm(prev => ({ ...prev, [name]: value }));
 
-    // removed auto-sync to parentEntries[0] because it overwrote the first parent row
-    // when typing a new parent before clicking "Add to list".
-    //
-    // If you need inline editing of existing parent rows, implement a dedicated
-    // edit flow that updates a specific parentEntries[index] instead of syncing
-    // all form inputs into parentEntries[0].
   };
 
   const handleSelectChange = (e: React.ChangeEvent<{ value: unknown }>, field: keyof User) => {
@@ -320,10 +337,6 @@ const UserManagement: React.FC = () => {
         [field]: value
       }));
 
-      // removed automatic sync to parentEntries[0]:
-      // previously updating parentEntries[0] here caused the first added parent row
-      // to be overwritten whenever the relation dropdown changed. Inline editing
-      // should be handled via explicit edit buttons that update a specific index.
     }
   };
 
@@ -392,10 +405,13 @@ const UserManagement: React.FC = () => {
     }
 
     // Determine whether to send password:
+    // For Staff updates, never send password. For other types, send only if explicitly changed.
     const passwordToSend =
-      editId === null
-        ? form.password
-        : (form.password && form.password !== PASSWORD_MASK ? form.password : undefined); 
+      activeTab === 'ManagementStaff' && editId !== null
+        ? undefined
+        : editId === null
+          ? form.password
+          : (form.password && form.password !== PASSWORD_MASK ? form.password : undefined); 
 
     const baseUserData: any = {
       name: form.name,
@@ -487,6 +503,24 @@ const UserManagement: React.FC = () => {
         break;
       }
 
+      case 'ManagementStaff': {
+        // For Staff, we handle just a single entry (no array support)
+        userData = {
+          ...baseUserData,
+          designation: form.designation || '',
+          department: form.department || '',
+          staffContact: form.staffContact || '',
+          staffId: form.staffId || '',
+          staffData: [{
+            designation: form.designation || '',
+            department: form.department || '',
+            staffContact: form.staffContact || '',
+            staffId: form.staffId || ''
+          }]
+        } as unknown as User;
+        break;
+      }
+
       default:
         userData = baseUserData;
     }
@@ -530,6 +564,10 @@ const UserManagement: React.FC = () => {
       studentGrade: "",
       teacherGrade: "",
       teacherGrades: [],
+      designation: "",
+      department: "",
+      staffContact: "",
+      staffId: "",
     });
     setTeacherAssignments([]);
     setParentEntries([]);
@@ -552,7 +590,11 @@ const UserManagement: React.FC = () => {
         profession: (userToEdit as any).profession || '',
         relation: (userToEdit as any).relation || '',
         parentContact: (userToEdit as any).parentContact || '',
-        studentAdmissionNo: (userToEdit as any).studentAdmissionNo || ''
+        studentAdmissionNo: (userToEdit as any).studentAdmissionNo || '',
+        designation: (userToEdit as any).designation || '',
+        department: (userToEdit as any).department || '',
+        staffContact: (userToEdit as any).staffContact || '',
+        staffId: (userToEdit as any).staffId || ''
       });
       setEditId(id);
 
@@ -658,7 +700,7 @@ const UserManagement: React.FC = () => {
           });
         }
       });
-    } else { // Parent
+    } else if (activeTab === 'Parent') {
       dataToExport.forEach(user => {
         const entries = getParentEntriesForExport(user);
         if (entries.length === 0) {
@@ -697,9 +739,46 @@ const UserManagement: React.FC = () => {
           });
         }
       });
+    } else if (activeTab === 'ManagementStaff') {
+      dataToExport.forEach(user => {
+        const entries = getStaffEntriesForExport(user);
+        if (entries.length === 0) {
+          tableData.push([
+            user.name || "-",
+            user.username || "-",
+            user.email || "-",
+            user.address || "-",
+            user.birthDay || "-",
+            user.contact || "-",
+            user.gender || "-",
+            user.designation || "-",
+            user.department || "-",
+            user.staffContact || user.contact || "-",
+            user.staffId || "-",
+            user.status ? "Active" : "Inactive"
+          ]);
+        } else {
+          entries.forEach(ent => {
+            tableData.push([
+              user.name || "-",
+              user.username || "-",
+              user.email || "-",
+              user.address || "-",
+              user.birthDay || "-",
+              user.contact || "-",
+              user.gender || "-",
+              ent.designation || "-",
+              ent.department || "-",
+              ent.staffContact || "-",
+              ent.staffId || "-",
+              user.status ? "Active" : "Inactive"
+            ]);
+          });
+        }
+      });
     }
 
-    const headers = {
+    const headers: any = {
       Student: [
         "Name","Username","Email","Address","Birthday","Phone No","Gender","Grade","Admission No","Class","Medium","Status"
       ],
@@ -708,6 +787,9 @@ const UserManagement: React.FC = () => {
       ],
       Parent: [
         "Name","Username","Email","Address","Birthday","Phone No","Gender","Relation","Profession","Parent Contact","Student Admission No","Status"
+      ],
+      ManagementStaff: [
+        "Name","Username","Email","Address","Birthday","Phone No","Gender","Designation","Department","Staff Contact","Staff ID","Status"
       ]
     };
 
@@ -717,7 +799,7 @@ const UserManagement: React.FC = () => {
     const margin = { left: 40, right: 40 };
     const pageWidth = (doc.internal.pageSize && (doc.internal.pageSize.getWidth ? doc.internal.pageSize.getWidth() : doc.internal.pageSize.width)) as number;
     const availableWidth = pageWidth - margin.left - margin.right;
-    const colCount = headers[activeTab].length;
+    const colCount = headers[activeTab as keyof typeof headers].length;
     const computedColWidth = Math.floor(availableWidth / colCount);
 
     const columnStyles: any = {};
@@ -727,7 +809,7 @@ const UserManagement: React.FC = () => {
 
     autoTable(doc, {
       startY: 60,
-      head: [headers[activeTab]],
+      head: [headers[activeTab as keyof typeof headers]],
       body: tableData,
       theme: "grid",
       margin,
@@ -813,7 +895,7 @@ const UserManagement: React.FC = () => {
             });
           });
         }
-      } else { // Parent
+      } else if (activeTab === 'Parent') {
         const entries = getParentEntriesForExport(user);
         if (entries.length === 0) {
           excelRows.push({
@@ -831,6 +913,27 @@ const UserManagement: React.FC = () => {
               'Profession': ent.profession || '-',
               'Parent Contact': ent.parentContact || '-',
               'Student Admission No': ent.studentAdmissionNo || '-'
+            });
+          });
+        }
+      } else if (activeTab === 'ManagementStaff') {
+        const entries = getStaffEntriesForExport(user);
+        if (entries.length === 0) {
+          excelRows.push({
+            ...base,
+            'Designation': user.designation || '-',
+            'Department': user.department || '-',
+            'Staff Contact': user.staffContact || user.contact || '-',
+            'Staff ID': user.staffId || '-'
+          });
+        } else {
+          entries.forEach(ent => {
+            excelRows.push({
+              ...base,
+              'Designation': ent.designation || '-',
+              'Department': ent.department || '-',
+              'Staff Contact': ent.staffContact || '-',
+              'Staff ID': ent.staffId || '-'
             });
           });
         }
@@ -890,20 +993,20 @@ const UserManagement: React.FC = () => {
 
   const getColumns = (): GridColDef<User>[] => {
     const commonColumns: GridColDef<User>[] = [
-      { field: 'name', headerName: 'Name', width: isMobile ? 120 : 150, flex: isMobile ? 0 : 1 },
-      { field: 'username', headerName: 'Username', width: isMobile ? 100 : 120, flex: isMobile ? 0 : 1 },
-      { field: 'email', headerName: 'Email', width: isMobile ? 150 : 180, flex: isMobile ? 0 : 1 },
-      { field: 'address', headerName: 'Address', width: isMobile ? 120 : 150, flex: isMobile ? 0 : 1 },
-      { field: 'birthDay', headerName: 'Birthday', width: isMobile ? 100 : 100, flex: isMobile ? 0 : 1 },
-      { field: 'contact', headerName: 'Phone No', width: isMobile ? 110 : 120, flex: isMobile ? 0 : 1 },
-      { field: 'gender', headerName: 'Gender', width: isMobile ? 80 : 100, flex: isMobile ? 0 : 1 },
+      { field: 'id', headerName: 'ID', minWidth: 80 },
+      { field: 'name', headerName: 'Name', minWidth: 150 },
+      { field: 'username', headerName: 'Username', minWidth: 140 },
+      { field: 'email', headerName: 'Email', minWidth: 180 },
+      { field: 'address', headerName: 'Address', minWidth: 160 },
+      { field: 'birthDay', headerName: 'Birthday', minWidth: 130 },
+      { field: 'contact', headerName: 'Phone No', minWidth: 130 },
+      { field: 'gender', headerName: 'Gender', minWidth: 110 },
     ];
 
     const statusColumn: GridColDef<User> = {
       field: 'status',
       headerName: 'Status',
-      width: isMobile ? 100 : 120,
-      flex: isMobile ? 0 : 1,
+      minWidth: 110,
       type: 'boolean',
       renderCell: (params) => (
         <Box
@@ -931,7 +1034,7 @@ const UserManagement: React.FC = () => {
       field: 'actions',
       headerName: 'Actions',
       type: 'actions',
-      width: isMobile ? 80 : 140,
+      minWidth: 120,
       getActions: (params: GridRowParams) => [
         <GridActionsCellItem
           icon={<EditIcon />}
@@ -965,20 +1068,20 @@ const UserManagement: React.FC = () => {
       case 'Student':
         return [
           ...commonColumns,
-          { field: 'grade', headerName: 'Grade', width: isMobile ? 80 : 100, flex: isMobile ? 0 : 1 },
-          { field: 'medium', headerName: 'Medium', width: isMobile ? 80 : 100, flex: isMobile ? 0 : 1 },
-          { field: 'class', headerName: 'Class', width: isMobile ? 80 : 100, flex: isMobile ? 0 : 1 },
-          { field: 'studentAdmissionNo', headerName: 'Admission No', width: isMobile ? 120 : 150, flex: isMobile ? 0 : 1 },
+          { field: 'grade', headerName: 'Grade', minWidth: 110 },
+          { field: 'medium', headerName: 'Medium', minWidth: 110 },
+          { field: 'class', headerName: 'Class', minWidth: 110 },
+          { field: 'studentAdmissionNo', headerName: 'Admission No', minWidth: 150 },
           statusColumn,
           actionColumn
         ];
       case 'Teacher':
         return [
           ...commonColumns,
-          { field: 'grade', headerName: 'Grade', width: isMobile ? 80 : 100, flex: isMobile ? 0 : 1 },
-          { field: 'class', headerName: 'Class', width: isMobile ? 80 : 100, flex: isMobile ? 0 : 1 },
-          { field: 'subject', headerName: 'Subject', width: isMobile ? 100 : 120, flex: isMobile ? 0 : 1 },
-          { field: 'medium', headerName: 'Medium', width: isMobile ? 80 : 100, flex: isMobile ? 0 : 1 },
+          { field: 'grade', headerName: 'Grade', minWidth: 110 },
+          { field: 'class', headerName: 'Class', minWidth: 110 },
+          { field: 'subject', headerName: 'Subject', minWidth: 140 },
+          { field: 'medium', headerName: 'Medium', minWidth: 110 },
           statusColumn,
           actionColumn
         ];
@@ -988,8 +1091,7 @@ const UserManagement: React.FC = () => {
           {
             field: 'profession',
             headerName: 'Profession',
-            width: isMobile ? 100 : 120,
-            flex: isMobile ? 0 : 1,
+            minWidth: 130,
             renderCell: (params) => {
               const entries = normalizeParentEntries(params.row);
               const vals = entries.map(e => e.profession).filter(Boolean);
@@ -999,8 +1101,7 @@ const UserManagement: React.FC = () => {
           {
             field: 'parentContact',
             headerName: 'Parent No',
-            width: isMobile ? 110 : 120,
-            flex: isMobile ? 0 : 1,
+            minWidth: 130,
             renderCell: (params) => {
               const entries = normalizeParentEntries(params.row);
               const vals = entries.map(e => e.parentContact).filter(Boolean);
@@ -1010,8 +1111,7 @@ const UserManagement: React.FC = () => {
           {
             field: 'studentAdmissionNo',
             headerName: 'Admission No',
-            width: isMobile ? 120 : 150,
-            flex: isMobile ? 0 : 1,
+            minWidth: 150,
             renderCell: (params) => {
               const entries = normalizeParentEntries(params.row);
               const vals = entries.map(e => e.studentAdmissionNo).filter(Boolean);
@@ -1021,14 +1121,20 @@ const UserManagement: React.FC = () => {
           {
             field: 'relation',
             headerName: 'Relation',
-            width: isMobile ? 100 : 120,
-            flex: isMobile ? 0 : 1,
+            minWidth: 130,
             renderCell: (params) => {
               const entries = normalizeParentEntries(params.row);
               const vals = entries.map(e => e.relation).filter(Boolean);
               return vals.length ? vals.join(', ') : (params.row.relation || '-');
             }
           },
+          statusColumn,
+          actionColumn
+        ];
+      case 'ManagementStaff':
+        return [
+          ...commonColumns,
+          
           statusColumn,
           actionColumn
         ];
@@ -1047,7 +1153,7 @@ const UserManagement: React.FC = () => {
         gap: isMobile ? 1 : 0,
         p: 1
       }}>
-        <Stack direction={isMobile ? 'column' : 'row'} spacing={1} sx={{ width: isMobile ? '100%' : 'auto' }}>
+        <Stack direction="row" spacing={1} sx={{ width: isMobile ? '100%' : 'auto', flexWrap: 'wrap' }}>
           <Tooltip title="Refresh data">
             <IconButton onClick={() => refetch()} size={isMobile ? 'small' : 'medium'}>
               <RefreshIcon />
@@ -1078,7 +1184,6 @@ const UserManagement: React.FC = () => {
         <Stack direction="row" spacing={0.5} sx={{ width: isMobile ? '100%' : 'auto', justifyContent: isMobile ? 'center' : 'flex-end' }}>
           <GridToolbarColumnsButton />
           <GridToolbarFilterButton />
-          <GridToolbarDensitySelector />
           <GridToolbarExport />
         </Stack>
       </GridToolbarContainer>
@@ -1091,40 +1196,44 @@ const UserManagement: React.FC = () => {
     const commonFields = (
       <Box sx={{
         display: 'grid',
-        gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)', md: 'repeat(3, 1fr)' },
-        gap: 2
+        gridTemplateColumns: { xs: '1fr', sm: '1fr', md: 'repeat(2, 1fr)', lg: 'repeat(3, 1fr)' },
+        gap: isMobile ? 1.5 : 2
       }}>
         <TextField
           label="Name*"
           name="name"
           value={form.name}
           onChange={handleChange}
-          sx={{ minWidth: 120 }}
+          sx={{ minWidth: isMobile ? 'auto' : 120 }}
           size="small"
+          fullWidth
         />
         <TextField
           label="Username*"
           name="username"
           value={form.username}
           onChange={handleChange}
-          sx={{ minWidth: 120 }}
+          sx={{ minWidth: isMobile ? 'auto' : 120 }}
           size="small"
+          fullWidth
         />
         <TextField
           label="Email*"
           name="email"
           value={form.email}
           onChange={handleChange}
-          sx={{ minWidth: 120 }}
+          sx={{ minWidth: isMobile ? 'auto' : 120 }}
           size="small"
+          fullWidth
         />
         <TextField
           label="Address"
           name="address"
           value={form.address || ''}
           onChange={handleChange}
-          sx={{ minWidth: 120 }}
+          sx={{ minWidth: isMobile ? 'auto' : 120 }}
           size="small"
+          fullWidth
         />
         <TextField
           label="Birthday"
@@ -1133,16 +1242,18 @@ const UserManagement: React.FC = () => {
           value={form.birthDay || ''}
           onChange={handleChange}
           InputLabelProps={{ shrink: true }}
-          sx={{ minWidth: 120 }}
+          sx={{ minWidth: isMobile ? 'auto' : 120 }}
           size="small"
+          fullWidth
         />
         <TextField
           label="Phone No"
           name="contact"
           value={form.contact || ''}
           onChange={handleChange}
-          sx={{ minWidth: 120 }}
+          sx={{ minWidth: isMobile ? 'auto' : 120 }}
           size="small"
+          fullWidth
         />
         <TextField
           type="file"
@@ -1186,8 +1297,9 @@ const UserManagement: React.FC = () => {
           name="userRole"
           value={form.userRole || ''}
           onChange={(e) => handleSelectChange(e, "userRole")}
-          sx={{ minWidth: 120 }}
+          sx={{ minWidth: isMobile ? 'auto' : 120 }}
           size="small"
+          fullWidth
         >
           {userRoleOptions.map((userRole: string) => (
             <MenuItem key={userRole} value={userRole}>
@@ -1201,8 +1313,9 @@ const UserManagement: React.FC = () => {
           name="userType"
           value={form.userType || ''}
           onChange={(e) => handleSelectChange(e, "userType")}
-          sx={{ minWidth: 120 }}
+          sx={{ minWidth: isMobile ? 'auto' : 120 }}
           size="small"
+          fullWidth
         >
           {userTypeOptions.map((userType: string) => (
             <MenuItem key={userType} value={userType}>
@@ -1216,8 +1329,9 @@ const UserManagement: React.FC = () => {
           name="gender"
           value={form.gender || ''}
           onChange={(e) => handleSelectChange(e, "gender")}
-          sx={{ minWidth: 120 }}
+          sx={{ minWidth: isMobile ? 'auto' : 120 }}
           size="small"
+          fullWidth
         >
           {genderOptions.map((gender: string) => (
             <MenuItem key={gender} value={gender}>
@@ -1234,8 +1348,9 @@ const UserManagement: React.FC = () => {
               type="password"
               value={form.password || ''}
               onChange={handleChange}
-              sx={{ minWidth: 120 }}
+              sx={{ minWidth: isMobile ? 'auto' : 120 }}
               size="small"
+              fullWidth
             />
             <TextField
               select
@@ -1243,8 +1358,9 @@ const UserManagement: React.FC = () => {
               name="status"
               value={form.status.toString()}
               onChange={(e) => handleSelectChange(e, "status")}
-              sx={{ minWidth: 120 }}
+              sx={{ minWidth: isMobile ? 'auto' : 120 }}
               size="small"
+              fullWidth
             >
               {statusOptions.map((option) => (
                 <MenuItem key={option.label} value={option.value.toString()}>
@@ -1261,8 +1377,9 @@ const UserManagement: React.FC = () => {
               type="password"
               value={form.password || ''}
               onChange={handleChange}
-              sx={{ minWidth: 120 }}
+              sx={{ minWidth: isMobile ? 'auto' : 120 }}
               size="small"
+              fullWidth
             />
             <TextField
               select
@@ -1271,9 +1388,10 @@ const UserManagement: React.FC = () => {
               value={form.status.toString()}
               onChange={(e) => handleSelectChange(e, "status")}
               sx={{
-                minWidth: 120
+                minWidth: isMobile ? 'auto' : 120
               }}
               size="small"
+              fullWidth
             >
               {statusOptions.map((option) => (
                 <MenuItem key={option.label} value={option.value.toString()}>
@@ -1293,8 +1411,8 @@ const UserManagement: React.FC = () => {
             {commonFields}
             <Box sx={{
               display: 'grid',
-              gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)', md: 'repeat(3, 1fr)' },
-              gap: 2
+              gridTemplateColumns: { xs: '1fr', sm: '1fr', md: 'repeat(2, 1fr)', lg: 'repeat(3, 1fr)' },
+              gap: isMobile ? 1.5 : 2
             }}>
               <TextField
                 select
@@ -1302,12 +1420,14 @@ const UserManagement: React.FC = () => {
                 name="grade"
                 value={form.grade || ''}
                 onChange={(e) => handleSelectChange(e, "grade")}
-                sx={{ minWidth: 120 }}
+                sx={{ minWidth: isMobile ? 'auto' : 120 }}
                 size="small"
+                disabled={isLoadingGrades}
+                fullWidth
               >
-                {gradeOptions.map((grade: string) => (
-                  <MenuItem key={grade} value={grade}>
-                    {grade}
+                {grades.map((grade) => (
+                  <MenuItem key={grade.id} value={grade.grade}>
+                    {grade.grade}
                   </MenuItem>
                 ))}
               </TextField>
@@ -1317,8 +1437,9 @@ const UserManagement: React.FC = () => {
                 name="medium"
                 value={form.medium || ''}
                 onChange={(e) => handleSelectChange(e, "medium")}
-                sx={{ minWidth: 120 }}
+                sx={{ minWidth: isMobile ? 'auto' : 120 }}
                 size="small"
+                fullWidth
               >
                 {mediumOptions.map((medium: string) => (
                   <MenuItem key={medium} value={medium}>
@@ -1331,8 +1452,9 @@ const UserManagement: React.FC = () => {
                 name="studentAdmissionNo"
                 value={form.studentAdmissionNo || ''}
                 onChange={handleChange}
-                sx={{ minWidth: 120 }}
+                sx={{ minWidth: isMobile ? 'auto' : 120 }}
                 size="small"
+                fullWidth
               />
               <TextField
                 select
@@ -1342,10 +1464,11 @@ const UserManagement: React.FC = () => {
                 onChange={(e) => handleSelectChange(e, "class")}
                 fullWidth
                 size="small"
+                disabled={isLoadingClasses}
               >
-                {classOptions.map((cls: string) => (
-                  <MenuItem key={cls} value={cls}>
-                    {cls}
+                {classes.map((cls) => (
+                  <MenuItem key={cls.id} value={cls.class}>
+                    {cls.class}
                   </MenuItem>
                 ))}
               </TextField>
@@ -1368,8 +1491,8 @@ const UserManagement: React.FC = () => {
 
             <Box sx={{
               display: 'grid',
-              gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)', md: 'repeat(4, 1fr)' },
-              gap: 2
+              gridTemplateColumns: { xs: '1fr', sm: '1fr', md: 'repeat(2, 1fr)', lg: 'repeat(4, 1fr)' },
+              gap: isMobile ? 1.5 : 2
             }}>
               <TextField
                 select
@@ -1377,11 +1500,15 @@ const UserManagement: React.FC = () => {
                 name="grade"
                 value={form.grade || ''}
                 onChange={(e) => handleSelectChange(e, "grade")}
-                sx={{ minWidth: 120 }}
+                sx={{ minWidth: isMobile ? 'auto' : 120 }}
                 size="small"
+                disabled={isLoadingGrades}
+                fullWidth
               >
-                {gradeOptions.map(grade => (
-                  <MenuItem key={grade} value={grade}>{grade}</MenuItem>
+                {grades.map((grade) => (
+                  <MenuItem key={grade.id} value={grade.grade}>
+                    {grade.grade}
+                  </MenuItem>
                 ))}
               </TextField>
 
@@ -1391,11 +1518,15 @@ const UserManagement: React.FC = () => {
                 name="class"
                 value={form.class || ''}
                 onChange={(e) => handleSelectChange(e, "class")}
-                sx={{ minWidth: 120 }}
+                sx={{ minWidth: isMobile ? 'auto' : 120 }}
                 size="small"
+                disabled={isLoadingClasses}
+                fullWidth
               >
-                {classOptions.map(cls => (
-                  <MenuItem key={cls} value={cls}>{cls}</MenuItem>
+                {classes.map((cls) => (
+                  <MenuItem key={cls.id} value={cls.class}>
+                    {cls.class}
+                  </MenuItem>
                 ))}
               </TextField>
 
@@ -1405,9 +1536,10 @@ const UserManagement: React.FC = () => {
                 name="subject"
                 value={form.subject || ''}
                 onChange={(e) => handleSelectChange(e, "subject")}
-                sx={{ minWidth: 120 }}
+                sx={{ minWidth: isMobile ? 'auto' : 120 }}
                 size="small"
                 disabled={isLoadingSubjects}
+                fullWidth
               >
                 {(subjects || []).slice().sort((a, b) =>
                   (a.mainSubject || '').localeCompare(b.mainSubject || '')
@@ -1424,8 +1556,9 @@ const UserManagement: React.FC = () => {
                 name="medium"
                 value={form.medium || ''}
                 onChange={(e) => handleSelectChange(e, "medium")}
-                sx={{ minWidth: 120 }}
+                sx={{ minWidth: isMobile ? 'auto' : 120 }}
                 size="small"
+                fullWidth
               >
                 {mediumOptions.map(med => (
                   <MenuItem key={med} value={med}>{med}</MenuItem>
@@ -1443,25 +1576,25 @@ const UserManagement: React.FC = () => {
             </Button>
 
             {teacherAssignments.length > 0 && (
-              <TableContainer component={Paper} sx={{ maxWidth: '100%', overflowX: 'auto' }}>
-                <MuiTable size={isMobile ? "small" : "medium"}>
+              <TableContainer component={Paper} sx={{ maxWidth: '100%', overflowX: 'auto', border: `1px solid ${theme.palette.divider}`, borderRadius: 1 }}>
+                <MuiTable size={isMobile ? "small" : "medium"} sx={{ minWidth: isMobile ? '100%' : 'auto' }}>
                   <TableHead>
-                    <TableRow>
-                      <TableCell>Grade</TableCell>
-                      <TableCell>Class</TableCell>
-                      <TableCell>Subject</TableCell>
-                      <TableCell>Medium</TableCell>
-                      <TableCell>Actions</TableCell>
+                    <TableRow sx={{ bgcolor: isMobile ? theme.palette.action.hover : 'inherit' }}>
+                      <TableCell sx={{ fontSize: isMobile ? '0.7rem' : '0.875rem', padding: isMobile ? '6px 4px' : '8px 16px', fontWeight: 'bold' }}>Grade</TableCell>
+                      <TableCell sx={{ fontSize: isMobile ? '0.7rem' : '0.875rem', padding: isMobile ? '6px 4px' : '8px 16px', fontWeight: 'bold' }}>Class</TableCell>
+                      <TableCell sx={{ fontSize: isMobile ? '0.7rem' : '0.875rem', padding: isMobile ? '6px 4px' : '8px 16px', fontWeight: 'bold' }}>Subject</TableCell>
+                      <TableCell sx={{ fontSize: isMobile ? '0.7rem' : '0.875rem', padding: isMobile ? '6px 4px' : '8px 16px', fontWeight: 'bold' }}>Medium</TableCell>
+                      <TableCell sx={{ fontSize: isMobile ? '0.7rem' : '0.875rem', padding: isMobile ? '6px 4px' : '8px 16px', fontWeight: 'bold' }}>Actions</TableCell>
                     </TableRow>
                   </TableHead>
                   <TableBody>
                     {teacherAssignments.map((assignment) => (
-                      <TableRow key={assignment.id}>
-                        <TableCell>{assignment.teacherGrade}</TableCell>
-                        <TableCell>{assignment.teacherClass}</TableCell>
-                        <TableCell>{assignment.subject}</TableCell>
-                        <TableCell>{assignment.medium}</TableCell>
-                        <TableCell>
+                      <TableRow key={assignment.id} sx={{ '&:hover': { bgcolor: theme.palette.action.hover } }}>
+                        <TableCell sx={{ fontSize: isMobile ? '0.7rem' : '0.875rem', padding: isMobile ? '6px 4px' : '8px 16px' }}>{assignment.teacherGrade}</TableCell>
+                        <TableCell sx={{ fontSize: isMobile ? '0.7rem' : '0.875rem', padding: isMobile ? '6px 4px' : '8px 16px' }}>{assignment.teacherClass}</TableCell>
+                        <TableCell sx={{ fontSize: isMobile ? '0.7rem' : '0.875rem', padding: isMobile ? '6px 4px' : '8px 16px' }}>{assignment.subject}</TableCell>
+                        <TableCell sx={{ fontSize: isMobile ? '0.7rem' : '0.875rem', padding: isMobile ? '6px 4px' : '8px 16px' }}>{assignment.medium}</TableCell>
+                        <TableCell sx={{ fontSize: isMobile ? '0.7rem' : '0.875rem', padding: isMobile ? '6px 4px' : '8px 16px' }}>
                           <IconButton
                             onClick={() => {
                               setTeacherAssignments(prev =>
@@ -1488,16 +1621,17 @@ const UserManagement: React.FC = () => {
 
             <Box sx={{
               display: 'grid',
-              gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)', md: 'repeat(4, 1fr)' },
-              gap: 2
+              gridTemplateColumns: { xs: '1fr', sm: '1fr', md: 'repeat(2, 1fr)', lg: 'repeat(4, 1fr)' },
+              gap: isMobile ? 1.5 : 2
             }}>
               <TextField
                 label="Profession"
                 name="profession"
                 value={form.profession || ''}
                 onChange={handleChange}
-                sx={{ minWidth: 120 }}
+                sx={{ minWidth: isMobile ? 'auto' : 120 }}
                 size="small"
+                fullWidth
               />
               <TextField
                 select
@@ -1505,8 +1639,9 @@ const UserManagement: React.FC = () => {
                 name="relation"
                 value={form.relation || ''}
                 onChange={(e) => handleSelectChange(e, "relation")}
-                sx={{ minWidth: 120 }}
+                sx={{ minWidth: isMobile ? 'auto' : 120 }}
                 size="small"
+                fullWidth
               >
                 {relationOptions.map((relation: string) => (
                   <MenuItem key={relation} value={relation}>
@@ -1519,16 +1654,18 @@ const UserManagement: React.FC = () => {
                 name="parentContact"
                 value={form.parentContact || ''}
                 onChange={handleChange}
-                sx={{ minWidth: 120 }}
+                sx={{ minWidth: isMobile ? 'auto' : 120 }}
                 size="small"
+                fullWidth
               />
               <TextField
                 label="Student Admission No"
                 name="studentAdmissionNo"
                 value={form.studentAdmissionNo || ''}
                 onChange={handleChange}
-                sx={{ minWidth: 120 }}
+                sx={{ minWidth: isMobile ? 'auto' : 120 }}
                 size="small"
+                fullWidth
               />
             </Box>
 
@@ -1542,25 +1679,25 @@ const UserManagement: React.FC = () => {
             </Button>
 
             {parentEntries.length > 0 && (
-              <TableContainer component={Paper} sx={{ maxWidth: '100%', overflowX: 'auto' }}>
-                <MuiTable size={isMobile ? "small" : "medium"}>
+              <TableContainer component={Paper} sx={{ maxWidth: '100%', overflowX: 'auto', border: `1px solid ${theme.palette.divider}`, borderRadius: 1 }}>
+                <MuiTable size={isMobile ? "small" : "medium"} sx={{ minWidth: isMobile ? '100%' : 'auto' }}>
                   <TableHead>
-                    <TableRow>
-                      <TableCell>Relation</TableCell>
-                      <TableCell>Profession</TableCell>
-                      <TableCell>Parent Contact</TableCell>
-                      <TableCell>Student Admission No</TableCell>
-                      <TableCell>Actions</TableCell>
+                    <TableRow sx={{ bgcolor: isMobile ? theme.palette.action.hover : 'inherit' }}>
+                      <TableCell sx={{ fontSize: isMobile ? '0.7rem' : '0.875rem', padding: isMobile ? '6px 4px' : '8px 16px', fontWeight: 'bold' }}>Relation</TableCell>
+                      <TableCell sx={{ fontSize: isMobile ? '0.7rem' : '0.875rem', padding: isMobile ? '6px 4px' : '8px 16px', fontWeight: 'bold' }}>Profession</TableCell>
+                      <TableCell sx={{ fontSize: isMobile ? '0.7rem' : '0.875rem', padding: isMobile ? '6px 4px' : '8px 16px', fontWeight: 'bold' }}>Parent Contact</TableCell>
+                      <TableCell sx={{ fontSize: isMobile ? '0.7rem' : '0.875rem', padding: isMobile ? '6px 4px' : '8px 16px', fontWeight: 'bold' }}>Admission No</TableCell>
+                      <TableCell sx={{ fontSize: isMobile ? '0.7rem' : '0.875rem', padding: isMobile ? '6px 4px' : '8px 16px', fontWeight: 'bold' }}>Actions</TableCell>
                     </TableRow>
                   </TableHead>
                   <TableBody>
                     {parentEntries.map((p) => (
-                      <TableRow key={p.id}>
-                        <TableCell>{p.relation}</TableCell>
-                        <TableCell>{p.profession}</TableCell>
-                        <TableCell>{p.parentContact}</TableCell>
-                        <TableCell>{p.studentAdmissionNo}</TableCell>
-                        <TableCell>
+                      <TableRow key={p.id} sx={{ '&:hover': { bgcolor: theme.palette.action.hover } }}>
+                        <TableCell sx={{ fontSize: isMobile ? '0.7rem' : '0.875rem', padding: isMobile ? '6px 4px' : '8px 16px' }}>{p.relation}</TableCell>
+                        <TableCell sx={{ fontSize: isMobile ? '0.7rem' : '0.875rem', padding: isMobile ? '6px 4px' : '8px 16px' }}>{p.profession}</TableCell>
+                        <TableCell sx={{ fontSize: isMobile ? '0.7rem' : '0.875rem', padding: isMobile ? '6px 4px' : '8px 16px' }}>{p.parentContact}</TableCell>
+                        <TableCell sx={{ fontSize: isMobile ? '0.7rem' : '0.875rem', padding: isMobile ? '6px 4px' : '8px 16px' }}>{p.studentAdmissionNo}</TableCell>
+                        <TableCell sx={{ fontSize: isMobile ? '0.7rem' : '0.875rem', padding: isMobile ? '6px 4px' : '8px 16px' }}>
                           <IconButton
                             onClick={() => setParentEntries(prev => prev.filter(x => x.id !== p.id))}
                             size={isMobile ? "small" : "medium"}
@@ -1576,6 +1713,14 @@ const UserManagement: React.FC = () => {
             )}
           </Box>
         );
+      case 'ManagementStaff':
+        return (
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+            {commonFields}
+
+            
+          </Box>
+        );
       default:
         return commonFields;
     }
@@ -1586,7 +1731,7 @@ const UserManagement: React.FC = () => {
       <CssBaseline />
       <Sidebar open={sidebarOpen} setOpen={setSidebarOpen} />
 
-      <Box sx={{ flexGrow: 1, display: "flex", flexDirection: "column", width: '100%' }}>
+      <Box sx={{ flexGrow: 1, display: "flex", flexDirection: "column", width: '90%' }}>
         <AppBar
           position="static"
           sx={{
@@ -1604,8 +1749,8 @@ const UserManagement: React.FC = () => {
           />
         </AppBar>
 
-        <Stack spacing={isMobile ? 2 : 3} sx={{ p: isMobile ? 2 : 3, overflow: 'auto', width: '100%' }}>
-          <Paper ref={formTopRef} sx={{ p: isMobile ? 2 : 3, borderRadius: 2 }}>
+        <Stack spacing={isMobile ? 1.5 : 3} sx={{ p: isMobile ? 1.5 : 3, overflow: 'auto', width: '100%', boxSizing: 'border-box' }}>
+          <Paper ref={formTopRef} sx={{ p: isMobile ? 1.5 : 3, borderRadius: 2, width: '100%', boxSizing: 'border-box' }}>
             <Typography variant={isMobile ? "subtitle1" : "h6"} sx={{ mb: 2, color: theme.palette.primary.main, fontWeight: 600 }}>
               {editId !== null ? "Edit User" : "Create New User"}
             </Typography>
@@ -1635,7 +1780,17 @@ const UserManagement: React.FC = () => {
             </Stack>
           </Paper>
 
-          <Paper sx={{ p: isMobile ? 1 : 2, borderRadius: 2, height: isMobile ? 600 : 720, display: 'flex', flexDirection: 'column' }}>
+         <Paper sx={{ 
+            p: isMobile ? 1 : 2, 
+            borderRadius: 2, 
+            height: isMobile ? 500 : 720, 
+            display: 'flex', 
+            flexDirection: 'column', 
+            overflow: 'hidden',
+            maxWidth: '100%',
+            width: '100%',
+            boxSizing: 'border-box'
+          }}>
             <Stack spacing={2}>
               <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
                 <Tabs
@@ -1648,6 +1803,7 @@ const UserManagement: React.FC = () => {
                   <Tab label="Students" value="Student" />
                   <Tab label="Teachers" value="Teacher" />
                   <Tab label="Parents" value="Parent" />
+                  <Tab label="ManagementStaff" value="ManagementStaff" />
                 </Tabs>
               </Box>
 
@@ -1684,7 +1840,15 @@ const UserManagement: React.FC = () => {
               </Stack>
             </Stack>
 
-            <Box sx={{ flexGrow: 1, mt: 2, overflow: 'hidden' }}>
+            <Box sx={{ 
+              flexGrow: 1, 
+              mt: 2, 
+              overflow: 'hidden', 
+              width: '100%', 
+              maxWidth: '100%',
+              display: 'flex', 
+              flexDirection: 'column' 
+            }}>
               <DataGrid
                 rows={displayData}
                 columns={columns}
@@ -1700,28 +1864,42 @@ const UserManagement: React.FC = () => {
                     paginationModel: { pageSize: isMobile ? 5 : 10, page: 0 },
                   },
                 }}
+                rowHeight={isMobile ? 48 : 52}
                 sx={{
                   border: 'none',
                   height: '100%',
+                  minHeight: isMobile ? 360 : '100%',
+                  width: '100%',
+                  maxWidth: '100%',
+                  boxSizing: 'border-box',
+                  '& .MuiDataGrid-root': {
+                    overflow: 'auto',
+                    maxWidth: '100%'
+                  },
+                  '& .MuiDataGrid-main': {
+                    overflow: 'auto',
+                    maxWidth: '100%'
+                  },
                   '& .MuiDataGrid-cell': {
                     borderBottom: `1px solid ${theme.palette.divider}`,
-                    fontSize: isMobile ? '0.75rem' : '0.875rem',
-                    padding: isMobile ? '4px 8px' : '8px 16px',
+                    fontSize: isMobile ? '0.78rem' : '0.875rem',
+                    padding: isMobile ? '6px 8px' : '8px 16px',
                   },
                   '& .MuiDataGrid-columnHeaders': {
                     backgroundColor: theme.palette.background.paper,
                     borderBottom: `1px solid ${theme.palette.divider}`,
-                    fontSize: isMobile ? '0.75rem' : '0.875rem',
+                    fontSize: isMobile ? '0.78rem' : '0.875rem',
                   },
                   '& .MuiDataGrid-toolbarContainer': {
                     padding: theme.spacing(1),
                     borderBottom: `1px solid ${theme.palette.divider}`,
                   },
                   '& .MuiDataGrid-virtualScroller': {
-                    overflow: 'auto',
+                    overflow: 'auto !important',
+                    maxWidth: '100%',
                     '&::-webkit-scrollbar': {
-                      width: '8px',
-                      height: '8px',
+                      width: '10px',
+                      height: '10px',
                     },
                     '&::-webkit-scrollbar-track': {
                       background: '#f1f1f1',
@@ -1732,14 +1910,31 @@ const UserManagement: React.FC = () => {
                       borderRadius: '4px',
                     },
                     '&::-webkit-scrollbar-thumb:hover': {
-                      background: '#666',
+                      background: '#555',
+                    },
+                  },
+                  '& .MuiDataGrid-scrollbar': {
+                    '&::-webkit-scrollbar': {
+                      width: '10px',
+                      height: '10px',
+                    },
+                    '&::-webkit-scrollbar-track': {
+                      background: '#f1f1f1',
+                      borderRadius: '4px',
+                    },
+                    '&::-webkit-scrollbar-thumb': {
+                      background: '#888',
+                      borderRadius: '4px',
+                    },
+                    '&::-webkit-scrollbar-thumb:hover': {
+                      background: '#555',
                     },
                   },
                   '& .MuiDataGrid-columnHeader': {
-                    padding: isMobile ? '4px 8px' : '8px 16px',
+                    padding: isMobile ? '6px 8px' : '8px 16px',
                   },
                   '& .MuiDataGrid-row': {
-                    minHeight: isMobile ? '40px !important' : '52px !important',
+                    minHeight: isMobile ? '48px !important' : '52px !important',
                   },
                 }}
                 ref={dataGridRef}
@@ -1885,6 +2080,80 @@ const normalizeParentEntries = (rawUser: any): ParentEntry[] => {
   });
 
   return normalized;
+};
+
+// Helper: ensure we get staff entries as an array
+const normalizeStaffEntries = (rawUser: any): StaffEntry[] => {
+  const rawStaffArray =
+    rawUser?.staffEntries ??
+    rawUser?.staffData ??
+    rawUser?.staff ??
+    rawUser?.staff_data ??
+    rawUser?.staff_info ??
+    [];
+
+  const arr = Array.isArray(rawStaffArray) ? rawStaffArray : (rawStaffArray ? [rawStaffArray] : []);
+
+  const normalized: StaffEntry[] = arr.flatMap((item: any) => {
+    // shape: { designation, department, staffContact, staffId }
+    if (item?.designation || item?.department || item?.staffContact || item?.staffId) {
+      return {
+        id: item.id ? String(item.id) : Math.random().toString(36).substr(2, 9),
+        designation: item.designation || item.staff_info?.designation || '',
+        department: item.department || item.staff_info?.department || '',
+        staffContact: item.staffContact || item.staff_contact || item.staff_info?.staff_contact || '',
+        staffId: item.staffId || item.staff_id || item.staff_info?.staff_id || ''
+      };
+    }
+
+    // fallback single-level mapping
+    if (item?.staff_info) {
+      const si = item.staff_info;
+      return {
+        id: Math.random().toString(36).substr(2, 9),
+        designation: si.designation || '',
+        department: si.department || '',
+        staffContact: si.staff_contact || si.staffContact || '',
+        staffId: si.staff_id || si.staffId || ''
+      };
+    }
+
+    return {
+      id: Math.random().toString(36).substr(2, 9),
+      designation: '',
+      department: '',
+      staffContact: '',
+      staffId: ''
+    };
+  });
+
+  return normalized;
+};
+
+// Helper: ensure we get staff entries as an array for export (tries normalizeStaffEntries first,
+// falls back to splitting comma-joined fields if needed).
+const getStaffEntriesForExport = (user: any): StaffEntry[] => {
+  const normalized = normalizeStaffEntries(user);
+  if (normalized && normalized.length > 0) return normalized;
+
+  // fallback: attempt to split comma-joined grid strings
+  const designations = (user.designation || '').toString().split(',').map((s: string) => s.trim()).filter(Boolean);
+  const departments = (user.department || '').toString().split(',').map((s: string) => s.trim()).filter(Boolean);
+  const staffContacts = (user.staffContact || user.contact || '').toString().split(',').map((s: string) => s.trim()).filter(Boolean);
+  const staffIds = (user.staffId || '').toString().split(',').map((s: string) => s.trim()).filter(Boolean);
+
+  const max = Math.max(designations.length, departments.length, staffContacts.length, staffIds.length, 1);
+  const entries: StaffEntry[] = [];
+  for (let i = 0; i < max; i++) {
+    entries.push({
+      id: `${user.id || 'u'}-${i}`,
+      designation: designations[i] || '',
+      department: departments[i] || '',
+      staffContact: staffContacts[i] || '',
+      staffId: staffIds[i] || ''
+    });
+  }
+  return entries;
 };
 
 // Helper: ensure we get parent entries as an array for export (tries normalizeParentEntries first,

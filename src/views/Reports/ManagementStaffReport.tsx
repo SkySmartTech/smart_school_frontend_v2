@@ -42,18 +42,18 @@ import { useQuery } from "@tanstack/react-query";
 import {
   fetchManagementStaffReport,
   checkAuthStatus,
-  fetchGradesFromApi, 
+  fetchGradesFromApi,
+  fetchYearsFromApi,
   type DropdownOption,
   type ClassMarks,
   type ManagementStaffReportData,
   type SubjectMark,
 } from "../../api/managementStaffApi";
 
-const years = ["2023", "2024", "2025", "2026", "2027", "2028"];
 const exams = [
-  { label: 'First Term', value: 'First' },
-  { label: 'Second Term', value: 'Mid' },
-  { label: 'Third Term', value: 'End' },
+  { label: 'First Term', value: 'First Term' },
+  { label: 'Second Term', value: 'Second Term' },
+  { label: 'Third Term', value: 'Third Term' },
   { label: 'Monthly Test', value: 'Monthly' }
 ];
 const months = [
@@ -87,12 +87,26 @@ const transformClassDataForStackedBarChart = (classData: ClassMarks | undefined)
   });
 };
 
+const getUniqueSubjectsFromClassData = (classData: ClassMarks | undefined): string[] => {
+  if (!classData) return [];
+
+  const subjects = new Set<string>();
+  Object.values(classData).forEach((subjectList) => {
+    subjectList.forEach((subject) => {
+      subjects.add(subject.subject);
+    });
+  });
+
+  return Array.from(subjects);
+};
+
 const ManagementStaff: React.FC = () => {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
   const isTablet = useMediaQuery(theme.breakpoints.down('md'));
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [year, setYear] = useState<string>(years[1]);
+  const [years, setYears] = useState<string[]>([]);
+  const [year, setYear] = useState<string>("");
   const [grade, setGrade] = useState<string>("");
   const [gradeOptions, setGradeOptions] = useState<DropdownOption[]>([]);
   const [exam, setExam] = useState<string>(exams[0].value);
@@ -107,9 +121,15 @@ const ManagementStaff: React.FC = () => {
     const fetchGrades = async () => {
       try {
         const grades = await fetchGradesFromApi();
-        setGradeOptions(grades);
-        if (grades.length > 0) {
-          setGrade(grades[0].value);
+        // Sort grades numerically (Grade 1, Grade 2, etc.)
+        const sortedGrades = [...grades].sort((a, b) => {
+          const gradeNumA = parseInt(a.label?.replace(/[^\d]/g, '') || '0', 10);
+          const gradeNumB = parseInt(b.label?.replace(/[^\d]/g, '') || '0', 10);
+          return gradeNumA - gradeNumB;
+        });
+        setGradeOptions(sortedGrades);
+        if (sortedGrades.length > 0) {
+          setGrade(sortedGrades[0].value);
         }
       } catch (error) {
         console.error("Failed to fetch grades:", error);
@@ -121,8 +141,26 @@ const ManagementStaff: React.FC = () => {
       }
     };
 
+    const fetchYears = async () => {
+      try {
+        const yearsData = await fetchYearsFromApi();
+        setYears(yearsData);
+        if (yearsData.length > 0) {
+          setYear(yearsData[0]);
+        }
+      } catch (error) {
+        console.error("Failed to fetch years:", error);
+        setSnackbar({
+          open: true,
+          message: "Failed to load year options",
+          severity: "error",
+        });
+      }
+    };
+
     if (checkAuthStatus()) {
       fetchGrades();
+      fetchYears();
     }
   }, []);
 
@@ -197,6 +235,12 @@ const ManagementStaff: React.FC = () => {
       setMonth("01");
     }
   };
+
+  // Memoize unique subjects from the data
+  const tableSubjects = React.useMemo(
+    () => getUniqueSubjectsFromClassData(data?.class_subject_marks),
+    [data?.class_subject_marks]
+  );
 
   return (
     <Box sx={{ display: "flex", width: "100%", minHeight: "100vh", overflow: "hidden" }}>
@@ -389,9 +433,13 @@ const ManagementStaff: React.FC = () => {
           )}
 
           {/* Charts Section */}
-          <Stack direction="column" spacing={isMobile ? 2 : 3}>
+          <Stack 
+            direction={isMobile ? "column" : "row"} 
+            spacing={isMobile ? 2 : 3}
+            sx={{ width: "100%" }}
+          >
             {/* Subject Distribution Chart */}
-            <Paper elevation={2} sx={{ p: isMobile ? 2 : 3, width: "100%" }}>
+            <Paper elevation={2} sx={{ p: isMobile ? 2 : 3, width: isMobile ? "100%" : "50%", flex: isMobile ? "unset" : 1 }}>
               <Typography variant={isMobile ? "subtitle1" : "h6"} fontWeight={600} mb={2}>
                 Subject Distribution
               </Typography>
@@ -448,12 +496,12 @@ const ManagementStaff: React.FC = () => {
             </Paper>
 
             {/* Class Performance Chart */}
-            <Paper elevation={2} sx={{ p: isMobile ? 2 : 3, width: "100%" }}>
+            <Paper elevation={2} sx={{ p: isMobile ? 2 : 3, width: isMobile ? "100%" : "50%", flex: isMobile ? "unset" : 1 }}>
               <Typography variant={isMobile ? "subtitle1" : "h6"} fontWeight={600} mb={2}>
                 Class Performance
               </Typography>
-              <Box sx={{ overflowX: "auto", width: "100%" }}>
-                <ResponsiveContainer width={isMobile ? 600 : "100%"} height={isMobile ? 280 : 350}>
+              <Box sx={{ width: "100%", overflowX: "auto" }}>
+                <ResponsiveContainer width="100%" height={isMobile ? 280 : 350} minWidth={isMobile ? 300 : 400}>
                   {isLoading ? (
                     <Box sx={{ display: "flex", justifyContent: "center", alignItems: "center", height: "100%" }}>
                       <CircularProgress />
@@ -488,48 +536,18 @@ const ManagementStaff: React.FC = () => {
                         wrapperStyle={{ fontSize: isMobile ? "10px" : "12px" }}
                         iconSize={isMobile ? 10 : 14}
                       />
-                      <Bar
-                        dataKey="Mathematics"
-                        name="Mathematics"
-                        stackId="1"
-                        fill={BAR_COLORS[0]}
-                        radius={[4, 4, 0, 0]}
-                      />
-                      <Bar
-                        dataKey="Science"
-                        name="Science"
-                        stackId="1"
-                        fill={BAR_COLORS[1]}
-                        radius={[4, 4, 0, 0]}
-                      />
-                      <Bar
-                        dataKey="English"
-                        name="English"
-                        stackId="1"
-                        fill={BAR_COLORS[2]}
-                        radius={[4, 4, 0, 0]}
-                      />
-                      <Bar
-                        dataKey="Sinhala"
-                        name="Sinhala"
-                        stackId="1"
-                        fill={BAR_COLORS[4]}
-                        radius={[4, 4, 0, 0]}
-                      />
-                      <Bar
-                        dataKey="History"
-                        name="History"
-                        stackId="1"
-                        fill={BAR_COLORS[6]}
-                        radius={[4, 4, 0, 0]}
-                      />
-                      <Bar
-                        dataKey="Buddhism"
-                        name="Buddhism"
-                        stackId="1"
-                        fill={BAR_COLORS[0]}
-                        radius={[4, 4, 0, 0]}
-                      />
+                      {getUniqueSubjectsFromClassData(data?.class_subject_marks).map(
+                        (subject: string, index: number) => (
+                          <Bar
+                            key={`bar-${subject}`}
+                            dataKey={subject}
+                            name={subject}
+                            stackId="1"
+                            fill={BAR_COLORS[index % BAR_COLORS.length]}
+                            radius={[4, 4, 0, 0]}
+                          />
+                        )
+                      )}
                     </BarChart>
                   )}
                 </ResponsiveContainer>
@@ -540,41 +558,47 @@ const ManagementStaff: React.FC = () => {
           {/* Table Section */}
           <Paper elevation={2} sx={{ p: isMobile ? 1.5 : 2, overflow: "auto" }}>
             <Typography variant={isMobile ? "subtitle1" : "h6"} fontWeight={600} mb={2} sx={{ px: isMobile ? 1 : 0 }}>
-              Detailed Marks Breakdown
+              Performance by Grade
             </Typography>
             <TableContainer sx={{ maxHeight: isMobile ? 400 : 600 }}>
               <Table size={isMobile ? "small" : "medium"} stickyHeader>
                 <TableHead>
                   <TableRow>
                     <TableCell sx={{ fontWeight: "bold", fontSize: isMobile ? "0.75rem" : "0.875rem", minWidth: isMobile ? 60 : 80 }}>Class</TableCell>
-                    <TableCell align="right" sx={{ fontSize: isMobile ? "0.75rem" : "0.875rem", minWidth: isMobile ? 50 : 70 }}>Eng</TableCell>
-                    <TableCell align="right" sx={{ fontSize: isMobile ? "0.75rem" : "0.875rem", minWidth: isMobile ? 50 : 70 }}>Math</TableCell>
-                    <TableCell align="right" sx={{ fontSize: isMobile ? "0.75rem" : "0.875rem", minWidth: isMobile ? 50 : 70 }}>Sci</TableCell>
-                    <TableCell align="right" sx={{ fontSize: isMobile ? "0.75rem" : "0.875rem", minWidth: isMobile ? 50 : 70 }}>Hist</TableCell>
-                    <TableCell align="right" sx={{ fontSize: isMobile ? "0.75rem" : "0.875rem", minWidth: isMobile ? 50 : 70 }}>Sin</TableCell>
-                    <TableCell align="right" sx={{ fontSize: isMobile ? "0.75rem" : "0.875rem", minWidth: isMobile ? 50 : 70 }}>Bud</TableCell>
-                    <TableCell align="right" sx={{ fontSize: isMobile ? "0.75rem" : "0.875rem", minWidth: isMobile ? 50 : 70 }}>Avg</TableCell>
+                    {tableSubjects.map((subject: string) => (
+                      <TableCell 
+                        key={`header-${subject}`}
+                        align="right" 
+                        sx={{ fontSize: isMobile ? "0.75rem" : "0.875rem", minWidth: isMobile ? 50 : 70 }}
+                      >
+                        {subject}
+                      </TableCell>
+                    ))}
+                    <TableCell align="right" sx={{ fontSize: isMobile ? "0.75rem" : "0.875rem", minWidth: isMobile ? 50 : 70 }}>Average</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
                   {isLoading ? (
                     <TableRow>
-                      <TableCell colSpan={8} align="center">
+                      <TableCell colSpan={tableSubjects.length + 2} align="center">
                         <CircularProgress size={24} />
                       </TableCell>
                     </TableRow>
                   ) : data?.tableData && data.tableData.length > 0 ? (
-                    data.tableData.map((row, idx) => (
+                    data.tableData.map((row: any, idx) => (
                       <TableRow key={idx} hover>
                         <TableCell sx={{ fontWeight: "bold", fontSize: isMobile ? "0.75rem" : "0.875rem" }}>
                           {row.class}
                         </TableCell>
-                        <TableCell align="right" sx={{ fontSize: isMobile ? "0.75rem" : "0.875rem" }}>{row.english}</TableCell>
-                        <TableCell align="right" sx={{ fontSize: isMobile ? "0.75rem" : "0.875rem" }}>{row.mathematics}</TableCell>
-                        <TableCell align="right" sx={{ fontSize: isMobile ? "0.75rem" : "0.875rem" }}>{row.science}</TableCell>
-                        <TableCell align="right" sx={{ fontSize: isMobile ? "0.75rem" : "0.875rem" }}>{row.history}</TableCell>
-                        <TableCell align="right" sx={{ fontSize: isMobile ? "0.75rem" : "0.875rem" }}>{row.sinhala}</TableCell>
-                        <TableCell align="right" sx={{ fontSize: isMobile ? "0.75rem" : "0.875rem" }}>{row.buddhism}</TableCell>
+                        {tableSubjects.map((subject: string) => (
+                          <TableCell 
+                            key={`cell-${idx}-${subject}`}
+                            align="right" 
+                            sx={{ fontSize: isMobile ? "0.75rem" : "0.875rem" }}
+                          >
+                            {(row as any)[subject.toLowerCase()] || 0}
+                          </TableCell>
+                        ))}
                         <TableCell align="right" sx={{ fontSize: isMobile ? "0.75rem" : "0.875rem" }}>
                           {row.overall_average || 0}
                         </TableCell>
@@ -582,9 +606,9 @@ const ManagementStaff: React.FC = () => {
                     ))
                   ) : (
                     <TableRow>
-                      <TableCell colSpan={8} align="center">
+                      <TableCell colSpan={tableSubjects.length + 2} align="center">
                         <Typography variant="body2" color="text.secondary" sx={{ fontSize: isMobile ? "0.75rem" : "0.875rem" }}>
-                          No data available for the selected criteria
+                          Marks have not been added to the subjects yet. Please check after submitting the marks.
                         </Typography>
                       </TableCell>
                     </TableRow>

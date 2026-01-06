@@ -41,21 +41,25 @@ import {
   fetchSubjects,
   fetchClasses,
   fetchCommonSettings,
+  fetchYears,
   createSchool, 
   createGrade,
   createSubject,
   createClass,
   createCommonSetting,
+  createYear,
   updateSchool, 
   updateGrade,
   updateSubject,
   updateClass,
   updateCommonSetting,
+  updateYear,
   deleteSchool, 
   deleteGrade,
   deleteSubject,
   deleteClass,
-  deleteCommonSetting
+  deleteCommonSetting,
+  deleteYear
 } from '../api/systemManagementApi';
 import Navbar from '../components/Navbar';
 
@@ -85,6 +89,7 @@ const SystemManagement = () => {
   const [grades, setGrades] = useState<any[]>([]);
   const [subjects, setSubjects] = useState<any[]>([]);
   const [classes, setClasses] = useState<any[]>([]);
+  const [years, setYears] = useState<any[]>([]);
   const [commonSettings, setCommonSettings] = useState<any[]>([]);
 
   // Form states
@@ -100,12 +105,16 @@ const SystemManagement = () => {
         switch (activeTab) {
           case 0: // Grades
             const gradesData = await fetchGrades();
-            setGrades(gradesData);
+            const sortedGrades = [...gradesData].sort((a, b) => {
+              // Extract numeric value from grade string (e.g., "Grade 1" -> 1)
+              const gradeNumA = parseInt(a.grade?.replace(/[^\d]/g, '') || '0', 10);
+              const gradeNumB = parseInt(b.grade?.replace(/[^\d]/g, '') || '0', 10);
+              return gradeNumA - gradeNumB; // Ascending order (Grade 1, 2, 3, etc.)
+            });
+            setGrades(sortedGrades);
             break;
           case 1: // Subjects
             const subjectsData = await fetchSubjects();
-            console.log('Subjects data from API :', subjectsData);
-            // Sort subjects alphabetically by mainSubject or subjectName
             const sortedSubjects = [...subjectsData].sort((a, b) => {
               const nameA = (a.mainSubject || a.subjectName || '').toLowerCase();
               const nameB = (b.mainSubject || b.subjectName || '').toLowerCase();
@@ -115,7 +124,6 @@ const SystemManagement = () => {
             break;
           case 2: // Classes
             const classesData = await fetchClasses();
-            // Sort classes alphabetically by class name
             const sortedClasses = [...classesData].sort((a, b) => {
               const nameA = (a.class || '').toLowerCase();
               const nameB = (b.class || '').toLowerCase();
@@ -123,7 +131,16 @@ const SystemManagement = () => {
             });
             setClasses(sortedClasses);
             break;
-          case 3: // Common Settings
+          case 3: // Years
+            const yearsData = await fetchYears();
+            const sortedYears = [...yearsData].sort((a, b) => {
+              const yearA = parseInt(a.year || '0');
+              const yearB = parseInt(b.year || '0');
+              return yearB - yearA; // Descending order (newest first)
+            });
+            setYears(sortedYears);
+            break;
+          case 4: // Common Settings
             const commonSettingsData = await fetchCommonSettings();
             setCommonSettings(commonSettingsData);
             break;
@@ -138,6 +155,60 @@ const SystemManagement = () => {
 
     fetchData();
   }, [activeTab]);
+
+  const refreshTabData = async () => {
+    try {
+      switch (activeTab) {
+        case 0: {
+          const gradesData = await fetchGrades();
+          const sortedGrades = [...gradesData].sort((a, b) => {
+            const gradeNumA = parseInt(a.grade?.replace(/[^\d]/g, '') || '0', 10);
+            const gradeNumB = parseInt(b.grade?.replace(/[^\d]/g, '') || '0', 10);
+            return gradeNumA - gradeNumB;
+          });
+          setGrades(sortedGrades);
+          break;
+        }
+        case 1: {
+          const subjectsData = await fetchSubjects();
+          const sortedSubjects = [...subjectsData].sort((a, b) => {
+            const nameA = (a.mainSubject || a.subjectName || '').toLowerCase();
+            const nameB = (b.mainSubject || b.subjectName || '').toLowerCase();
+            return nameA.localeCompare(nameB);
+          });
+          setSubjects(sortedSubjects);
+          break;
+        }
+        case 2: {
+          const classesData = await fetchClasses();
+          const sortedClasses = [...classesData].sort((a, b) => {
+            const nameA = (a.class || '').toLowerCase();
+            const nameB = (b.class || '').toLowerCase();
+            return nameA.localeCompare(nameB);
+          });
+          setClasses(sortedClasses);
+          break;
+        }
+        case 3: {
+          const yearsData = await fetchYears();
+          const sortedYears = [...yearsData].sort((a, b) => {
+            const yearA = parseInt(a.year || '0');
+            const yearB = parseInt(b.year || '0');
+            return yearB - yearA;
+          });
+          setYears(sortedYears);
+          break;
+        }
+        case 4: {
+          const commonSettingsData = await fetchCommonSettings();
+          setCommonSettings(commonSettingsData);
+          break;
+        }
+      }
+    } catch (error) {
+      console.error('Error refreshing tab data:', error);
+    }
+  };
 
   const handleTabChange = (_event: React.SyntheticEvent, newValue: number) => {
     setActiveTab(newValue);
@@ -176,38 +247,14 @@ const SystemManagement = () => {
         case 0: await deleteGrade(id); break; 
         case 1: await deleteSubject(id); break; 
         case 2: await deleteClass(id); break; 
-        case 3: await deleteCommonSetting(id); break; 
+        case 3: await deleteYear(id); break;
+        case 4: await deleteCommonSetting(id); break; 
         default: await deleteSchool(id); break;
       }
       showSnackbar('Item deleted successfully', 'success');
 
       // Refresh data
-      switch (activeTab) {
-        case 0: 
-          setGrades(await fetchGrades()); 
-          break;
-        case 1: 
-          const subjectsData = await fetchSubjects();
-          const sortedSubjects = [...subjectsData].sort((a, b) => {
-            const nameA = (a.mainSubject || a.subjectName || '').toLowerCase();
-            const nameB = (b.mainSubject || b.subjectName || '').toLowerCase();
-            return nameA.localeCompare(nameB);
-          });
-          setSubjects(sortedSubjects);
-          break;
-        case 2: 
-          const classesDataDeleted = await fetchClasses();
-          const sortedClassesDeleted = [...classesDataDeleted].sort((a, b) => {
-            const nameA = (a.class || '').toLowerCase();
-            const nameB = (b.class || '').toLowerCase();
-            return nameA.localeCompare(nameB);
-          });
-          setClasses(sortedClassesDeleted);
-          break;
-        case 3: 
-          setCommonSettings(await fetchCommonSettings()); 
-          break;
-      }
+      await refreshTabData();
     } catch (error) {
       console.error('Error deleting item:', error);
       showSnackbar('Failed to delete item', 'error');
@@ -226,8 +273,9 @@ const SystemManagement = () => {
         switch (activeTab) {
           case 0: await updateGrade(editId, formData); break; 
           case 1: await updateSubject(editId, formData); break; 
-          case 2: await updateClass(editId, formData); break; 
-          case 3: await updateCommonSetting(editId, formData); break; 
+          case 2: await updateClass(editId, formData); break;
+          case 3: await updateYear(editId, formData); break;
+          case 4: await updateCommonSetting(editId, formData); break; 
           default: await updateSchool(editId, formData); break;
         }
       } else {
@@ -241,8 +289,9 @@ const SystemManagement = () => {
               await createGrade(formData); 
               break; 
           case 1: await createSubject(formData); break; 
-          case 2: await createClass(formData); break; 
-          case 3: await createCommonSetting(formData); break; 
+          case 2: await createClass(formData); break;
+          case 3: await createYear(formData); break;
+          case 4: await createCommonSetting(formData); break; 
           default: await createSchool(formData); break;
         }
       }
@@ -251,32 +300,7 @@ const SystemManagement = () => {
       setOpenForm(false);
 
       // Refresh data
-      switch (activeTab) {
-        case 0: 
-          setGrades(await fetchGrades()); 
-          break;
-        case 1: 
-          const subjectsData = await fetchSubjects();
-          const sortedSubjects = [...subjectsData].sort((a, b) => {
-            const nameA = (a.mainSubject || a.subjectName || '').toLowerCase();
-            const nameB = (b.mainSubject || b.subjectName || '').toLowerCase();
-            return nameA.localeCompare(nameB);
-          });
-          setSubjects(sortedSubjects);
-          break;
-        case 2: 
-          const classesDataSubmit = await fetchClasses();
-          const sortedClassesSubmit = [...classesDataSubmit].sort((a, b) => {
-            const nameA = (a.class || '').toLowerCase();
-            const nameB = (b.class || '').toLowerCase();
-            return nameA.localeCompare(nameB);
-          });
-          setClasses(sortedClassesSubmit);
-          break;
-        case 3: 
-          setCommonSettings(await fetchCommonSettings()); 
-          break;
-      }
+      await refreshTabData();
     } catch (error: any) {
       console.error('Error saving data:', error);
 
@@ -296,8 +320,11 @@ const SystemManagement = () => {
           if (apiErrors.grade) {
              normalizedErrors.grade = apiErrors.grade[0];
           }
+          if (apiErrors.year) {
+             normalizedErrors.year = apiErrors.year[0];
+          }
           Object.keys(apiErrors).forEach(key => {
-             if (key !== 'subSubject' && key !== 'mainSubject' && key !== 'grade') {
+             if (key !== 'subSubject' && key !== 'mainSubject' && key !== 'grade' && key !== 'year') {
                  normalizedErrors[key] = apiErrors[key][0];
              }
           });
@@ -384,6 +411,19 @@ const SystemManagement = () => {
               </Typography>
             </>
           )}
+          {type === 'year' && (
+            <>
+              <Typography variant="h6" gutterBottom>
+                {item.year}
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                Updated: {item.updated_at}
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                Created: {item.created_at}
+              </Typography>
+            </>
+          )}
           {type === 'setting' && (
             <>
               <Typography variant="h6" gutterBottom>
@@ -452,7 +492,13 @@ const SystemManagement = () => {
               {classes.map((cls) => renderMobileCard(cls, 'class'))}
             </Box>
           );
-        case 3: // Common Settings
+        case 3: // Years
+          return (
+            <Box>
+              {years.map((year) => renderMobileCard(year, 'year'))}
+            </Box>
+          );
+        case 4: // Common Settings
           return (
             <Box>
               {commonSettings.map((setting) => renderMobileCard(setting, 'setting'))}
@@ -569,7 +615,41 @@ const SystemManagement = () => {
             </Table>
           </TableContainer>
         );
-      case 3: // Common Settings
+      case 3: // Years
+        return (
+          <TableContainer component={Paper} sx={{ overflowX: 'auto' }}>
+            <Table size={isTablet ? 'small' : 'medium'}>
+              <TableHead>
+                <TableRow>
+                  <TableCell>Year</TableCell>
+                  {!isTablet && <TableCell>Updated At</TableCell>}
+                  {!isTablet && <TableCell>Created At</TableCell>}
+                  <TableCell>Actions</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {years.map((year) => (
+                  <TableRow key={year.id}>
+                    <TableCell>{year.year}</TableCell>
+                    {!isTablet && <TableCell>{year.updated_at}</TableCell>}
+                    {!isTablet && <TableCell>{year.created_at}</TableCell>}
+                    <TableCell>
+                      <Box sx={{ display: 'flex', gap: 0.5 }}>
+                        <IconButton onClick={() => handleEditClick(year)} size="small">
+                          <EditIcon color="primary" fontSize="small" />
+                        </IconButton>
+                        <IconButton onClick={() => handleDeleteClick(year.id)} size="small">
+                          <DeleteIcon color="error" fontSize="small" />
+                        </IconButton>
+                      </Box>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </TableContainer>
+        );
+      case 4: // Common Settings
         return (
           <TableContainer component={Paper} sx={{ overflowX: 'auto' }}>
             <Table size={isTablet ? 'small' : 'medium'}>
@@ -685,7 +765,24 @@ const SystemManagement = () => {
             />
           </>
         );
-      case 3: // Common Settings
+      case 3: // Years
+        return (
+          <>
+            <TextField
+              fullWidth
+              label="Year"
+              name="year"
+              value={formData.year || ''}
+              onChange={handleFormChange}
+              margin="normal"
+              error={!!fieldErrors.year}
+              helperText={fieldErrors.year}
+              placeholder="e.g., 2024"
+              size={isMobile ? 'small' : 'medium'}
+            />
+          </>
+        );
+      case 4: // Common Settings
         return (
           <>
             <TextField
@@ -773,6 +870,7 @@ const SystemManagement = () => {
               <Tab label="Grades" />
               <Tab label="Subjects" />
               <Tab label="Classes" />
+              <Tab label="Years" />
               <Tab label="Common Setting" />
             </Tabs>
           </Box>

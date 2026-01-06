@@ -111,26 +111,26 @@ const ForgotPasswordDialog = ({ open, handleClose }: ForgotPasswordDialogProps) 
     return `${m}:${s}`;
   };
 
-  const handleSendOtp = async () => {
-    setError(null);
-    if (!email) {
-      setError("Email is required");
-      return;
-    }
+const handleSendOtp = async () => {
+  setError(null);
+  if (!email) {
+    setError("Email is required");
+    return;
+  }
 
-    setIsPending(true);
-    try {
-      await sendForgotPasswordOtp({ email });
-      enqueueSnackbar("OTP sent to your email", { variant: "info" });
-      setStep("verify");
-      // reset and start countdown whenever OTP is (re)sent
-      startCountdown(300);
-    } catch (err: any) {
-      setError(err?.message || "Failed to send OTP");
-    } finally {
-      setIsPending(false);
-    }
-  };
+  setIsPending(true);
+  try {
+    await sendForgotPasswordOtp({ email });
+    enqueueSnackbar("OTP sent to your email", { variant: "info" });
+    setStep("verify");
+    // reset and start countdown whenever OTP is (re)sent (3 minutes = 180 seconds)
+    startCountdown(180);
+  } catch (err: any) {
+    setError(err?.message || "Failed to send OTP");
+  } finally {
+    setIsPending(false);
+  }
+};
 
   const handleVerifyOtp = async () => {
     setError(null);
@@ -227,7 +227,7 @@ const ForgotPasswordDialog = ({ open, handleClose }: ForgotPasswordDialogProps) 
               Time remaining: {formatTime(remainingSeconds)}
             </Typography>
             <Typography variant="body2" color="text.secondary">
-              Didn't receive OTP? You can resend by clicking "Send OTP" again.
+              
             </Typography>
           </>
         )}

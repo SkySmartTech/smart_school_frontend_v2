@@ -86,6 +86,21 @@ export async function fetchGradesFromApi(): Promise<DropdownOption[]> {
   }
 }
 
+export async function fetchYearsFromApi(): Promise<string[]> {
+  try {
+    const res = await axios.get(`${API_BASE_URL}/api/years`, getAuthHeader());
+    if (!Array.isArray(res.data)) return [];
+
+    // Extract year values from objects if they contain a year property
+    return res.data.map((item: any) =>
+      typeof item === 'string' ? item : item.year
+    );
+  } catch (err) {
+    handleApiError(err, "fetchYearsFromApi");
+    return [];
+  }
+}
+
 /**
  * Fetch marks status data.
  * year: string (hardcoded value from UI)

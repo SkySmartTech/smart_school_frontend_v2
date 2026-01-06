@@ -35,6 +35,8 @@ export interface ClassTeacherReportData {
   subject_marks: SubjectMark[];
   student_marks: StudentMark[];
   yearly_subject_averages: YearlySubjectAverage[];
+  end_year?: number;
+  end_term?: string;
 }
 
 export async function fetchGradesFromApi(): Promise<DropdownOption[]> {
@@ -42,21 +44,74 @@ export async function fetchGradesFromApi(): Promise<DropdownOption[]> {
     const res = await axios.get(`${API_BASE_URL}/api/grades`, getAuthHeader());
     
     return Array.isArray(res.data)
-      ? res.data.map((item: any) => {
+      ? res.data
+        .map((item: any) => {
           // Extract the grade value - it could be in different fields
-          const gradeValue = item.grade || item.id || item.value || item.name || "";
-          
-          // Create the label with "Grade" prefix
-          const gradeLabel = gradeValue ? ` ${gradeValue}` : "Unknown Grade";
-          
+          const rawGrade = item.grade || item.id || item.value || item.name || "";
+          const gradeStr = rawGrade.toString();
+
+          // Try to extract a numeric part from the grade (e.g. "Grade 3" or "3")
+          const digitMatch = gradeStr.match(/\d+/);
+          const numericValue = digitMatch ? parseInt(digitMatch[0], 10) : NaN;
+
+          // Create a friendly label: "Grade X" when numeric, otherwise use the raw string
+          const gradeLabel = !isNaN(numericValue) ? `Grade ${numericValue}` : (gradeStr || "Unknown Grade");
+
           return {
             label: gradeLabel,
-            value: gradeValue.toString(), // Ensure value is a string
+            // Prefer a numeric string value when possible so consumers receive consistent values
+            value: !isNaN(numericValue) ? numericValue.toString() : gradeStr,
+            _sortValue: isNaN(numericValue) ? 999 : numericValue
+          };
+        })
+        .sort((a, b) => a._sortValue - b._sortValue)
+        .map(({ _sortValue, ...rest }) => rest)
+      : [];
+  } catch (error) {
+    handleApiError(error, "fetchGradesFromApi");
+    return [];
+  }
+}
+
+export async function fetchClassesFromApi(): Promise<DropdownOption[]> {
+  try {
+    const res = await axios.get(`${API_BASE_URL}/api/grade-classes`, getAuthHeader());
+    
+    return Array.isArray(res.data)
+      ? res.data
+        .map((item: any) => {
+          // Extract the class value from the class property
+          const classValue = item.class || item.id || item.value || item.name || "";
+          
+          return {
+            label: classValue.toString(),
+            value: classValue.toString(), // Ensure value is a string
+          };
+        })
+        .sort((a, b) => a.label.localeCompare(b.label))
+      : [];
+  } catch (error) {
+    handleApiError(error, "fetchClassesFromApi");
+    return [];
+  }
+}
+
+export async function fetchYearsFromApi(): Promise<DropdownOption[]> {
+  try {
+    const res = await axios.get(`${API_BASE_URL}/api/years`, getAuthHeader());
+    
+    return Array.isArray(res.data)
+      ? res.data.map((item: any) => {
+          const yearValue = item.year || item.id || item.value || "";
+          
+          return {
+            label: yearValue.toString(),
+            value: yearValue.toString(),
           };
         })
       : [];
   } catch (error) {
-    handleApiError(error, "fetchGradesFromApi");
+    handleApiError(error, "fetchYearsFromApi");
     return [];
   }
 }
@@ -78,8 +133,8 @@ const getAuthHeader = () => {
 };
 
 export const fetchClassTeacherReport = async (
-  startDate: string,
-  endDate: string,
+  startYear: string,
+  endYear: string,
   grade: string, 
   className: string,
   exam: string,
@@ -87,18 +142,13 @@ export const fetchClassTeacherReport = async (
 ): Promise<ClassTeacherReportData> => {
   try {
     // Validate inputs
-    if (!startDate || !endDate || !grade || !className || !exam) {
+    if (!startYear || !endYear || !grade || !className || !exam) {
       throw new Error('Missing required parameters');
     }
 
-    // Format dates to match required format (YYYY.MM.DD)
-    const formatDate = (date: string) => {
-      return date.replace(/-/g, '.');
-    };
-
     // Format the month parameter based on exam type
     let monthParam = "null";
-    if (exam === "Monthly") {
+    if (exam === "Monthly Test") {
       // Convert month number to month name for Monthly exam type
       const monthNames = {
         "01": "January", "02": "February", "03": "March", "04": "April",
@@ -109,7 +159,7 @@ export const fetchClassTeacherReport = async (
     }
 
     // Build base URL with required parameters
-    const apiUrl = `${API_BASE_URL}/api/teacher-report-data/${formatDate(startDate)}/${formatDate(endDate)}/${grade}/${className}/${exam}/${monthParam}`
+    const apiUrl = `${API_BASE_URL}/api/teacher-report-data/${startYear}/${endYear}/${grade}/${className}/${exam}/${monthParam}`
       .replace(/([^:]\/)\/+/g, "$1") // Remove any double slashes (except after http/https)
       .trim();
 
@@ -161,7 +211,9 @@ export const fetchClassTeacherReport = async (
           average_marks: transformMarks(subject.average_marks),
           percentage: transformMarks(subject.percentage)
         }))
-      })) || []
+      })) || [],
+      end_year: response.data.end_year,
+      end_term: response.data.end_term
     };
   } catch (error) {
     console.error('API Error:', error);

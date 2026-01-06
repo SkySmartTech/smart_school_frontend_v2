@@ -3,9 +3,6 @@ import { Navigate, Route, Routes } from "react-router-dom";
 import MainLayout from "./components/Layout/MainLayout";
 import PageLoader from "./components/PageLoader";
 import ProtectedRoute from "./components/ProtectedRoute";
-import UnauthorizedPage from "./views/UnauthorizedPage";
-import CommonDashboard from "./views/Dashboard/CommonDashboard";
-import TeacherDashboard from "./views/Dashboard/TeacherDashboard";
 import UserAccessManagementSystem from "./views/UserAccessManagementSystem";
 import ManagementStaff from "./views/Reports/ManagementStaffReport";
 import ClassTeacherReport from "./views/Reports/ClassTeacherReport";
@@ -22,15 +19,9 @@ const RegistrationPage = React.lazy(() => import("./views/RegistrationPage/Regis
 
 // Dashboard pages
 const AddMarks = React.lazy(() => import("./views/Dashboard/AddMarks"));
-const StudentDashboard = React.lazy(() => import("./views/Dashboard/StudentDashboard"));
+const EditMarks = React.lazy(() => import("./views/EditMarks"));
 const SystemManagementPage = React.lazy(() => import("./views/SystemMangementPage"));
 const UserProfile = React.lazy(() => import("./views/UserProfile"));
-
-// const HelpPage = React.lazy(() => import("./views/Dashboard/HelpPage"));
-// const SettingPage = React.lazy(() => import("./views/Dashboard/SettingPage"));
-// const DayPlanUpload = React.lazy(() => import("./views/Dashboard/DayPlan/DayPlanUpload"));
-// const DayPlanReport = React.lazy(() => import("./views/Dashboard/DayPlanReport/DayPlanReport"));
-// const DayPlanSummary = React.lazy(() => import("./views/Dashboard/DayPlanSummary/DayPlanSummary"));
 
 // // Administration pages
 
@@ -45,42 +36,11 @@ function AppRoutes() {
       {/* Public routes */}
       <Route path="/login" element={<LoginPage />} />
       <Route path="/register" element={<RegistrationPage />} />
-      <Route path="/unauthorized" element={<UnauthorizedPage />} />
+      {/* Removed UnauthorizedPage - redirecting unknown routes to login */}
 
       {/* Protected routes */}
       <Route element={<MainLayout />}>
-        <Route
-          path="/dashboard"
-          element={
-            <ProtectedRoute permission="dashboard">
-              <Suspense fallback={<PageLoader />}>
-                <CommonDashboard />
-              </Suspense>
-            </ProtectedRoute>
-          }
-        />
 
-        <Route
-          path="/studentdashboard"
-          element={
-            <ProtectedRoute permission="studentDashboard">
-              <Suspense fallback={<PageLoader />}>
-                <StudentDashboard />
-              </Suspense>
-            </ProtectedRoute>
-          }
-        />
-
-        <Route
-          path="/teacherdashboard"
-          element={
-            <ProtectedRoute permission="teacherDashboard">
-              <Suspense fallback={<PageLoader />}>
-                <TeacherDashboard />
-              </Suspense>
-            </ProtectedRoute>
-          }
-        />
 
         <Route
           path="/userprofile"
@@ -127,11 +87,11 @@ function AppRoutes() {
         />
 
         <Route
-          path="/addStudent"
+          path="/editMarks"
           element={
-            <ProtectedRoute permission="addStudent">
+            <ProtectedRoute permission="editMarks">
               <Suspense fallback={<PageLoader />}>
-                <AddStudent />
+                <EditMarks />
               </Suspense>
             </ProtectedRoute>
           }
@@ -266,10 +226,10 @@ function AppRoutes() {
       <Route
         path="/"
         element={
-          <Navigate to="/dashboard" replace />
+          <Navigate to="/userProfile" replace />
         }
       />
-      <Route path="*" element={<Navigate to="/unauthorized" replace />} />
+      <Route path="*" element={<Navigate to="/userProfile" replace />} />
     </Routes>
   );
 }

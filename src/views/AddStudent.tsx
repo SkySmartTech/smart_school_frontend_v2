@@ -44,6 +44,7 @@ import {
   promoteStudents,
   getAvailableGrades,
   getAvailableClasses,
+  getAvailableYears,
   fetchClassStudents,
   type Student,
   type PromoteStudentsRequest
@@ -66,8 +67,7 @@ const AddStudent = () => {
   const [classFilter, setClassFilter] = useState("");
 
   // Available options
-  const YEARS = ["2023", "2024", "2025", "2026", "2027", "2028", "2029", "2030"];
-  const [years] = useState<string[]>(YEARS);
+  const [years, setYears] = useState<string[]>([]);
   const [grades, setGrades] = useState<(string | GradeOption)[]>([]);
   const [classes, setClasses] = useState<string[]>([]);
 
@@ -98,9 +98,10 @@ const AddStudent = () => {
   // Notification
   const [snackbar, setSnackbar] = useState({ open: false, message: "", severity: "success" as "success" | "error" });
 
-  // Load available grade options on mount
+  // Load available grade options and years on mount
   useEffect(() => {
     void loadAvailableGrades();
+    void loadAvailableYearsData();
   }, []);
 
   // Load students when filters change (year, grade, class)
@@ -131,6 +132,71 @@ const AddStudent = () => {
     }
   }, [grade]);
 
+  // Load classes when current grade filter in dialog changes
+  useEffect(() => {
+    if (currentGradeFilter) {
+      const loadClassesForCurrentGrade = async () => {
+        try {
+          const classesData = await getAvailableClasses(currentGradeFilter);
+          setClasses(classesData);
+        } catch (error) {
+          showSnackbar("Failed to load classes for current grade", "error");
+          setClasses([]);
+        }
+      };
+      void loadClassesForCurrentGrade();
+    } else {
+      setClasses([]);
+      setCurrentClassFilter("");
+    }
+  }, [currentGradeFilter]);
+
+  // Load students for dialog when dialog filters change
+  useEffect(() => {
+    if (dialogOpen && currentYearFilter && currentGradeFilter && currentClassFilter) {
+      const loadStudentsForDialog = async () => {
+        try {
+          const studentsData = await fetchClassStudents(currentYearFilter, currentGradeFilter, currentClassFilter);
+          setStudents(studentsData);
+        } catch (error) {
+          showSnackbar("Failed to load students for dialog", "error");
+          setStudents([]);
+        }
+      };
+      void loadStudentsForDialog();
+    }
+  }, [dialogOpen, currentYearFilter, currentGradeFilter, currentClassFilter]);
+
+  useEffect(() => {
+    if (currentGradeFilter) {
+      const loadClassesForCurrentGrade = async () => {
+        try {
+          const classesData = await getAvailableClasses(currentGradeFilter);
+          setClasses(classesData);
+        } catch (error) {
+          showSnackbar("Failed to load classes for current grade", "error");
+        }
+      };
+      void loadClassesForCurrentGrade();
+    }
+  }, [currentGradeFilter]);
+
+  // Load students for dialog when dialog filters change
+  useEffect(() => {
+    if (dialogOpen && currentYearFilter && currentGradeFilter && currentClassFilter) {
+      const loadStudentsForDialog = async () => {
+        try {
+          const studentsData = await fetchClassStudents(currentYearFilter, currentGradeFilter, currentClassFilter);
+          setStudents(studentsData);
+        } catch (error) {
+          showSnackbar("Failed to load students for dialog", "error");
+          setStudents([]);
+        }
+      };
+      void loadStudentsForDialog();
+    }
+  }, [dialogOpen, currentYearFilter, currentGradeFilter, currentClassFilter]);
+
   useEffect(() => {
     if (nextGrade) {
       const loadClassesForNextGrade = async () => {
@@ -151,6 +217,19 @@ const AddStudent = () => {
       setGrades(gradesData);
     } catch (error) {
       showSnackbar("Failed to load available grades", "error");
+    }
+  };
+
+  const loadAvailableYearsData = async () => {
+    try {
+      const yearsData = await getAvailableYears();
+      // Extract year values from objects if they contain a year property
+      const extractedYears = yearsData.map((item: any) => 
+        typeof item === 'string' ? item : item.year
+      );
+      setYears(extractedYears);
+    } catch (error) {
+      showSnackbar("Failed to load available years", "error");
     }
   };
 
@@ -336,6 +415,29 @@ const AddStudent = () => {
 
       setUploadedStudents(cleaned);
       setExcelUploaded(true);
+      // Populate selected students and next-year details from the uploaded file
+      setSelectedStudents(cleaned);
+
+      // Use the first row to populate next year/grade/class fields
+      const first = cleaned[0];
+      const candidateNextYear = first?.year ?? "";
+      const candidateNextGrade = first?.grade ?? "";
+      const candidateNextClass = first?.class ?? "";
+
+      setNextYear(candidateNextYear);
+      setNextGrade(candidateNextGrade);
+      setNextClass(candidateNextClass);
+
+      // Load classes for the next grade so the Next Class dropdown is populated
+      if (candidateNextGrade) {
+        try {
+          const classesData = await getAvailableClasses(candidateNextGrade);
+          setClasses(classesData);
+        } catch (err) {
+          showSnackbar("Failed to load classes for uploaded next grade", "error");
+        }
+      }
+
       showSnackbar(`Loaded ${cleaned.length} students from Excel.`, "success");
     } catch (e) {
       console.error(e);
@@ -360,24 +462,31 @@ const AddStudent = () => {
 
   const downloadSampleExcel = () => {
     try {
-      const sample = [
-        {
-          "Admission No": "A001",
-          "Name": "Sunita Suren",
-          "Grade": "Grade 1",
-          "Class": "A",
-          "Medium": "English",
-          "Year": "2024"
-        }
-      ];
+      const dataToExport = excelUploaded ? uploadedStudents : dialogDisplayStudents;
+      if (!dataToExport || dataToExport.length === 0) {
+        showSnackbar("No students to export", "error");
+        return;
+      }
 
-      const worksheet = XLSX.utils.json_to_sheet(sample, { header: ["Admission No", "Name", "Grade", "Class", "Medium", "Year"] });
+      const mapped = dataToExport.map(s => ({
+        "Admission No": s.admissionNo || "",
+        "Name": s.name || "",
+        "Grade": s.grade || "",
+        "Class": s.class || "",
+        "Medium": s.medium || "",
+        "Year": s.year || ""
+      }));
+
+      const header = ["Admission No", "Name", "Grade", "Class", "Medium", "Year"];
+      const worksheet = XLSX.utils.json_to_sheet(mapped, { header });
       const workbook = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(workbook, worksheet, "Students");
-      XLSX.writeFile(workbook, "student_promotion_sample.xlsx");
+      const fileName = excelUploaded ? "uploaded_students.xlsx" : "students_export.xlsx";
+      XLSX.writeFile(workbook, fileName);
+      showSnackbar(`Downloaded ${mapped.length} students.`, "success");
     } catch (err) {
-      console.error("Failed to generate sample Excel", err);
-      showSnackbar("Failed to generate sample file", "error");
+      console.error("Failed to export students", err);
+      showSnackbar("Failed to generate export file", "error");
     }
   };
 
@@ -554,9 +663,14 @@ const AddStudent = () => {
 
           {/* Students Table */}
           <Paper sx={{ p: { xs: 1.5, sm: 2 } }}>
-            <Typography variant={isMobile ? "subtitle1" : "h6"} gutterBottom>
-              Students List
-            </Typography>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+              <Typography variant={isMobile ? "subtitle1" : "h6"} gutterBottom sx={{ mb: 0 }}>
+                Students List
+              </Typography>
+              <Typography variant={isMobile ? "caption" : "body2"} sx={{ fontWeight: 'bold', color: 'primary.main' }}>
+                Total: {students.length} {students.length === 1 ? 'Student' : 'Students'}
+              </Typography>
+            </Box>
             {loading ? (
               <Box sx={{ display: 'flex', justifyContent: 'center', p: 3 }}>
                 <CircularProgress />
@@ -643,7 +757,7 @@ const AddStudent = () => {
                 </Button>
 
                 <Button variant="outlined" onClick={downloadSampleExcel} fullWidth={isMobile} size={isMobile ? "small" : "medium"}>
-                  {isMobile ? "Sample" : "Download Sample"}
+                  {isMobile ? "Sample" : "Download Selected Students"}
                 </Button>
 
                 {excelUploaded && (
